@@ -9,6 +9,10 @@ import io.javalin.http.ForbiddenResponse
  *
  * Applications override this to customise the 403 response (body, headers, problem+json, etc.).
  * The default implementation responds with a bare `403 Forbidden`.
+ *
+ * Implementations do not need to throw to stop the request: the guard skips all remaining handlers
+ * after invoking this callback, so the matched handler is never reached. Simply rendering the desired
+ * response (status, headers, body) is sufficient.
  */
 fun interface AccessDeniedHandler {
 

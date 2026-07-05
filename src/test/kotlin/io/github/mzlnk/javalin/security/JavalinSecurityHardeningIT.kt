@@ -217,6 +217,73 @@ class JavalinSecurityHardeningIT {
         assertThat(response.body.string()).doesNotContain("super secret internal reason")
     }
 
+    @Test
+    fun `should not run the matched handler when a custom entry point does not throw`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.configureSecurity(
+                config {
+                    authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
+                    // A natural but unsafe implementation: render a 401 and return without throwing.
+                    authenticationEntryPoint { ctx, _ -> ctx.status(401).result("denied-without-throwing") }
+                },
+            )
+            cfg.routes.get("/api/v1/resource") { it.result("protected-content") }
+        },
+    ) { _, client ->
+        // when: an anonymous caller hits an authenticated rule
+        val response = client.get("/api/v1/resource")
+
+        // then: the guard halts the request, so the protected handler never runs
+        assertThat(response.code).isEqualTo(401)
+        val body = response.body.string()
+        assertThat(body).isEqualTo("denied-without-throwing")
+        assertThat(body).doesNotContain("protected-content")
+    }
+
+    @Test
+    fun `should not run the matched handler when a custom access denied handler does not throw`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.configureSecurity(
+                config {
+                    authorizeRequests { authorize("/api/v1/**", GET, hasRole("ADMIN")) }
+                    // Render a 403 and return without throwing.
+                    accessDeniedHandler { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") }
+                    authenticationProvider(headerProvider)
+                },
+            )
+            cfg.routes.get("/api/v1/resource") { it.result("protected-content") }
+        },
+    ) { _, client ->
+        // when: an authenticated caller lacking the role
+        val response = client.get("/api/v1/resource") { it.header("X-User", "bob") }
+
+        // then: the guard halts the request, so the protected handler never runs
+        assertThat(response.code).isEqualTo(403)
+        val body = response.body.string()
+        assertThat(body).isEqualTo("forbidden-without-throwing")
+        assertThat(body).doesNotContain("protected-content")
+    }
+
+    @Test
+    fun `should authorize a parameterized route against the matched route template`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.configureSecurity(
+                config {
+                    authorizeRequests { authorize("/api/v1/users/**", GET, denyAll) }
+                    authenticationProvider(headerProvider)
+                },
+            )
+            cfg.routes.get("/api/v1/users/{id}") { it.result("user-${it.pathParam("id")}") }
+        },
+    ) { _, client ->
+        // when: a concrete request to the parameterized route
+        val response = client.get("/api/v1/users/42") { it.header("X-User", "bob") }
+
+        // then: authorization is evaluated against the matched template /api/v1/users/{id}
+        assertThat(response.code).isEqualTo(403)
+        assertThat(response.body.string()).doesNotContain("user-42")
+    }
+
     private fun config(init: io.github.mzlnk.javalin.security.http.HttpConfig.Dsl.() -> Unit): JavalinSecurityConfig =
         object : JavalinSecurityConfig {
             override val security = javalinSecurity { http(init) }

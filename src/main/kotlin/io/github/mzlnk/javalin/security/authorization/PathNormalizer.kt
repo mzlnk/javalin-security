@@ -11,21 +11,19 @@ package io.github.mzlnk.javalin.security.authorization
  *
  * Case sensitivity is intentionally handled by [AntPathMatcher] (via a case-insensitive regex)
  * rather than here, so patterns and paths keep their original casing for logging.
+ *
+ * The context path is supplied per call (from `context.contextPath()`) and stripped with a plain
+ * `removePrefix`, mirroring Javalin's own `ctx.path().removePrefix(ctx.contextPath())` so the two
+ * layers operate on the exact same request path and cannot diverge.
  */
 internal class PathNormalizer(
-    contextPath: String,
     private val ignoreTrailingSlashes: Boolean,
     private val treatMultipleSlashesAsSingleSlash: Boolean,
 ) {
 
-    private val contextPath: String = contextPath.takeIf { it != "/" }?.trimEnd('/') ?: ""
+    fun normalize(rawPath: String, contextPath: String): String {
+        var path = rawPath.removePrefix(contextPath)
 
-    fun normalize(rawPath: String): String {
-        var path = rawPath
-
-        if (contextPath.isNotEmpty() && path.startsWith(contextPath)) {
-            path = path.removePrefix(contextPath)
-        }
         if (path.isEmpty()) {
             path = "/"
         }

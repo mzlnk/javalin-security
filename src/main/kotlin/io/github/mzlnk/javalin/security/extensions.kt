@@ -38,7 +38,6 @@ fun JavalinConfig.configureSecurity(config: JavalinSecurityConfig) {
     )
 
     val pathNormalizer = PathNormalizer(
-        contextPath = router.contextPath,
         ignoreTrailingSlashes = router.ignoreTrailingSlashes,
         treatMultipleSlashesAsSingleSlash = router.treatMultipleSlashesAsSingleSlash,
     )

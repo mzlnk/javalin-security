@@ -26,7 +26,7 @@ internal class SecurityGuard(
 
     fun handle(context: Context) {
         val method = context.method()
-        val path = pathNormalizer.normalize(context.path())
+        val path = authorizationPath(context)
 
         val authentication = when (val result = authenticationManager.authenticate(context)) {
             is AuthenticationResult.Success -> result.authentication
@@ -36,6 +36,7 @@ internal class SecurityGuard(
                 // leaking why authentication failed.
                 log.warn("Authentication failed for {} {}: {}", method, path, result.message ?: "no detail", result.cause)
                 authenticationEntryPoint.commence(context, result)
+                context.skipRemainingHandlers()
                 return
             }
         }
@@ -52,11 +53,26 @@ internal class SecurityGuard(
         if (authentication.isAuthenticated) {
             log.warn("Access denied to {} for {} {}", principalName(authentication), method, path)
             accessDeniedHandler.handle(context, authentication)
+            context.skipRemainingHandlers()
         } else {
             log.warn("Access denied to anonymous caller for {} {}", method, path)
             authenticationEntryPoint.commence(context, null)
+            context.skipRemainingHandlers()
         }
     }
+
+    /**
+     * Resolves the path that authorization rules are evaluated against.
+     *
+     * For a matched dynamic route this is Javalin's own matched route template (e.g. `/users/{id}`),
+     * which is bypass-proof because it is exactly what the router dispatched to. For requests with no
+     * matched HTTP endpoint (static files, single-page-app fallback, HEAD served by a GET resource)
+     * it falls back to the request path sourced from `context.path()` with the runtime context path
+     * removed - the same input Javalin routes on - normalized for trailing/duplicate slashes.
+     */
+    private fun authorizationPath(context: Context): String =
+        context.endpoints().matchedHttpEndpoint()?.path
+            ?: pathNormalizer.normalize(context.path(), context.contextPath())
 
     private fun principalName(authentication: Authentication): String =
         (authentication.principal as? AuthenticatedPrincipal)?.name ?: "anonymous"

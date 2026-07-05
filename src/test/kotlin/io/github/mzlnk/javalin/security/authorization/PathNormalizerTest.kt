@@ -7,45 +7,45 @@ class PathNormalizerTest {
 
     @Test
     fun `should strip a trailing slash when configured`() {
-        val normalizer = PathNormalizer(contextPath = "/", ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = false)
+        val normalizer = PathNormalizer(ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = false)
 
-        assertThat(normalizer.normalize("/api/v1/users/")).isEqualTo("/api/v1/users")
-        assertThat(normalizer.normalize("/api/v1/users")).isEqualTo("/api/v1/users")
+        assertThat(normalizer.normalize("/api/v1/users/", "")).isEqualTo("/api/v1/users")
+        assertThat(normalizer.normalize("/api/v1/users", "")).isEqualTo("/api/v1/users")
     }
 
     @Test
     fun `should keep the trailing slash when not configured to ignore it`() {
-        val normalizer = PathNormalizer(contextPath = "/", ignoreTrailingSlashes = false, treatMultipleSlashesAsSingleSlash = false)
+        val normalizer = PathNormalizer(ignoreTrailingSlashes = false, treatMultipleSlashesAsSingleSlash = false)
 
-        assertThat(normalizer.normalize("/api/v1/users/")).isEqualTo("/api/v1/users/")
+        assertThat(normalizer.normalize("/api/v1/users/", "")).isEqualTo("/api/v1/users/")
     }
 
     @Test
     fun `should preserve the root path`() {
-        val normalizer = PathNormalizer(contextPath = "/", ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = false)
+        val normalizer = PathNormalizer(ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = false)
 
-        assertThat(normalizer.normalize("/")).isEqualTo("/")
+        assertThat(normalizer.normalize("/", "")).isEqualTo("/")
     }
 
     @Test
     fun `should collapse multiple slashes when configured`() {
-        val normalizer = PathNormalizer(contextPath = "/", ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = true)
+        val normalizer = PathNormalizer(ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = true)
 
-        assertThat(normalizer.normalize("/api//v1///users")).isEqualTo("/api/v1/users")
+        assertThat(normalizer.normalize("/api//v1///users", "")).isEqualTo("/api/v1/users")
     }
 
     @Test
     fun `should not collapse multiple slashes by default`() {
-        val normalizer = PathNormalizer(contextPath = "/", ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = false)
+        val normalizer = PathNormalizer(ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = false)
 
-        assertThat(normalizer.normalize("/api//v1")).isEqualTo("/api//v1")
+        assertThat(normalizer.normalize("/api//v1", "")).isEqualTo("/api//v1")
     }
 
     @Test
-    fun `should strip the configured context path`() {
-        val normalizer = PathNormalizer(contextPath = "/blog", ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = false)
+    fun `should strip the runtime context path`() {
+        val normalizer = PathNormalizer(ignoreTrailingSlashes = true, treatMultipleSlashesAsSingleSlash = false)
 
-        assertThat(normalizer.normalize("/blog/api/v1/users")).isEqualTo("/api/v1/users")
-        assertThat(normalizer.normalize("/blog")).isEqualTo("/")
+        assertThat(normalizer.normalize("/blog/api/v1/users", "/blog")).isEqualTo("/api/v1/users")
+        assertThat(normalizer.normalize("/blog", "/blog")).isEqualTo("/")
     }
 }

@@ -15,6 +15,10 @@ import io.javalin.http.UnauthorizedResponse
  *
  * The default implementation responds with a generic 401 and never echoes the provider's failure
  * message back to the client, to avoid leaking why authentication failed.
+ *
+ * Implementations do not need to throw to stop the request: the guard skips all remaining handlers
+ * after invoking this callback, so the matched handler is never reached. Simply rendering the desired
+ * response (status, headers, body) is sufficient.
  */
 fun interface AuthenticationEntryPoint {
 
