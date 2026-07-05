@@ -10,16 +10,19 @@ package io.github.mzlnk.javalin.security.authorization
  * - `**` matches zero or more path segments (crosses `/`)
  *
  * The compiled [Regex] is built once per pattern so matching stays cheap on the request path.
+ *
+ * When [caseInsensitive] is set (to align with Javalin's `caseInsensitiveRoutes`), matching ignores
+ * character case.
  */
-internal class AntPathMatcher(val pattern: String) {
+internal class AntPathMatcher(val pattern: String, caseInsensitive: Boolean = false) {
 
-    private val regex: Regex = compile(pattern)
+    private val regex: Regex = compile(pattern, caseInsensitive)
 
     fun matches(path: String): Boolean = regex.matches(path)
 
     private companion object {
 
-        fun compile(pattern: String): Regex {
+        fun compile(pattern: String, caseInsensitive: Boolean): Regex {
             val sb = StringBuilder()
             var i = 0
             while (i < pattern.length) {
@@ -51,7 +54,8 @@ internal class AntPathMatcher(val pattern: String) {
                 }
                 i++
             }
-            return Regex(sb.toString())
+            val options = if (caseInsensitive) setOf(RegexOption.IGNORE_CASE) else emptySet()
+            return Regex(sb.toString(), options)
         }
 
     }

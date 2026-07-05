@@ -9,9 +9,9 @@ import io.javalin.http.Context
  * libraries implement this interface (for example, by extracting a token and verifying it) and
  * register it through the security DSL.
  *
- * Only one provider is supported by design. To combine multiple authentication strategies, compose
- * them into a single provider that delegates as needed - the framework intentionally keeps that
- * logic out of the core.
+ * Multiple providers may be registered; the default [AuthenticationManager] tries them in
+ * registration order and the first decisive result wins. For bespoke orchestration, supply a custom
+ * [AuthenticationManager] instead.
  */
 fun interface AuthenticationProvider {
 
@@ -26,9 +26,8 @@ fun interface AuthenticationProvider {
     companion object {
 
         /**
-         * The default provider used when none is configured. It never authenticates, so every
-         * request is treated as anonymous. Having a real instance keeps the provider non-nullable
-         * throughout the framework.
+         * A no-op provider that never authenticates, so every request is treated as anonymous.
+         * Useful as an explicit placeholder or in tests.
          */
         val NONE: AuthenticationProvider = AuthenticationProvider { AuthenticationResult.NotAuthenticated }
 

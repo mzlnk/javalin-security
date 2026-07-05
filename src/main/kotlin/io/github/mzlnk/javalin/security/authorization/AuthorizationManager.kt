@@ -11,6 +11,10 @@ import io.javalin.http.HandlerType
  * no entry is denied. This component performs no control flow via exceptions - it returns whether
  * access is [granted][isGranted] and leaves the response decision to the
  * [io.github.mzlnk.javalin.security.SecurityGuard].
+ *
+ * Matching operates on the already-normalized request path (see
+ * [io.github.mzlnk.javalin.security.authorization.PathNormalizer]) so it stays consistent with
+ * Javalin's own route matching.
  */
 internal class AuthorizationManager(
     private val entries: List<Entry>,
@@ -20,15 +24,25 @@ internal class AuthorizationManager(
         pattern: String,
         val method: HandlerType?,
         val rule: AuthorizationRule,
+        caseInsensitive: Boolean = false,
     ) {
-        private val matcher = AntPathMatcher(pattern)
+        private val matcher = AntPathMatcher(pattern, caseInsensitive)
 
-        fun matches(context: Context): Boolean =
-            (method == null || method == context.method()) && matcher.matches(context.path())
+        fun matches(method: HandlerType, path: String): Boolean =
+            methodMatches(method) && matcher.matches(path)
+
+        private fun methodMatches(requestMethod: HandlerType): Boolean = when {
+            method == null -> true
+            method == requestMethod -> true
+            // Javalin serves HEAD requests through the matched GET handler, so a GET rule must
+            // also govern the corresponding HEAD request.
+            method == HandlerType.GET && requestMethod == HandlerType.HEAD -> true
+            else -> false
+        }
     }
 
-    fun isGranted(context: Context, authentication: Authentication): Boolean {
-        val matched = entries.firstOrNull { it.matches(context) } ?: return false
+    fun isGranted(method: HandlerType, path: String, authentication: Authentication, context: Context): Boolean {
+        val matched = entries.firstOrNull { it.matches(method, path) } ?: return false
         return matched.rule.isGranted(authentication, context)
     }
 

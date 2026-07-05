@@ -1,41 +1,31 @@
 package io.github.mzlnk.javalin.security.http.authorize
 
-import io.github.mzlnk.javalin.security.authorization.AuthorizationManager
 import io.github.mzlnk.javalin.security.authorization.AuthorizationRule
+import io.github.mzlnk.javalin.security.authorization.AuthorizationRuleFactory
 import io.github.mzlnk.javalin.security.authorization.AuthorizationRules
 import io.javalin.http.HandlerType
 
 /**
- * Holds the compiled authorization rules for the `authorizeRequests { }` block.
+ * Holds the raw authorization rule declarations for the `authorizeRequests { }` block.
+ *
+ * The declarations are kept as plain [Entry] specs (not a compiled matcher) because the correct
+ * path-normalization and case-sensitivity settings are only known once the security is installed
+ * into a Javalin instance. They are compiled at that point by
+ * [io.github.mzlnk.javalin.security.configureSecurity].
  */
 class AuthorizeRequestsConfig internal constructor(
-    internal val authorizationManager: AuthorizationManager,
+    internal val entries: List<Entry>,
 ) {
 
-    class Dsl {
+    class Entry internal constructor(
+        internal val pattern: String,
+        internal val method: HandlerType?,
+        internal val rule: AuthorizationRule,
+    )
 
-        private val entries = mutableListOf<AuthorizationManager.Entry>()
+    class Dsl : AuthorizationRuleFactory by AuthorizationRules {
 
-        /** Always grants access, even to unauthenticated callers. */
-        val permitAll: AuthorizationRule get() = AuthorizationRules.permitAll
-
-        /** Never grants access. */
-        val denyAll: AuthorizationRule get() = AuthorizationRules.denyAll
-
-        /** Grants access to any authenticated caller. */
-        val authenticated: AuthorizationRule get() = AuthorizationRules.authenticated
-
-        /** Grants access when the caller holds the role, i.e. the authority `ROLE_<role>`. */
-        fun hasRole(role: String): AuthorizationRule = AuthorizationRules.hasRole(role)
-
-        /** Grants access when the caller holds at least one of the given roles. */
-        fun hasAnyRole(vararg roles: String): AuthorizationRule = AuthorizationRules.hasAnyRole(*roles)
-
-        /** Grants access when the caller holds the given [authority]. */
-        fun hasAuthority(authority: String): AuthorizationRule = AuthorizationRules.hasAuthority(authority)
-
-        /** Grants access when the caller holds at least one of the given [authorities]. */
-        fun hasAnyAuthority(vararg authorities: String): AuthorizationRule = AuthorizationRules.hasAnyAuthority(*authorities)
+        private val entries = mutableListOf<Entry>()
 
         /**
          * Registers a rule for requests matching [pattern] with the given HTTP [method].
@@ -44,7 +34,7 @@ class AuthorizeRequestsConfig internal constructor(
          * `authorize("/x", GET) { auth, ctx -> ... }`.
          */
         fun authorize(pattern: String, method: HandlerType, rule: AuthorizationRule) {
-            entries += AuthorizationManager.Entry(pattern = pattern, method = method, rule = rule)
+            entries += Entry(pattern = pattern, method = method, rule = rule)
         }
 
         /**
@@ -53,11 +43,20 @@ class AuthorizeRequestsConfig internal constructor(
          * A custom rule may be supplied as a trailing lambda.
          */
         fun authorize(pattern: String, rule: AuthorizationRule) {
-            entries += AuthorizationManager.Entry(pattern = pattern, method = null, rule = rule)
+            entries += Entry(pattern = pattern, method = null, rule = rule)
         }
 
-        fun build(): AuthorizeRequestsConfig =
-            AuthorizeRequestsConfig(authorizationManager = AuthorizationManager(entries.toList()))
+        /**
+         * Registers a terminal catch-all rule applied to every request (any path, any method).
+         *
+         * Because matching is first-match-wins, this should be declared last; it mirrors Spring
+         * Security's `anyRequest()` and reduces the risk of leaving routes uncovered.
+         */
+        fun anyRequest(rule: AuthorizationRule) {
+            entries += Entry(pattern = "/**", method = null, rule = rule)
+        }
+
+        fun build(): AuthorizeRequestsConfig = AuthorizeRequestsConfig(entries = entries.toList())
 
     }
 

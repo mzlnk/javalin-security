@@ -25,7 +25,7 @@ class AuthorizationManagerTest {
         )
 
         // when
-        val granted = manager.isGranted(mockContext(HandlerType.GET, "/api/x"), anonymous)
+        val granted = manager.isGranted(HandlerType.GET, "/api/x", anonymous, mockContext())
 
         // then: first-match-wins grants access
         assertThat(granted).isTrue()
@@ -39,7 +39,7 @@ class AuthorizationManagerTest {
         )
 
         // when
-        val granted = manager.isGranted(mockContext(HandlerType.GET, "/private"), authenticated())
+        val granted = manager.isGranted(HandlerType.GET, "/private", authenticated(), mockContext())
 
         // then
         assertThat(granted).isFalse()
@@ -53,7 +53,7 @@ class AuthorizationManagerTest {
         )
 
         // when: a GET does not match the POST rule
-        val granted = manager.isGranted(mockContext(HandlerType.GET, "/api/x"), anonymous)
+        val granted = manager.isGranted(HandlerType.GET, "/api/x", anonymous, mockContext())
 
         // then
         assertThat(granted).isFalse()
@@ -67,7 +67,21 @@ class AuthorizationManagerTest {
         )
 
         // when
-        val granted = manager.isGranted(mockContext(HandlerType.DELETE, "/api/x"), anonymous)
+        val granted = manager.isGranted(HandlerType.DELETE, "/api/x", anonymous, mockContext())
+
+        // then
+        assertThat(granted).isTrue()
+    }
+
+    @Test
+    fun `should treat HEAD as GET when matching a GET rule`() {
+        // given
+        val manager = AuthorizationManager(
+            listOf(AuthorizationManager.Entry("/api/**", HandlerType.GET, AuthorizationRules.permitAll)),
+        )
+
+        // when
+        val granted = manager.isGranted(HandlerType.HEAD, "/api/x", anonymous, mockContext())
 
         // then
         assertThat(granted).isTrue()
@@ -81,7 +95,7 @@ class AuthorizationManagerTest {
         )
 
         // when
-        val granted = manager.isGranted(mockContext(HandlerType.GET, "/api/x"), authenticated("ROLE_USER"))
+        val granted = manager.isGranted(HandlerType.GET, "/api/x", authenticated("ROLE_USER"), mockContext())
 
         // then
         assertThat(granted).isFalse()
@@ -95,9 +109,37 @@ class AuthorizationManagerTest {
         )
 
         // when
-        val granted = manager.isGranted(mockContext(HandlerType.DELETE, "/api/x"), authenticated("ROLE_ADMIN"))
+        val granted = manager.isGranted(HandlerType.DELETE, "/api/x", authenticated("ROLE_ADMIN"), mockContext())
 
         // then
         assertThat(granted).isTrue()
+    }
+
+    @Test
+    fun `should match case-insensitively when configured`() {
+        // given: permitAll so a match yields true, distinguishing it from deny-by-default
+        val manager = AuthorizationManager(
+            listOf(AuthorizationManager.Entry("/api/admin/**", HandlerType.GET, AuthorizationRules.permitAll, caseInsensitive = true)),
+        )
+
+        // when: an upper-cased path still matches the rule
+        val granted = manager.isGranted(HandlerType.GET, "/API/ADMIN/x", anonymous, mockContext())
+
+        // then
+        assertThat(granted).isTrue()
+    }
+
+    @Test
+    fun `should not match case-insensitively by default`() {
+        // given
+        val manager = AuthorizationManager(
+            listOf(AuthorizationManager.Entry("/api/admin/**", HandlerType.GET, AuthorizationRules.permitAll)),
+        )
+
+        // when
+        val granted = manager.isGranted(HandlerType.GET, "/API/ADMIN/x", anonymous, mockContext())
+
+        // then: case-sensitive matcher does not match, so deny-by-default applies
+        assertThat(granted).isFalse()
     }
 }

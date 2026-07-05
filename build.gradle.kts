@@ -11,6 +11,7 @@ repositories {
 
 dependencies {
     compileOnly("io.javalin:javalin:7.2.2")
+    compileOnly("org.slf4j:slf4j-api:2.0.16")
 
     testImplementation("io.javalin:javalin:7.2.2")
     testImplementation("io.javalin:javalin-testtools:7.2.2")

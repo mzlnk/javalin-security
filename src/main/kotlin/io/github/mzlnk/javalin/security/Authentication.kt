@@ -20,14 +20,18 @@ interface Authentication {
     companion object {
 
         /** Builds an authenticated [Authentication] for the given [principal] and [authorities]. */
+        @JvmStatic
+        @JvmOverloads
         fun authenticated(principal: AuthenticatedPrincipal, authorities: Set<String> = emptySet()): Authentication =
             AuthenticatedAuthentication(principal = principal, authorities = authorities)
 
         /** Builds an authenticated [Authentication] for the given [principal] and [authorities]. */
+        @JvmStatic
         fun authenticated(principal: AuthenticatedPrincipal, vararg authorities: String): Authentication =
             AuthenticatedAuthentication(principal = principal, authorities = authorities.toSet())
 
         /** Returns the shared unauthenticated (anonymous) [Authentication]. */
+        @JvmStatic
         fun unauthenticated(): Authentication = UnauthenticatedAuthentication
 
     }
