@@ -21,7 +21,7 @@ import io.javalin.plugin.PluginPriority
  * registered before `beforeMatched` handlers added by other plugins (those with [PluginPriority.NORMAL]
  * or [PluginPriority.LATE]). However, handlers added directly via `cfg.routes.beforeMatched()` or
  * `cfg.routes.before()` inside `Javalin.create { }` are registered before any plugin's `onStart`,
- * so they run before the guard. To observe a resolved [Authentication], add user `beforeMatched`
+ * so they run before the guard. To observe a resolved [authentication.Authentication], add user `beforeMatched`
  * handlers on the Javalin instance after creation (`app.beforeMatched { ... }`).
  *
  * The plugin is not [repeatable], so accidentally calling `security { }` twice fails fast.

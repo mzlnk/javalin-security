@@ -28,7 +28,7 @@ object JavalinSecuritySupport {
      *
      * The security guard runs at [io.javalin.plugin.PluginPriority.EARLY], so it is the first
      * `beforeMatched` handler and every subsequent handler observes a populated
-     * [io.github.mzlnk.javalin.security.Authentication] on the context.
+     * [io.github.mzlnk.javalin.security.authentication.Authentication] on the context.
      */
     @JvmStatic
     fun enable(config: JavalinConfig, security: JavalinSecurity) {

@@ -1,6 +1,8 @@
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
+import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationEntryPoint
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
@@ -14,7 +16,7 @@ import java.util.concurrent.CompletableFuture
 /**
  * The request-time pipeline and the sole bridge between the framework and Javalin.
  *
- * It authenticates, publishes the [Authentication] on the [Context], then authorizes. Failures are
+ * It authenticates, publishes the [authentication.Authentication] on the [Context], then authorizes. Failures are
  * delegated to the configured [AuthenticationEntryPoint] (401) and [AccessDeniedHandler] (403); the
  * guard itself contains no interception, reflection or thread-locals.
  *

@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security.interop;
 
-import io.github.mzlnk.javalin.security.Authentication;
-import io.github.mzlnk.javalin.security.AuthenticatedPrincipal;
+import io.github.mzlnk.javalin.security.authentication.Authentication;
+import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal;
 import io.github.mzlnk.javalin.security.JavalinSecurity;
 import io.github.mzlnk.javalin.security.SecurityConfigurationException;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationProvider;
@@ -9,7 +9,6 @@ import io.github.mzlnk.javalin.security.authentication.AuthenticationResult;
 import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler;
 import io.github.mzlnk.javalin.security.authorization.AuthorizationRule;
 import io.javalin.Javalin;
-import io.javalin.http.HandlerType;
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
 

@@ -1,9 +1,11 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authentication.Authentication
+import io.github.mzlnk.javalin.security.authentication.Principal
 import io.javalin.config.JavalinConfig
 import io.javalin.http.Context
 
-/** Request attribute key under which the resolved [Authentication] is stored on the [Context]. */
+/** Request attribute key under which the resolved [authentication.Authentication] is stored on the [Context]. */
 internal const val AUTHENTICATION_ATTRIBUTE = "io.github.mzlnk.javalin.security.authentication"
 
 /**
@@ -26,13 +28,13 @@ fun JavalinConfig.security(init: JavalinSecurity.Dsl.() -> Unit) {
 }
 
 /**
- * Returns the [Authentication] resolved for the current request.
+ * Returns the [authentication.Authentication] resolved for the current request.
  *
- * After the security guard has run this is always populated (an unauthenticated [Authentication]
+ * After the security guard has run this is always populated (an unauthenticated [authentication.Authentication]
  * when no credentials were provided). If security is not installed it falls back to unauthenticated.
  */
 fun Context.authentication(): Authentication =
     attribute<Authentication>(AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()
 
-/** Convenience accessor for the [Principal] of the current request's [authentication]. */
+/** Convenience accessor for the [authentication.Principal] of the current request's [authentication]. */
 fun Context.principal(): Principal = authentication().principal

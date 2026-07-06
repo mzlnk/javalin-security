@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security
+package io.github.mzlnk.javalin.security.authentication
 
 /**
  * Represents the identity of a successfully authenticated caller.

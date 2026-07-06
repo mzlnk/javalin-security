@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security
+package io.github.mzlnk.javalin.security.authentication
 
 /**
  * The core security token stored on the Javalin [io.javalin.http.Context] for the duration of a request.
@@ -8,7 +8,7 @@ package io.github.mzlnk.javalin.security
  */
 interface Authentication {
 
-    /** The identity of the caller. Either an [AuthenticatedPrincipal] or [UnauthenticatedPrincipal]. */
+    /** The identity of the caller. Either an [io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal] or [io.github.mzlnk.javalin.security.authentication.UnauthenticatedPrincipal]. */
     val principal: Principal
 
     /** The authorities (roles/permissions) granted to the caller. Empty when unauthenticated. */

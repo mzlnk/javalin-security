@@ -1,7 +1,5 @@
 package io.github.mzlnk.javalin.security.authentication
 
-import io.github.mzlnk.javalin.security.Authentication
-
 /**
  * The outcome of an [AuthenticationProvider.resolve] call.
  *

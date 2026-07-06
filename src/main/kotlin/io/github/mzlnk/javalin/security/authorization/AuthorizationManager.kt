@@ -1,6 +1,6 @@
 package io.github.mzlnk.javalin.security.authorization
 
-import io.github.mzlnk.javalin.security.Authentication
+import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.javalin.http.Context
 import io.javalin.http.HandlerType
 

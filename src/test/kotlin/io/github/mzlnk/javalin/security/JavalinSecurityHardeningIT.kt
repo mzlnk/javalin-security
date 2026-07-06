@@ -1,17 +1,14 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.AuthenticationProvider
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.Javalin
-import io.javalin.config.JavalinState
-import io.javalin.http.Context
 import io.javalin.http.HandlerType.GET
-import io.javalin.http.HandlerType.OPTIONS
 import io.javalin.http.HandlerType.POST
 import io.javalin.http.UnauthorizedResponse
 import io.javalin.http.staticfiles.Location
-import io.javalin.plugin.Plugin
 import io.javalin.plugin.bundled.CorsPlugin
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
@@ -284,7 +281,7 @@ class JavalinSecurityHardeningIT {
      * the position of `beforeMatched` registrations relative to other plugins or direct
      * `cfg.routes.beforeMatched()` calls.
      *
-     * For handlers that must observe the resolved [Authentication], the recommended pattern is to
+     * For handlers that must observe the resolved [authentication.Authentication], the recommended pattern is to
      * add them inside the matched route handler itself, which always runs after the guard.
      */
     @Test

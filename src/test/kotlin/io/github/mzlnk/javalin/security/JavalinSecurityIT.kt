@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationProvider
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.Javalin
