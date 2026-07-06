@@ -1,9 +1,8 @@
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
-import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.AuthenticationEntryPoint
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
@@ -17,7 +16,7 @@ import java.util.concurrent.CompletableFuture
  * The request-time pipeline and the sole bridge between the framework and Javalin.
  *
  * It authenticates, publishes the [authentication.Authentication] on the [Context], then authorizes. Failures are
- * delegated to the configured [AuthenticationEntryPoint] (401) and [AccessDeniedHandler] (403); the
+ * delegated to the configured [UnauthorizedHandler] (401) and [AccessDeniedHandler] (403); the
  * guard itself contains no interception, reflection or thread-locals.
  *
  * **Sync path (default, zero overhead):** When [authenticationManager] is present (or neither
@@ -33,7 +32,7 @@ internal class SecurityGuard(
     private val asyncAuthenticationManager: AsyncAuthenticationManager?,
     private val authorizationManager: AuthorizationManager,
     private val pathNormalizer: PathNormalizer,
-    private val authenticationEntryPoint: AuthenticationEntryPoint,
+    private val unauthorizedHandler: UnauthorizedHandler,
     private val accessDeniedHandler: AccessDeniedHandler,
 ) {
 
@@ -59,7 +58,7 @@ internal class SecurityGuard(
             is AuthenticationResult.NotAuthenticated -> Authentication.unauthenticated()
             is AuthenticationResult.Failure -> {
                 logAuthFailure(method, path, result)
-                authenticationEntryPoint.commence(context, result)
+                unauthorizedHandler.handle(context, result)
                 context.skipRemainingHandlers()
                 return
             }
@@ -80,7 +79,7 @@ internal class SecurityGuard(
                         is AuthenticationResult.NotAuthenticated -> Authentication.unauthenticated()
                         is AuthenticationResult.Failure -> {
                             logAuthFailure(method, path, result)
-                            authenticationEntryPoint.commence(context, result)
+                            unauthorizedHandler.handle(context, result)
                             context.skipRemainingHandlers()
                             null
                         }
@@ -116,7 +115,7 @@ internal class SecurityGuard(
             context.skipRemainingHandlers()
         } else {
             log.warn("Access denied to anonymous caller for {} {}", method, sanitize(path))
-            authenticationEntryPoint.commence(context, null)
+            unauthorizedHandler.handle(context, null)
             context.skipRemainingHandlers()
         }
     }
@@ -149,7 +148,7 @@ internal class SecurityGuard(
             ?: pathNormalizer.normalize(context.path(), context.contextPath())
 
     private fun principalName(authentication: Authentication): String =
-        sanitize((authentication.principal as? AuthenticatedPrincipal)?.name ?: "anonymous")
+        sanitize(authentication.principal?.name ?: "anonymous")
 
     private companion object {
         val log = LoggerFactory.getLogger(SecurityGuard::class.java)

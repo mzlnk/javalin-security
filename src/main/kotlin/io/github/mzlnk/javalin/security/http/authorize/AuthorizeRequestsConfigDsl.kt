@@ -41,9 +41,11 @@ class AuthorizeRequestsConfigDsl internal constructor() : AuthorizationRuleFacto
      * Because matching is first-match-wins, this should be declared last; it mirrors Spring
      * Security's `anyRequest()` and reduces the risk of leaving routes uncovered.
      */
-    fun anyRequest(rule: AuthorizationRule) {
-        builder.anyRequest(rule)
-    }
+    var anyRequest: AuthorizationRule? = null
+        set(rule) {
+            field = rule
+            rule?.let { builder.anyRequest(it) }
+        }
 
     /**
      * Permits CORS preflight `OPTIONS` requests identified by the presence of the
@@ -53,13 +55,15 @@ class AuthorizeRequestsConfigDsl internal constructor() : AuthorizationRuleFacto
      * requests, preserving the deny-by-default guarantee for regular `OPTIONS` traffic while
      * allowing browsers to complete the preflight exchange.
      *
-     * **Ordering:** Call this before `anyRequest(denyAll)` (first-match-wins). Javalin's CORS
+     * **Ordering:** Assign `true` before `anyRequest = denyAll` (first-match-wins). Javalin's CORS
      * plugin must be registered alongside the security configuration to add the required CORS
      * response headers; this helper only controls whether the security guard passes the preflight.
      */
-    fun permitCorsPreflight() {
-        builder.permitCorsPreflight()
-    }
+    var permitCorsPreflight: Boolean = false
+        set(value) {
+            field = value
+            if (value) builder.permitCorsPreflight()
+        }
 
     internal fun build(): AuthorizeRequestsConfig = builder.build()
 

@@ -118,7 +118,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
-                    authenticationManager(alwaysBob)
+                    authenticationManager = alwaysBob
                 }
             }
             cfg.routes.get("/api/v1/me") { it.result((it.principal() as TestPrincipal).name) }
@@ -138,7 +138,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
-                    authenticationEntryPoint { ctx, _ ->
+                    unauthorizedHandler = { ctx, _ ->
                         ctx.header("WWW-Authenticate", "Bearer")
                         throw UnauthorizedResponse()
                     }
@@ -161,10 +161,10 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/v1/**", GET, hasRole("ADMIN")) }
-                    accessDeniedHandler { ctx, _ ->
+                    accessDeniedHandler = { ctx, _ ->
                         throw io.javalin.http.ForbiddenResponse("custom denied")
                     }
-                    authenticationManager(headerManager)
+                    authenticationManager = headerManager
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -184,7 +184,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/v1/**", GET, permitAll) }
-                    authenticationManager(headerManager)
+                    authenticationManager = headerManager
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -205,7 +205,7 @@ class JavalinSecurityHardeningIT {
                 http {
                     authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
                     // A natural but unsafe implementation: render a 401 and return without throwing.
-                    authenticationEntryPoint { ctx, _ -> ctx.status(401).result("denied-without-throwing") }
+                    unauthorizedHandler = { ctx, _ -> ctx.status(401).result("denied-without-throwing") }
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("protected-content") }
@@ -228,8 +228,8 @@ class JavalinSecurityHardeningIT {
                 http {
                     authorizeRequests { authorize("/api/v1/**", GET, hasRole("ADMIN")) }
                     // Render a 403 and return without throwing.
-                    accessDeniedHandler { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") }
-                    authenticationManager(headerManager)
+                    accessDeniedHandler = { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") }
+                    authenticationManager = headerManager
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("protected-content") }
@@ -268,7 +268,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
-                    authenticationManager(headerManager)
+                    authenticationManager = headerManager
                 }
             }
             cfg.routes.get("/api/v1/resource") { ctx ->
@@ -292,9 +292,9 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests {
-                        permitCorsPreflight()
+                        permitCorsPreflight = true
                         authorize("/api/**", GET, permitAll)
-                        anyRequest(denyAll)
+                        anyRequest = denyAll
                     }
                 }
             }
@@ -324,9 +324,9 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests {
-                        permitCorsPreflight()
+                        permitCorsPreflight = true
                         authorize("/api/**", GET, permitAll)
-                        anyRequest(denyAll)
+                        anyRequest = denyAll
                     }
                 }
             }
@@ -349,7 +349,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/v1/users/**", GET, denyAll) }
-                    authenticationManager(headerManager)
+                    authenticationManager = headerManager
                 }
             }
             cfg.routes.get("/api/v1/users/{id}") { it.result("user-${it.pathParam("id")}") }
@@ -371,7 +371,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/**", GET, authenticated) }
-                    asyncAuthenticationManager { ctx ->
+                    asyncAuthenticationManager = { ctx ->
                         // Simulate I/O without blocking the request thread
                         CompletableFuture.supplyAsync {
                             val user = ctx.header("X-User")
@@ -400,7 +400,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/**", GET, permitAll) }
-                    asyncAuthenticationManager { _ ->
+                    asyncAuthenticationManager = { _ ->
                         CompletableFuture.completedFuture(
                             AuthenticationResult.Failure("async credential failure"),
                         )
@@ -424,7 +424,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/**", GET, authenticated) }
-                    asyncAuthenticationManager { _ ->
+                    asyncAuthenticationManager = { _ ->
                         CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated)
                     }
                 }

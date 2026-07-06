@@ -111,7 +111,7 @@ class JavaInteropIT {
                 .http(http -> http
                         .authorizeRequests(auth -> auth.anyRequest(Rules.hasRole("ADMIN")))
                         .authenticationManager(headerManager)
-                        .authenticationEntryPoint((ctx, failure) -> ctx.status(401).result("custom-401"))
+                        .unauthorizedHandler((ctx, failure) -> ctx.status(401).result("custom-401"))
                         .accessDeniedHandler((ctx, auth) -> ctx.status(403).result("custom-403")))
                 .build();
 

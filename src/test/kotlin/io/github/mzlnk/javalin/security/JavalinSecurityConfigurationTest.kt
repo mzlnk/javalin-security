@@ -13,8 +13,8 @@ class JavalinSecurityConfigurationTest {
         assertThatThrownBy {
             javalinSecurity {
                 http {
-                    authenticationManager { AuthenticationResult.NotAuthenticated }
-                    asyncAuthenticationManager { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) }
+                    authenticationManager = { AuthenticationResult.NotAuthenticated }
+                    asyncAuthenticationManager = { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) }
                 }
             }
         }
@@ -27,7 +27,7 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             javalinSecurity {
                 http {
-                    authenticationManager { AuthenticationResult.NotAuthenticated }
+                    authenticationManager = { AuthenticationResult.NotAuthenticated }
                 }
             }
         }.doesNotThrowAnyException()
@@ -38,7 +38,7 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             javalinSecurity {
                 http {
-                    asyncAuthenticationManager { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) }
+                    asyncAuthenticationManager = { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) }
                 }
             }
         }.doesNotThrowAnyException()

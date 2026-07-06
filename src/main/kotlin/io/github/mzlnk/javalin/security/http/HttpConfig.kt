@@ -2,7 +2,7 @@ package io.github.mzlnk.javalin.security.http
 
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
-import io.github.mzlnk.javalin.security.authentication.AuthenticationEntryPoint
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
 import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
 import io.github.mzlnk.javalin.security.http.authorize.AuthorizeRequestsConfig
@@ -25,7 +25,7 @@ class HttpConfig internal constructor(
     val authorizeRequestsConfig: AuthorizeRequestsConfig,
     internal val authenticationManager: AuthenticationManager?,
     internal val asyncAuthenticationManager: AsyncAuthenticationManager?,
-    internal val authenticationEntryPoint: AuthenticationEntryPoint,
+    internal val unauthorizedHandler: UnauthorizedHandler,
     internal val accessDeniedHandler: AccessDeniedHandler,
 ) {
 
@@ -34,7 +34,7 @@ class HttpConfig internal constructor(
         private var authorizeRequestsConfig: AuthorizeRequestsConfig = AuthorizeRequestsConfig.Builder().build()
         private var authenticationManager: AuthenticationManager? = null
         private var asyncAuthenticationManager: AsyncAuthenticationManager? = null
-        private var authenticationEntryPoint: AuthenticationEntryPoint = AuthenticationEntryPoint.DEFAULT
+        private var unauthorizedHandler: UnauthorizedHandler = UnauthorizedHandler.DEFAULT
         private var accessDeniedHandler: AccessDeniedHandler = AccessDeniedHandler.DEFAULT
 
         /** Configures the request authorization rules. */
@@ -78,8 +78,8 @@ class HttpConfig internal constructor(
         }
 
         /** Overrides how failed/absent authentication is rendered (HTTP 401 by default). */
-        fun authenticationEntryPoint(entryPoint: AuthenticationEntryPoint): Builder {
-            this.authenticationEntryPoint = entryPoint
+        fun unauthorizedHandler(handler: UnauthorizedHandler): Builder {
+            this.unauthorizedHandler = handler
             return this
         }
 
@@ -102,7 +102,7 @@ class HttpConfig internal constructor(
                 authorizeRequestsConfig = authorizeRequestsConfig,
                 authenticationManager = authenticationManager,
                 asyncAuthenticationManager = asyncAuthenticationManager,
-                authenticationEntryPoint = authenticationEntryPoint,
+                unauthorizedHandler = unauthorizedHandler,
                 accessDeniedHandler = accessDeniedHandler,
             )
         }

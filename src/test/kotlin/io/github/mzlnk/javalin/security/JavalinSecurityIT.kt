@@ -42,7 +42,7 @@ class JavalinSecurityIT {
                         authorize("/api/v1/**", POST, authenticated)
                         authorize("/api/v1/**", DELETE, hasRole("ADMIN"))
                     }
-                    manager?.let { authenticationManager(it) }
+                    manager?.let { authenticationManager = it }
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -140,7 +140,7 @@ class JavalinSecurityIT {
                     authorizeRequests {
                         authorize("/api/v1/**", GET, permitAll)
                     }
-                    authenticationManager(headerManager)
+                    authenticationManager = headerManager
                 }
             }
             cfg.routes.get("/internal") { it.result("secret") }

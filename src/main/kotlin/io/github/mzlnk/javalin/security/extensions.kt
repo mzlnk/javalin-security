@@ -1,12 +1,9 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.Principal
 import io.javalin.config.JavalinConfig
 import io.javalin.http.Context
-
-/** Request attribute key under which the resolved [authentication.Authentication] is stored on the [Context]. */
-internal const val AUTHENTICATION_ATTRIBUTE = "io.github.mzlnk.javalin.security.authentication"
 
 /**
  * Installs and configures the security framework into a Javalin application using an inline DSL.
@@ -36,5 +33,6 @@ fun JavalinConfig.security(init: JavalinSecurityDsl.() -> Unit) {
 fun Context.authentication(): Authentication =
     attribute<Authentication>(AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()
 
-/** Convenience accessor for the [authentication.Principal] of the current request's [authentication]. */
-fun Context.principal(): Principal = authentication().principal
+/** Convenience accessor for the principal of the current request. `null` when the request is unauthenticated. */
+@Suppress("UNCHECKED_CAST")
+fun <T : AuthenticatedPrincipal> Context.principal(): T = (authentication().principal ?: error("no principal")) as T

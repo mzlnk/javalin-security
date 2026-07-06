@@ -57,7 +57,7 @@ internal class JavalinSecurityPlugin(
             asyncAuthenticationManager = http.asyncAuthenticationManager,
             authorizationManager = authorizationManager,
             pathNormalizer = pathNormalizer,
-            authenticationEntryPoint = http.authenticationEntryPoint,
+            unauthorizedHandler = http.unauthorizedHandler,
             accessDeniedHandler = http.accessDeniedHandler,
         )
 

@@ -20,14 +20,14 @@ import io.javalin.http.UnauthorizedResponse
  * after invoking this callback, so the matched handler is never reached. Simply rendering the desired
  * response (status, headers, body) is sufficient.
  */
-fun interface AuthenticationEntryPoint {
+fun interface UnauthorizedHandler {
 
-    fun commence(context: Context, failure: AuthenticationResult.Failure?)
+    fun handle(context: Context, failure: AuthenticationResult.Failure?)
 
     companion object {
 
-        /** The default entry point: a bare `401 Unauthorized` with no credential details leaked. */
-        val DEFAULT: AuthenticationEntryPoint = AuthenticationEntryPoint { _, _ -> throw UnauthorizedResponse() }
+        /** The default handler: a bare `401 Unauthorized` with no credential details leaked. */
+        val DEFAULT: UnauthorizedHandler = UnauthorizedHandler { _, _ -> throw UnauthorizedResponse() }
 
     }
 

@@ -8,8 +8,8 @@ package io.github.mzlnk.javalin.security.authentication
  */
 interface Authentication {
 
-    /** The identity of the caller. Either an [io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal] or [io.github.mzlnk.javalin.security.authentication.UnauthenticatedPrincipal]. */
-    val principal: Principal
+    /** The identity of the caller. `null` when the request is unauthenticated. */
+    val principal: AuthenticatedPrincipal?
 
     /** The authorities (roles/permissions) granted to the caller. Empty when unauthenticated. */
     val authorities: Set<String>
@@ -49,7 +49,7 @@ internal data class AuthenticatedAuthentication(
 
 internal data object UnauthenticatedAuthentication : Authentication {
 
-    override val principal: Principal = UnauthenticatedPrincipal
+    override val principal: AuthenticatedPrincipal? = null
     override val authorities: Set<String> = emptySet()
     override val isAuthenticated: Boolean = false
 
