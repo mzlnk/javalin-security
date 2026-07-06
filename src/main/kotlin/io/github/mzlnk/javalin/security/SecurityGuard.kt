@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.AuthenticationEntryPoint
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
@@ -8,6 +9,7 @@ import io.github.mzlnk.javalin.security.authorization.AuthorizationManager
 import io.github.mzlnk.javalin.security.authorization.PathNormalizer
 import io.javalin.http.Context
 import org.slf4j.LoggerFactory
+import java.util.concurrent.CompletableFuture
 
 /**
  * The request-time pipeline and the sole bridge between the framework and Javalin.
@@ -15,9 +17,18 @@ import org.slf4j.LoggerFactory
  * It authenticates, publishes the [Authentication] on the [Context], then authorizes. Failures are
  * delegated to the configured [AuthenticationEntryPoint] (401) and [AccessDeniedHandler] (403); the
  * guard itself contains no interception, reflection or thread-locals.
+ *
+ * **Sync path (default, zero overhead):** When [authenticationManager] is present (or neither
+ * manager is set, treating all requests as anonymous), the pipeline is entirely synchronous.
+ *
+ * **Async path (opt-in):** When [asyncAuthenticationManager] is present, authentication resolves
+ * via [Context.future] so the request thread is released while the [CompletableFuture] is in
+ * flight. Authorization and all fail-closed semantics run inside the completion stage, so the same
+ * security guarantees apply across the async boundary.
  */
 internal class SecurityGuard(
-    private val authenticationManager: AuthenticationManager,
+    private val authenticationManager: AuthenticationManager?,
+    private val asyncAuthenticationManager: AsyncAuthenticationManager?,
     private val authorizationManager: AuthorizationManager,
     private val pathNormalizer: PathNormalizer,
     private val authenticationEntryPoint: AuthenticationEntryPoint,
@@ -28,13 +39,24 @@ internal class SecurityGuard(
         val method = context.method()
         val path = authorizationPath(context)
 
-        val authentication = when (val result = authenticationManager.authenticate(context)) {
+        if (asyncAuthenticationManager != null) {
+            handleAsync(context, method, path)
+        } else {
+            handleSync(context, method, path)
+        }
+    }
+
+    // ── synchronous path ─────────────────────────────────────────────────────
+
+    private fun handleSync(context: Context, method: io.javalin.http.HandlerType, path: String) {
+        val result = authenticationManager?.authenticate(context)
+            ?: AuthenticationResult.NotAuthenticated
+
+        val authentication = when (result) {
             is AuthenticationResult.Success -> result.authentication
             is AuthenticationResult.NotAuthenticated -> Authentication.unauthenticated()
             is AuthenticationResult.Failure -> {
-                // The failure message/cause is logged but never forwarded to the client, to avoid
-                // leaking why authentication failed.
-                log.warn("Authentication failed for {} {}: {}", method, sanitize(path), sanitize(result.message ?: "no detail"), result.cause)
+                logAuthFailure(method, path, result)
                 authenticationEntryPoint.commence(context, result)
                 context.skipRemainingHandlers()
                 return
@@ -42,7 +64,43 @@ internal class SecurityGuard(
         }
 
         context.attribute(AUTHENTICATION_ATTRIBUTE, authentication)
+        enforceAuthorization(context, method, path, authentication)
+    }
 
+    // ── asynchronous path ─────────────────────────────────────────────────────
+
+    private fun handleAsync(context: Context, method: io.javalin.http.HandlerType, path: String) {
+        context.future {
+            asyncAuthenticationManager!!.authenticate(context)
+                .thenApply { result ->
+                    when (result) {
+                        is AuthenticationResult.Success -> result.authentication
+                        is AuthenticationResult.NotAuthenticated -> Authentication.unauthenticated()
+                        is AuthenticationResult.Failure -> {
+                            logAuthFailure(method, path, result)
+                            authenticationEntryPoint.commence(context, result)
+                            context.skipRemainingHandlers()
+                            null
+                        }
+                    }
+                }
+                .thenAccept { authentication ->
+                    if (authentication != null) {
+                        context.attribute(AUTHENTICATION_ATTRIBUTE, authentication)
+                        enforceAuthorization(context, method, path, authentication)
+                    }
+                }
+        }
+    }
+
+    // ── shared pipeline steps ─────────────────────────────────────────────────
+
+    private fun enforceAuthorization(
+        context: Context,
+        method: io.javalin.http.HandlerType,
+        path: String,
+        authentication: Authentication,
+    ) {
         if (authorizationManager.isGranted(method, path, authentication, context)) {
             if (log.isDebugEnabled) {
                 log.debug("Access granted to {} for {} {}", principalName(authentication), method, sanitize(path))
@@ -59,6 +117,20 @@ internal class SecurityGuard(
             authenticationEntryPoint.commence(context, null)
             context.skipRemainingHandlers()
         }
+    }
+
+    private fun logAuthFailure(
+        method: io.javalin.http.HandlerType,
+        path: String,
+        result: AuthenticationResult.Failure,
+    ) {
+        log.warn(
+            "Authentication failed for {} {}: {}",
+            method,
+            sanitize(path),
+            sanitize(result.message ?: "no detail"),
+            result.cause,
+        )
     }
 
     /**
@@ -101,5 +173,4 @@ internal class SecurityGuard(
             }
         }
     }
-
 }

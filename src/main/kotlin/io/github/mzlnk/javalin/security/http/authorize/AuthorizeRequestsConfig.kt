@@ -10,8 +10,7 @@ import io.javalin.http.HandlerType
  *
  * The declarations are kept as plain [Entry] specs (not a compiled matcher) because the correct
  * path-normalization and case-sensitivity settings are only known once the security is installed
- * into a Javalin instance. They are compiled at that point by
- * [io.github.mzlnk.javalin.security.configureSecurity].
+ * into a Javalin instance. They are compiled at that point by [JavalinSecurityPlugin][io.github.mzlnk.javalin.security.JavalinSecurityPlugin].
  */
 class AuthorizeRequestsConfig internal constructor(
     internal val entries: List<Entry>,
@@ -54,6 +53,28 @@ class AuthorizeRequestsConfig internal constructor(
          */
         fun anyRequest(rule: AuthorizationRule) {
             entries += Entry(pattern = "/**", method = null, rule = rule)
+        }
+
+        /**
+         * Permits CORS preflight `OPTIONS` requests identified by the presence of the
+         * `Access-Control-Request-Method` request header.
+         *
+         * This is a narrowly-scoped opt-in helper. It does **not** blanket-exempt all `OPTIONS`
+         * requests, preserving the deny-by-default guarantee for regular `OPTIONS` traffic while
+         * allowing browsers to complete the preflight exchange.
+         *
+         * **Ordering:** Call this before `anyRequest(denyAll)` (first-match-wins). Javalin's CORS
+         * plugin must be registered alongside `security { }` to add the required CORS response
+         * headers; this helper only controls whether the security guard passes the preflight through.
+         */
+        fun permitCorsPreflight() {
+            entries += Entry(
+                pattern = "/**",
+                method = HandlerType.OPTIONS,
+                rule = AuthorizationRule { _, ctx ->
+                    ctx.header("Access-Control-Request-Method") != null
+                },
+            )
         }
 
         fun build(): AuthorizeRequestsConfig = AuthorizeRequestsConfig(entries = entries.toList())

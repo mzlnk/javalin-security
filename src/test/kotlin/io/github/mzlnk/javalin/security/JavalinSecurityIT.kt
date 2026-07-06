@@ -32,24 +32,18 @@ class JavalinSecurityIT {
         }
     }
 
-    private inner class SecurityConfig(
-        private val provider: AuthenticationProvider? = headerProvider,
-    ) : JavalinSecurityConfig {
-        override val security = javalinSecurity {
-            http {
-                authorizeRequests {
-                    authorize("/api/v1/**", GET, permitAll)
-                    authorize("/api/v1/**", POST, authenticated)
-                    authorize("/api/v1/**", DELETE, hasRole("ADMIN"))
-                }
-                provider?.let { authenticationProvider(it) }
-            }
-        }
-    }
-
-    private fun app(config: JavalinSecurityConfig): Javalin =
+    private fun app(provider: AuthenticationProvider? = headerProvider): Javalin =
         Javalin.create { cfg ->
-            cfg.configureSecurity(config)
+            cfg.security {
+                http {
+                    authorizeRequests {
+                        authorize("/api/v1/**", GET, permitAll)
+                        authorize("/api/v1/**", POST, authenticated)
+                        authorize("/api/v1/**", DELETE, hasRole("ADMIN"))
+                    }
+                    provider?.let { authenticationProvider(it) }
+                }
+            }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
             cfg.routes.post("/api/v1/resource") { it.result("created") }
             cfg.routes.delete("/api/v1/resource") { it.result("deleted") }
@@ -57,7 +51,7 @@ class JavalinSecurityIT {
         }
 
     @Test
-    fun `should allow anonymous access when rule is permitAll`() = JavalinTest.test(app(SecurityConfig())) { _, client ->
+    fun `should allow anonymous access when rule is permitAll`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.get("/api/v1/resource")
 
@@ -67,7 +61,7 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should return 401 when authenticated rule is hit without credentials`() = JavalinTest.test(app(SecurityConfig())) { _, client ->
+    fun `should return 401 when authenticated rule is hit without credentials`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.post("/api/v1/resource")
 
@@ -76,7 +70,7 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should allow access when authenticated rule is hit with credentials`() = JavalinTest.test(app(SecurityConfig())) { _, client ->
+    fun `should allow access when authenticated rule is hit with credentials`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.post("/api/v1/resource", null) { it.header("X-User", "bob") }
 
@@ -85,7 +79,7 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should return 401 when role protected rule is hit anonymously`() = JavalinTest.test(app(SecurityConfig())) { _, client ->
+    fun `should return 401 when role protected rule is hit anonymously`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.delete("/api/v1/resource")
 
@@ -94,7 +88,7 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should return 403 when role protected rule is hit without the role`() = JavalinTest.test(app(SecurityConfig())) { _, client ->
+    fun `should return 403 when role protected rule is hit without the role`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.delete("/api/v1/resource", null) {
             it.header("X-User", "bob")
@@ -106,7 +100,7 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should allow access when role protected rule is hit with the role`() = JavalinTest.test(app(SecurityConfig())) { _, client ->
+    fun `should allow access when role protected rule is hit with the role`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.delete("/api/v1/resource", null) {
             it.header("X-User", "admin")
@@ -119,7 +113,7 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should return 401 when provider reports a failure`() = JavalinTest.test(app(SecurityConfig())) { _, client ->
+    fun `should return 401 when provider reports a failure`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.post("/api/v1/resource", null) { it.header("X-User", "invalid") }
 
@@ -128,7 +122,7 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should expose the authenticated principal on the context`() = JavalinTest.test(app(SecurityConfig())) { _, client ->
+    fun `should expose the authenticated principal on the context`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.get("/api/v1/me") { it.header("X-User", "bob") }
 
@@ -140,18 +134,14 @@ class JavalinSecurityIT {
     @Test
     fun `should deny by default when no rule matches the route`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.configureSecurity(
-                object : JavalinSecurityConfig {
-                    override val security = javalinSecurity {
-                        http {
-                            authorizeRequests {
-                                authorize("/api/v1/**", GET, permitAll)
-                            }
-                            authenticationProvider(headerProvider)
-                        }
+            cfg.security {
+                http {
+                    authorizeRequests {
+                        authorize("/api/v1/**", GET, permitAll)
                     }
-                },
-            )
+                    authenticationProvider(headerProvider)
+                }
+            }
             cfg.routes.get("/internal") { it.result("secret") }
         },
     ) { _, client ->
@@ -164,18 +154,7 @@ class JavalinSecurityIT {
 
     @Test
     fun `should treat every request as anonymous when no provider is configured`() = JavalinTest.test(
-        app(
-            object : JavalinSecurityConfig {
-                override val security = javalinSecurity {
-                    http {
-                        authorizeRequests {
-                            authorize("/api/v1/**", GET, permitAll)
-                            authorize("/api/v1/**", POST, authenticated)
-                        }
-                    }
-                }
-            },
-        ),
+        app(provider = null),
     ) { _, client ->
         // when / then: permitAll succeeds, authenticated is rejected with 401
         assertThat(client.get("/api/v1/resource").code).isEqualTo(200)

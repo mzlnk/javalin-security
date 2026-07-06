@@ -7,26 +7,22 @@ import io.javalin.http.Context
 internal const val AUTHENTICATION_ATTRIBUTE = "io.github.mzlnk.javalin.security.authentication"
 
 /**
- * Installs the security framework into a Javalin application.
+ * Installs and configures the security framework into a Javalin application using an inline DSL.
  *
- * Call this inside `Javalin.create { }`:
- * ```
- * Javalin.create { config ->
- *     config.configureSecurity(SecurityConfig())
- *     config.routes.get("/api/v1/resource") { it.result("ok") }
- * }
- * ```
+ * Call this inside `Javalin.create { }` and configure authorization rules, providers, and failure
+ * handlers directly inline — no separate config class required. The call order relative to route
+ * declarations does not matter because the guard is wired in `onStart`, after the entire
+ * `Javalin.create { }` block has been applied.
  *
  * It registers a `beforeMatched` guard that authenticates and authorizes every matched request.
  * Failures surface as Javalin's native `UnauthorizedResponse` (401) and `ForbiddenResponse` (403).
  *
- * The guard is wired through a Javalin plugin whose setup runs once the whole `Javalin.create { }`
- * block has been applied, so it always sees the final router configuration. This means the call
- * order does not matter: `configureSecurity` may be placed before or after the router settings and
- * route declarations without risking a mismatch.
+ * This ordering-independence is a security property: the authorization matcher and the path
+ * normalizer mirror the final router configuration at startup, so they cannot diverge from the
+ * actual routing regardless of declaration order.
  */
-fun JavalinConfig.configureSecurity(config: JavalinSecurityConfig) {
-    registerPlugin(JavalinSecurityPlugin(config.security))
+fun JavalinConfig.security(init: JavalinSecurity.Dsl.() -> Unit) {
+    registerPlugin(JavalinSecurityPlugin(JavalinSecurity.Dsl().apply(init).build()))
 }
 
 /**
