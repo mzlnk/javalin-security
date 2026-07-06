@@ -1,22 +1,23 @@
-package io.github.mzlnk.javalin.security.interop;
+package io.github.mzlnk.javalin.security;
 
 import io.github.mzlnk.javalin.security.authentication.Authentication;
 import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal;
-import io.github.mzlnk.javalin.security.JavalinSecurity;
-import io.github.mzlnk.javalin.security.SecurityConfigurationException;
-import io.github.mzlnk.javalin.security.authentication.AuthenticationProvider;
+import io.github.mzlnk.javalin.security.authentication.AuthenticationManager;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult;
 import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler;
 import io.github.mzlnk.javalin.security.authorization.AuthorizationRule;
+import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.javalin.Javalin;
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.CompletableFuture;
 
 import static io.javalin.http.HandlerType.*;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * Verifies that the Java interop API produces configurations identical to the Kotlin DSL.
+ * Verifies that the Java API produces configurations identical to the Kotlin DSL.
  * This test is the guardrail that keeps the Java ergonomics from regressing: it must compile
  * with no {@code Unit.INSTANCE}, no {@code .INSTANCE.getX()} for common operations, and no
  * raw casts.
@@ -30,7 +31,7 @@ class JavaInteropIT {
         @Override public String getName() { return name; }
     }
 
-    private final AuthenticationProvider headerProvider = ctx -> {
+    private final AuthenticationManager headerManager = ctx -> {
         String user = ctx.header("X-User");
         if (user == null) return AuthenticationResult.NotAuthenticated.INSTANCE;
         if ("invalid".equals(user)) return new AuthenticationResult.Failure("bad credentials", null);
@@ -44,13 +45,13 @@ class JavaInteropIT {
     @Test
     void builder_produces_JavalinSecurity_without_unit_instance() {
         // No Unit.INSTANCE, no .INSTANCE.getX() — compiles cleanly from Java
-        JavalinSecurity security = JavalinSecuritySupport.builder()
+        JavalinSecurity security = JavalinSecurity.builder()
                 .http(http -> http
                         .authorizeRequests(auth -> auth
                                 .authorize("/api/**", GET, Rules.permitAll())
                                 .authorize("/admin/**", POST, Rules.hasRole("ADMIN"))
                                 .anyRequest(Rules.denyAll()))
-                        .authenticationProvider(headerProvider))
+                        .authenticationManager(headerManager))
                 .build();
 
         assertThat(security).isNotNull();
@@ -76,7 +77,7 @@ class JavaInteropIT {
         // AuthorizationRule is a fun interface — Java lambda works directly
         AuthorizationRule customRule = (auth, ctx) -> auth.isAuthenticated();
 
-        JavalinSecurity security = JavalinSecuritySupport.builder()
+        JavalinSecurity security = JavalinSecurity.builder()
                 .http(http -> http
                         .authorizeRequests(auth -> auth
                                 .anyRequest(customRule)))
@@ -85,18 +86,18 @@ class JavaInteropIT {
         assertThat(security).isNotNull();
     }
 
-    // ── custom AuthenticationProvider as lambda ───────────────────────────────
+    // ── custom AuthenticationManager as lambda ───────────────────────────────
 
     @Test
-    void custom_authentication_provider_as_java_lambda() {
-        AuthenticationProvider alwaysBob = ctx ->
+    void custom_authentication_manager_as_java_lambda() {
+        AuthenticationManager alwaysBob = ctx ->
                 new AuthenticationResult.Success(
                         Authentication.authenticated(new TestPrincipal("bob")));
 
-        JavalinSecurity security = JavalinSecuritySupport.builder()
+        JavalinSecurity security = JavalinSecurity.builder()
                 .http(http -> http
                         .authorizeRequests(auth -> auth.anyRequest(Rules.authenticated()))
-                        .authenticationProvider(alwaysBob))
+                        .authenticationManager(alwaysBob))
                 .build();
 
         assertThat(security).isNotNull();
@@ -106,10 +107,10 @@ class JavaInteropIT {
 
     @Test
     void custom_entry_point_and_access_denied_handler() {
-        JavalinSecurity security = JavalinSecuritySupport.builder()
+        JavalinSecurity security = JavalinSecurity.builder()
                 .http(http -> http
                         .authorizeRequests(auth -> auth.anyRequest(Rules.hasRole("ADMIN")))
-                        .authenticationProvider(headerProvider)
+                        .authenticationManager(headerManager)
                         .authenticationEntryPoint((ctx, failure) -> ctx.status(401).result("custom-401"))
                         .accessDeniedHandler((ctx, auth) -> ctx.status(403).result("custom-403")))
                 .build();
@@ -117,36 +118,37 @@ class JavaInteropIT {
         assertThat(security).isNotNull();
     }
 
-    // ── mutual exclusion validation preserved ─────────────────────────────────
+    // ── mutual exclusion: sync + async managers rejected ─────────────────────
 
     @Test
-    void builder_rejects_both_provider_and_manager() {
+    void builder_rejects_both_sync_and_async_manager() {
         assertThatThrownBy(() ->
-                JavalinSecuritySupport.builder()
+                JavalinSecurity.builder()
                         .http(http -> http
                                 .authorizeRequests(auth -> auth.anyRequest(Rules.permitAll()))
-                                .authenticationProvider(headerProvider)
-                                .authenticationManager(ctx -> AuthenticationResult.NotAuthenticated.INSTANCE))
+                                .authenticationManager(ctx -> AuthenticationResult.NotAuthenticated.INSTANCE)
+                                .asyncAuthenticationManager(ctx -> CompletableFuture.completedFuture(
+                                        AuthenticationResult.NotAuthenticated.INSTANCE)))
                         .build()
         ).isInstanceOf(SecurityConfigurationException.class)
                 .hasMessageContaining("mutually exclusive");
     }
 
-    // ── full integration via JavalinSecuritySupport.enable ────────────────────
+    // ── full integration via JavalinSecurity.enable ───────────────────────────
 
     @Test
     void enable_installs_security_and_enforces_rules() {
         Javalin app = Javalin.create(config -> {
-            JavalinSecurity security = JavalinSecuritySupport.builder()
+            JavalinSecurity security = JavalinSecurity.builder()
                     .http(http -> http
                             .authorizeRequests(auth -> auth
                                     .authorize("/api/**", GET, Rules.permitAll())
                                     .authorize("/api/**", POST, Rules.authenticated())
                                     .anyRequest(Rules.denyAll()))
-                            .authenticationProvider(headerProvider))
+                            .authenticationManager(headerManager))
                     .build();
 
-            JavalinSecuritySupport.enable(config, security);
+            JavalinSecurity.enable(config, security);
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
             config.routes.post("/api/resource", ctx -> ctx.result("created"));
         });
@@ -170,15 +172,15 @@ class JavaInteropIT {
         AccessDeniedHandler denied = (ctx, auth) -> ctx.status(403).result("java-denied");
 
         Javalin app = Javalin.create(config -> {
-            JavalinSecurity security = JavalinSecuritySupport.builder()
+            JavalinSecurity security = JavalinSecurity.builder()
                     .http(http -> http
                             .authorizeRequests(auth -> auth
                                     .authorize("/api/**", GET, Rules.hasRole("ADMIN")))
-                            .authenticationProvider(headerProvider)
+                            .authenticationManager(headerManager)
                             .accessDeniedHandler(denied))
                     .build();
 
-            JavalinSecuritySupport.enable(config, security);
+            JavalinSecurity.enable(config, security);
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
         });
 

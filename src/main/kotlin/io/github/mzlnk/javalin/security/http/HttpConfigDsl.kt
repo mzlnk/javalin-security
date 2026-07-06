@@ -1,0 +1,55 @@
+package io.github.mzlnk.javalin.security.http
+
+import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.AuthenticationEntryPoint
+import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
+import io.github.mzlnk.javalin.security.http.authorize.AuthorizeRequestsConfigDsl
+
+/**
+ * Kotlin DSL receiver for the `http { }` security block.
+ *
+ * Companion libraries contribute their authentication strategy by calling
+ * [authenticationManager] or [asyncAuthenticationManager] from their own extension functions
+ * on this receiver, for example a future `jwt { }` extension.
+ */
+class HttpConfigDsl internal constructor() {
+
+    private val builder = HttpConfig.Builder()
+
+    /** Configures the request authorization rules. */
+    fun authorizeRequests(init: AuthorizeRequestsConfigDsl.() -> Unit) {
+        builder.authorizeRequests(AuthorizeRequestsConfigDsl().apply(init).build())
+    }
+
+    /**
+     * Registers a blocking [AuthenticationManager].
+     *
+     * Mutually exclusive with [asyncAuthenticationManager].
+     */
+    fun authenticationManager(manager: AuthenticationManager) {
+        builder.authenticationManager(manager)
+    }
+
+    /**
+     * Registers an opt-in async [AsyncAuthenticationManager] for I/O-bound authentication.
+     *
+     * Mutually exclusive with [authenticationManager].
+     */
+    fun asyncAuthenticationManager(manager: AsyncAuthenticationManager) {
+        builder.asyncAuthenticationManager(manager)
+    }
+
+    /** Overrides how failed/absent authentication is rendered (HTTP 401 by default). */
+    fun authenticationEntryPoint(entryPoint: AuthenticationEntryPoint) {
+        builder.authenticationEntryPoint(entryPoint)
+    }
+
+    /** Overrides how access-denied for an authenticated caller is rendered (HTTP 403 by default). */
+    fun accessDeniedHandler(handler: AccessDeniedHandler) {
+        builder.accessDeniedHandler(handler)
+    }
+
+    internal fun build(): HttpConfig = builder.build()
+
+}

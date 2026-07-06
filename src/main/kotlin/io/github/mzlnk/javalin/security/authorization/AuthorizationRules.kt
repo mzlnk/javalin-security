@@ -3,9 +3,9 @@ package io.github.mzlnk.javalin.security.authorization
 /**
  * The set of built-in authorization rule factories.
  *
- * Declared as an interface so the single implementation ([AuthorizationRules]) can be reused
- * unqualified inside the `authorizeRequests { }` DSL through Kotlin interface delegation, keeping one
- * source of truth for the rule logic.
+ * Declared as an interface so [AuthorizationRules] can be mixed into the `authorizeRequests { }`
+ * DSL receiver via Kotlin interface delegation, making all rule names available unqualified inside
+ * the block.
  */
 interface AuthorizationRuleFactory {
 
@@ -33,32 +33,26 @@ interface AuthorizationRuleFactory {
 }
 
 /**
- * Built-in [AuthorizationRule] factories.
+ * DSL adapter that exposes [Rules] as unqualified members of the `authorizeRequests { }` block
+ * through Kotlin interface delegation.
  *
- * These are exposed to end users as unqualified members of the `authorizeRequests { }` DSL, but are
- * also available directly for programmatic use and testing.
+ * The actual rule logic lives in [Rules]; this object exists solely to bridge the [AuthorizationRuleFactory]
+ * interface required for delegation.
  */
 object AuthorizationRules : AuthorizationRuleFactory {
 
-    internal const val ROLE_PREFIX = "ROLE_"
+    override val permitAll: AuthorizationRule get() = Rules.permitAll()
 
-    override val permitAll: AuthorizationRule = AuthorizationRule { _, _ -> true }
+    override val denyAll: AuthorizationRule get() = Rules.denyAll()
 
-    override val denyAll: AuthorizationRule = AuthorizationRule { _, _ -> false }
+    override val authenticated: AuthorizationRule get() = Rules.authenticated()
 
-    override val authenticated: AuthorizationRule = AuthorizationRule { authentication, _ -> authentication.isAuthenticated }
+    override fun hasAuthority(authority: String): AuthorizationRule = Rules.hasAuthority(authority)
 
-    override fun hasAuthority(authority: String): AuthorizationRule =
-        AuthorizationRule { authentication, _ -> authentication.isAuthenticated && authority in authentication.authorities }
+    override fun hasAnyAuthority(vararg authorities: String): AuthorizationRule = Rules.hasAnyAuthority(*authorities)
 
-    override fun hasAnyAuthority(vararg authorities: String): AuthorizationRule =
-        AuthorizationRule { authentication, _ ->
-            authentication.isAuthenticated && authorities.any { it in authentication.authorities }
-        }
+    override fun hasRole(role: String): AuthorizationRule = Rules.hasRole(role)
 
-    override fun hasRole(role: String): AuthorizationRule = hasAuthority(ROLE_PREFIX + role)
-
-    override fun hasAnyRole(vararg roles: String): AuthorizationRule =
-        hasAnyAuthority(*roles.map { ROLE_PREFIX + it }.toTypedArray())
+    override fun hasAnyRole(vararg roles: String): AuthorizationRule = Rules.hasAnyRole(*roles)
 
 }

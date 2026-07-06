@@ -2,7 +2,6 @@ package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
-import io.github.mzlnk.javalin.security.authentication.AuthenticationProvider
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.Javalin
 import io.javalin.http.HandlerType.GET
@@ -21,7 +20,7 @@ import java.net.http.HttpRequest as JdkHttpRequest
 
 class JavalinSecurityHardeningIT {
 
-    private val headerProvider = AuthenticationProvider { context ->
+    private val headerManager = AuthenticationManager { context ->
         when (val user = context.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             "invalid" -> AuthenticationResult.Failure(message = "super secret internal reason")
@@ -111,27 +110,6 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `should try multiple providers in registration order`() = JavalinTest.test(
-        Javalin.create { cfg ->
-            val abstains = AuthenticationProvider { AuthenticationResult.NotAuthenticated }
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", POST, authenticated) }
-                    authenticationProvider(abstains)
-                    authenticationProvider(headerProvider)
-                }
-            }
-            cfg.routes.post("/api/v1/resource") { it.result("created") }
-        },
-    ) { _, client ->
-        // when: the first provider abstains, the second authenticates
-        val response = client.post("/api/v1/resource", null) { it.header("X-User", "bob") }
-
-        // then
-        assertThat(response.code).isEqualTo(200)
-    }
-
-    @Test
     fun `should use a custom authentication manager when provided`() = JavalinTest.test(
         Javalin.create { cfg ->
             val alwaysBob = AuthenticationManager {
@@ -186,7 +164,7 @@ class JavalinSecurityHardeningIT {
                     accessDeniedHandler { ctx, _ ->
                         throw io.javalin.http.ForbiddenResponse("custom denied")
                     }
-                    authenticationProvider(headerProvider)
+                    authenticationManager(headerManager)
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -206,7 +184,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/v1/**", GET, permitAll) }
-                    authenticationProvider(headerProvider)
+                    authenticationManager(headerManager)
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -251,7 +229,7 @@ class JavalinSecurityHardeningIT {
                     authorizeRequests { authorize("/api/v1/**", GET, hasRole("ADMIN")) }
                     // Render a 403 and return without throwing.
                     accessDeniedHandler { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") }
-                    authenticationProvider(headerProvider)
+                    authenticationManager(headerManager)
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("protected-content") }
@@ -290,7 +268,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
-                    authenticationProvider(headerProvider)
+                    authenticationManager(headerManager)
                 }
             }
             cfg.routes.get("/api/v1/resource") { ctx ->
@@ -371,7 +349,7 @@ class JavalinSecurityHardeningIT {
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/v1/users/**", GET, denyAll) }
-                    authenticationProvider(headerProvider)
+                    authenticationManager(headerManager)
                 }
             }
             cfg.routes.get("/api/v1/users/{id}") { it.result("user-${it.pathParam("id")}") }
@@ -388,12 +366,12 @@ class JavalinSecurityHardeningIT {
     // ── async authentication ──────────────────────────────────────────────────
 
     @Test
-    fun `async provider should authenticate and allow access`() = JavalinTest.test(
+    fun `async manager should authenticate and allow access`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/**", GET, authenticated) }
-                    asyncAuthenticationProvider { ctx ->
+                    asyncAuthenticationManager { ctx ->
                         // Simulate I/O without blocking the request thread
                         CompletableFuture.supplyAsync {
                             val user = ctx.header("X-User")
@@ -417,12 +395,12 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `async provider should be fail-closed on authentication failure`() = JavalinTest.test(
+    fun `async manager should be fail-closed on authentication failure`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/**", GET, permitAll) }
-                    asyncAuthenticationProvider { _ ->
+                    asyncAuthenticationManager { _ ->
                         CompletableFuture.completedFuture(
                             AuthenticationResult.Failure("async credential failure"),
                         )
@@ -441,12 +419,12 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `async provider should not run the handler after denial`() = JavalinTest.test(
+    fun `async manager should not run the handler after denial`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.security {
                 http {
                     authorizeRequests { authorize("/api/**", GET, authenticated) }
-                    asyncAuthenticationProvider { _ ->
+                    asyncAuthenticationManager { _ ->
                         CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated)
                     }
                 }

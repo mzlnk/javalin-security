@@ -23,8 +23,8 @@ internal const val AUTHENTICATION_ATTRIBUTE = "io.github.mzlnk.javalin.security.
  * normalizer mirror the final router configuration at startup, so they cannot diverge from the
  * actual routing regardless of declaration order.
  */
-fun JavalinConfig.security(init: JavalinSecurity.Dsl.() -> Unit) {
-    registerPlugin(JavalinSecurityPlugin(JavalinSecurity.Dsl().apply(init).build()))
+fun JavalinConfig.security(init: JavalinSecurityDsl.() -> Unit) {
+    registerPlugin(JavalinSecurityPlugin(JavalinSecurityDsl().apply(init).build()))
 }
 
 /**

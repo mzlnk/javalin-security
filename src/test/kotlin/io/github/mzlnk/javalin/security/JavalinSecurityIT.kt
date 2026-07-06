@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.AuthenticationProvider
+import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.Javalin
 import io.javalin.http.HandlerType.DELETE
@@ -14,10 +14,10 @@ import org.junit.jupiter.api.Test
 class JavalinSecurityIT {
 
     /**
-     * Test provider: authenticates when an `X-User` header is present, granting the authorities
+     * Test manager: authenticates when an `X-User` header is present, granting the authorities
      * listed (comma separated) in `X-Authorities`. A user named "invalid" simulates a bad credential.
      */
-    private val headerProvider = AuthenticationProvider { context ->
+    private val headerManager = AuthenticationManager { context ->
         when (val user = context.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             "invalid" -> AuthenticationResult.Failure(message = "bad credentials")
@@ -33,7 +33,7 @@ class JavalinSecurityIT {
         }
     }
 
-    private fun app(provider: AuthenticationProvider? = headerProvider): Javalin =
+    private fun app(manager: AuthenticationManager? = headerManager): Javalin =
         Javalin.create { cfg ->
             cfg.security {
                 http {
@@ -42,7 +42,7 @@ class JavalinSecurityIT {
                         authorize("/api/v1/**", POST, authenticated)
                         authorize("/api/v1/**", DELETE, hasRole("ADMIN"))
                     }
-                    provider?.let { authenticationProvider(it) }
+                    manager?.let { authenticationManager(it) }
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -140,7 +140,7 @@ class JavalinSecurityIT {
                     authorizeRequests {
                         authorize("/api/v1/**", GET, permitAll)
                     }
-                    authenticationProvider(headerProvider)
+                    authenticationManager(headerManager)
                 }
             }
             cfg.routes.get("/internal") { it.result("secret") }
@@ -154,8 +154,8 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should treat every request as anonymous when no provider is configured`() = JavalinTest.test(
-        app(provider = null),
+    fun `should treat every request as anonymous when no manager is configured`() = JavalinTest.test(
+        app(manager = null),
     ) { _, client ->
         // when / then: permitAll succeeds, authenticated is rejected with 401
         assertThat(client.get("/api/v1/resource").code).isEqualTo(200)
