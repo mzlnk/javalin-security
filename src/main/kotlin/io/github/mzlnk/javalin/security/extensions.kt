@@ -1,7 +1,5 @@
 package io.github.mzlnk.javalin.security
 
-import io.github.mzlnk.javalin.security.authorization.AuthorizationManager
-import io.github.mzlnk.javalin.security.authorization.PathNormalizer
 import io.javalin.config.JavalinConfig
 import io.javalin.http.Context
 
@@ -21,36 +19,14 @@ internal const val AUTHENTICATION_ATTRIBUTE = "io.github.mzlnk.javalin.security.
  *
  * It registers a `beforeMatched` guard that authenticates and authorizes every matched request.
  * Failures surface as Javalin's native `UnauthorizedResponse` (401) and `ForbiddenResponse` (403).
+ *
+ * The guard is wired through a Javalin plugin whose setup runs once the whole `Javalin.create { }`
+ * block has been applied, so it always sees the final router configuration. This means the call
+ * order does not matter: `configureSecurity` may be placed before or after the router settings and
+ * route declarations without risking a mismatch.
  */
 fun JavalinConfig.configureSecurity(config: JavalinSecurityConfig) {
-    val http = config.security.httpConfig
-
-    val caseInsensitive = router.caseInsensitiveRoutes
-    val authorizationManager = AuthorizationManager(
-        http.authorizeRequestsConfig.entries.map { entry ->
-            AuthorizationManager.Entry(
-                pattern = entry.pattern,
-                method = entry.method,
-                rule = entry.rule,
-                caseInsensitive = caseInsensitive,
-            )
-        },
-    )
-
-    val pathNormalizer = PathNormalizer(
-        ignoreTrailingSlashes = router.ignoreTrailingSlashes,
-        treatMultipleSlashesAsSingleSlash = router.treatMultipleSlashesAsSingleSlash,
-    )
-
-    val guard = SecurityGuard(
-        authenticationManager = http.authenticationManager,
-        authorizationManager = authorizationManager,
-        pathNormalizer = pathNormalizer,
-        authenticationEntryPoint = http.authenticationEntryPoint,
-        accessDeniedHandler = http.accessDeniedHandler,
-    )
-
-    routes.beforeMatched(guard::handle)
+    registerPlugin(JavalinSecurityPlugin(config.security))
 }
 
 /**

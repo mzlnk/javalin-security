@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security.http
 
+import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.authentication.AuthenticationEntryPoint
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.AuthenticationProvider
@@ -43,7 +44,8 @@ class HttpConfig internal constructor(
          * tried in registration order by the default [AuthenticationManager], so several strategies
          * (JWT, API key, ...) can coexist without clobbering one another.
          *
-         * Ignored when a custom [authenticationManager] is supplied.
+         * Mutually exclusive with [authenticationManager]: configuring both is rejected at
+         * [build] time with a [SecurityConfigurationException].
          */
         fun authenticationProvider(provider: AuthenticationProvider) {
             this.authenticationProviders += provider
@@ -51,8 +53,11 @@ class HttpConfig internal constructor(
 
         /**
          * Registers a fully custom [AuthenticationManager], taking complete control of how requests
-         * are authenticated. When set, it takes precedence over any registered
-         * [authenticationProvider]s.
+         * are authenticated.
+         *
+         * Mutually exclusive with [authenticationProvider]: a custom manager already owns provider
+         * orchestration, so configuring both is a contradiction and is rejected at [build] time with
+         * a [SecurityConfigurationException] rather than silently ignoring the providers.
          */
         fun authenticationManager(manager: AuthenticationManager) {
             this.authenticationManager = manager
@@ -68,13 +73,24 @@ class HttpConfig internal constructor(
             this.accessDeniedHandler = handler
         }
 
-        fun build(): HttpConfig =
-            HttpConfig(
+        fun build(): HttpConfig {
+            val customManager = authenticationManager
+            if (customManager != null && authenticationProviders.isNotEmpty()) {
+                throw SecurityConfigurationException(
+                    "Both a custom authenticationManager and ${authenticationProviders.size} " +
+                        "authenticationProvider(s) were configured, but they are mutually exclusive: " +
+                        "a custom manager takes full control of authentication and would ignore the " +
+                        "providers. Register either a custom authenticationManager or one or more " +
+                        "authenticationProvider(s), not both.",
+                )
+            }
+            return HttpConfig(
                 authorizeRequestsConfig = authorizeRequestsConfig,
-                authenticationManager = authenticationManager ?: ProviderAuthenticationManager(authenticationProviders.toList()),
+                authenticationManager = customManager ?: ProviderAuthenticationManager(authenticationProviders.toList()),
                 authenticationEntryPoint = authenticationEntryPoint,
                 accessDeniedHandler = accessDeniedHandler,
             )
+        }
 
     }
 

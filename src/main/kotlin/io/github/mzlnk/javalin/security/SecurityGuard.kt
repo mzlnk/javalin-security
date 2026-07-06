@@ -34,7 +34,7 @@ internal class SecurityGuard(
             is AuthenticationResult.Failure -> {
                 // The failure message/cause is logged but never forwarded to the client, to avoid
                 // leaking why authentication failed.
-                log.warn("Authentication failed for {} {}: {}", method, path, result.message ?: "no detail", result.cause)
+                log.warn("Authentication failed for {} {}: {}", method, sanitize(path), sanitize(result.message ?: "no detail"), result.cause)
                 authenticationEntryPoint.commence(context, result)
                 context.skipRemainingHandlers()
                 return
@@ -45,17 +45,17 @@ internal class SecurityGuard(
 
         if (authorizationManager.isGranted(method, path, authentication, context)) {
             if (log.isDebugEnabled) {
-                log.debug("Access granted to {} for {} {}", principalName(authentication), method, path)
+                log.debug("Access granted to {} for {} {}", principalName(authentication), method, sanitize(path))
             }
             return
         }
 
         if (authentication.isAuthenticated) {
-            log.warn("Access denied to {} for {} {}", principalName(authentication), method, path)
+            log.warn("Access denied to {} for {} {}", principalName(authentication), method, sanitize(path))
             accessDeniedHandler.handle(context, authentication)
             context.skipRemainingHandlers()
         } else {
-            log.warn("Access denied to anonymous caller for {} {}", method, path)
+            log.warn("Access denied to anonymous caller for {} {}", method, sanitize(path))
             authenticationEntryPoint.commence(context, null)
             context.skipRemainingHandlers()
         }
@@ -75,10 +75,31 @@ internal class SecurityGuard(
             ?: pathNormalizer.normalize(context.path(), context.contextPath())
 
     private fun principalName(authentication: Authentication): String =
-        (authentication.principal as? AuthenticatedPrincipal)?.name ?: "anonymous"
+        sanitize((authentication.principal as? AuthenticatedPrincipal)?.name ?: "anonymous")
 
     private companion object {
         val log = LoggerFactory.getLogger(SecurityGuard::class.java)
+
+        /** Matches ASCII control characters (including CR, LF and TAB). */
+        val CONTROL_CHARS = Regex("\\p{Cntrl}")
+
+        /** Upper bound on the length of any single value written to the log. */
+        const val MAX_LOGGED_LENGTH = 256
+
+        /**
+         * Sanitizes an attacker-influenced value (request path, principal name, provider message)
+         * before it is written to the log. Control characters are replaced so a crafted value
+         * cannot inject newlines to forge additional log lines (CRLF log injection), and overly
+         * long values are truncated to keep log lines bounded.
+         */
+        fun sanitize(value: String): String {
+            val cleaned = CONTROL_CHARS.replace(value, "_")
+            return if (cleaned.length > MAX_LOGGED_LENGTH) {
+                cleaned.substring(0, MAX_LOGGED_LENGTH) + "..."
+            } else {
+                cleaned
+            }
+        }
     }
 
 }
