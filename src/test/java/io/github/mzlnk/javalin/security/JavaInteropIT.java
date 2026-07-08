@@ -4,9 +4,9 @@ import io.github.mzlnk.javalin.security.authentication.Authentication;
 import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult;
-import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler;
-import io.github.mzlnk.javalin.security.authorization.AuthorizationRule;
-import io.github.mzlnk.javalin.security.authorization.Rules;
+import io.github.mzlnk.javalin.security.http.authorization.AccessDeniedHandler;
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRule;
+import io.github.mzlnk.javalin.security.http.authorization.Rules;
 import io.javalin.Javalin;
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
@@ -49,7 +49,7 @@ class JavaInteropIT {
                 .http(http -> http
                         .authorizeRequests(auth -> auth
                                 .authorize("/api/**", GET, Rules.permitAll())
-                                .authorize("/admin/**", POST, Rules.hasRole("ADMIN"))
+                                .authorize("/admin/**", POST, Rules.hasAuthority("ADMIN"))
                                 .anyRequest(Rules.denyAll()))
                         .authenticationManager(headerManager))
                 .build();
@@ -66,8 +66,6 @@ class JavaInteropIT {
         assertThat(Rules.authenticated()).isNotNull();
         assertThat(Rules.hasAuthority("READ")).isNotNull();
         assertThat(Rules.hasAnyAuthority("READ", "WRITE")).isNotNull();
-        assertThat(Rules.hasRole("ADMIN")).isNotNull();
-        assertThat(Rules.hasAnyRole("ADMIN", "USER")).isNotNull();
     }
 
     // ── custom AuthorizationRule as lambda ────────────────────────────────────
@@ -109,7 +107,7 @@ class JavaInteropIT {
     void custom_entry_point_and_access_denied_handler() {
         JavalinSecurity security = JavalinSecurity.builder()
                 .http(http -> http
-                        .authorizeRequests(auth -> auth.anyRequest(Rules.hasRole("ADMIN")))
+                        .authorizeRequests(auth -> auth.anyRequest(Rules.hasAuthority("ADMIN")))
                         .authenticationManager(headerManager)
                         .unauthorizedHandler((ctx, failure) -> ctx.status(401).result("custom-401"))
                         .accessDeniedHandler((ctx, auth) -> ctx.status(403).result("custom-403")))
@@ -175,7 +173,7 @@ class JavaInteropIT {
             JavalinSecurity security = JavalinSecurity.builder()
                     .http(http -> http
                             .authorizeRequests(auth -> auth
-                                    .authorize("/api/**", GET, Rules.hasRole("ADMIN")))
+                                    .authorize("/api/**", GET, Rules.hasAuthority("ADMIN")))
                             .authenticationManager(headerManager)
                             .accessDeniedHandler(denied))
                     .build();

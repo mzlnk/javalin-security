@@ -2,6 +2,7 @@ package io.github.mzlnk.javalin.security.authorization
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.TestPrincipal
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRules
 import io.github.mzlnk.javalin.security.mockContext
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -48,42 +49,6 @@ class AuthorizationRulesTest {
 
         // then
         assertThat(granted).isFalse()
-    }
-
-    @Test
-    fun `should grant when caller has the required role`() {
-        // when
-        val granted = AuthorizationRules.hasRole("ADMIN").isGranted(authenticated("ROLE_ADMIN"), context)
-
-        // then
-        assertThat(granted).isTrue()
-    }
-
-    @Test
-    fun `should deny when caller lacks the required role`() {
-        // when
-        val granted = AuthorizationRules.hasRole("ADMIN").isGranted(authenticated("ROLE_USER"), context)
-
-        // then
-        assertThat(granted).isFalse()
-    }
-
-    @Test
-    fun `should deny hasRole when caller is anonymous`() {
-        // when
-        val granted = AuthorizationRules.hasRole("ADMIN").isGranted(anonymous, context)
-
-        // then
-        assertThat(granted).isFalse()
-    }
-
-    @Test
-    fun `should grant when caller has any of the required roles`() {
-        // when
-        val granted = AuthorizationRules.hasAnyRole("ADMIN", "USER").isGranted(authenticated("ROLE_USER"), context)
-
-        // then
-        assertThat(granted).isTrue()
     }
 
     @Test

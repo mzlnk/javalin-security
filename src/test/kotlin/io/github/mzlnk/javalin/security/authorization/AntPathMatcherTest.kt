@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security.authorization
 
+import io.github.mzlnk.javalin.security.http.authorization.AntPathMatcher
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 

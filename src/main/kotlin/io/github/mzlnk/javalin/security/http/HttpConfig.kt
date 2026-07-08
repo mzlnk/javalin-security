@@ -4,8 +4,7 @@ import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
-import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
-import io.github.mzlnk.javalin.security.http.authorize.AuthorizeRequestsConfig
+import io.github.mzlnk.javalin.security.http.authorization.AccessDeniedHandler
 import java.util.function.Consumer
 
 /**
@@ -37,8 +36,20 @@ class HttpConfig internal constructor(
         private var unauthorizedHandler: UnauthorizedHandler = UnauthorizedHandler.DEFAULT
         private var accessDeniedHandler: AccessDeniedHandler = AccessDeniedHandler.DEFAULT
 
+        private var authorizeRequestsSet = false
+        private var authenticationManagerSet = false
+        private var asyncAuthenticationManagerSet = false
+        private var unauthorizedHandlerSet = false
+        private var accessDeniedHandlerSet = false
+
         /** Configures the request authorization rules. */
         fun authorizeRequests(configure: Consumer<AuthorizeRequestsConfig.Builder>): Builder {
+            if (authorizeRequestsSet) {
+                throw SecurityConfigurationException(
+                    "authorizeRequests was already configured; it may only be set once.",
+                )
+            }
+            authorizeRequestsSet = true
             val builder = AuthorizeRequestsConfig.Builder()
             configure.accept(builder)
             this.authorizeRequestsConfig = builder.build()
@@ -46,6 +57,12 @@ class HttpConfig internal constructor(
         }
 
         internal fun authorizeRequests(config: AuthorizeRequestsConfig): Builder {
+            if (authorizeRequestsSet) {
+                throw SecurityConfigurationException(
+                    "authorizeRequests was already configured; it may only be set once.",
+                )
+            }
+            authorizeRequestsSet = true
             this.authorizeRequestsConfig = config
             return this
         }
@@ -55,8 +72,16 @@ class HttpConfig internal constructor(
          *
          * This is the hook that companion libraries call from their own configuration extension
          * functions. Mutually exclusive with [asyncAuthenticationManager].
+         *
+         * May only be called once; a second call throws [SecurityConfigurationException].
          */
         fun authenticationManager(manager: AuthenticationManager): Builder {
+            if (authenticationManagerSet) {
+                throw SecurityConfigurationException(
+                    "authenticationManager was already configured; it may only be set once.",
+                )
+            }
+            authenticationManagerSet = true
             this.authenticationManager = manager
             return this
         }
@@ -71,20 +96,48 @@ class HttpConfig internal constructor(
          * Mutually exclusive with [authenticationManager]. For `config.useVirtualThreads = true`
          * applications, the blocking path is typically preferred — virtual threads make blocking
          * I/O cheap.
+         *
+         * May only be called once; a second call throws [SecurityConfigurationException].
          */
         fun asyncAuthenticationManager(manager: AsyncAuthenticationManager): Builder {
+            if (asyncAuthenticationManagerSet) {
+                throw SecurityConfigurationException(
+                    "asyncAuthenticationManager was already configured; it may only be set once.",
+                )
+            }
+            asyncAuthenticationManagerSet = true
             this.asyncAuthenticationManager = manager
             return this
         }
 
-        /** Overrides how failed/absent authentication is rendered (HTTP 401 by default). */
+        /**
+         * Overrides how failed/absent authentication is rendered (HTTP 401 by default).
+         *
+         * May only be called once; a second call throws [SecurityConfigurationException].
+         */
         fun unauthorizedHandler(handler: UnauthorizedHandler): Builder {
+            if (unauthorizedHandlerSet) {
+                throw SecurityConfigurationException(
+                    "unauthorizedHandler was already configured; it may only be set once.",
+                )
+            }
+            unauthorizedHandlerSet = true
             this.unauthorizedHandler = handler
             return this
         }
 
-        /** Overrides how access-denied for an authenticated caller is rendered (HTTP 403 by default). */
+        /**
+         * Overrides how access-denied for an authenticated caller is rendered (HTTP 403 by default).
+         *
+         * May only be called once; a second call throws [SecurityConfigurationException].
+         */
         fun accessDeniedHandler(handler: AccessDeniedHandler): Builder {
+            if (accessDeniedHandlerSet) {
+                throw SecurityConfigurationException(
+                    "accessDeniedHandler was already configured; it may only be set once.",
+                )
+            }
+            accessDeniedHandlerSet = true
             this.accessDeniedHandler = handler
             return this
         }

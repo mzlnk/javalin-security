@@ -18,9 +18,20 @@ class JavalinSecurity internal constructor(
     class Builder {
 
         private var httpConfig: HttpConfig = HttpConfig.Builder().build()
+        private var httpSet = false
 
-        /** Configures the HTTP security block. */
+        /**
+         * Configures the HTTP security block.
+         *
+         * May only be called once; a second call throws [SecurityConfigurationException].
+         */
         fun http(configure: Consumer<HttpConfig.Builder>): Builder {
+            if (httpSet) {
+                throw SecurityConfigurationException(
+                    "http was already configured; it may only be set once.",
+                )
+            }
+            httpSet = true
             val builder = HttpConfig.Builder()
             configure.accept(builder)
             this.httpConfig = builder.build()
@@ -28,6 +39,12 @@ class JavalinSecurity internal constructor(
         }
 
         internal fun http(config: HttpConfig): Builder {
+            if (httpSet) {
+                throw SecurityConfigurationException(
+                    "http was already configured; it may only be set once.",
+                )
+            }
+            httpSet = true
             this.httpConfig = config
             return this
         }
@@ -52,9 +69,15 @@ class JavalinSecurity internal constructor(
          * Equivalent to the Kotlin `config.security { }` extension when the [JavalinSecurity]
          * object has already been constructed (e.g. by a [builder]).
          *
-         * The security guard runs at [io.javalin.plugin.PluginPriority.EARLY], so it is the first
-         * `beforeMatched` handler and every subsequent handler observes a populated
-         * [io.github.mzlnk.javalin.security.authentication.Authentication] on the context.
+         * The security guard always runs before the matched route handler — this is enforced by
+         * Javalin's own `beforeMatched` lifecycle. The plugin runs at
+         * [io.javalin.plugin.PluginPriority.EARLY], which orders the guard ahead of `beforeMatched`
+         * handlers added by other plugins (`NORMAL` or `LATE` priority). However, `beforeMatched`
+         * handlers registered directly via `cfg.routes.beforeMatched()` inside `Javalin.create { }`
+         * are added before any plugin's `onStart`, so they run before the guard and will not yet
+         * see a populated [io.github.mzlnk.javalin.security.authentication.Authentication].
+         * To observe the resolved authentication, add handlers on the Javalin instance after
+         * creation (`app.beforeMatched { }`) or read it inside the matched route handler itself.
          */
         @JvmStatic
         fun enable(config: JavalinConfig, security: JavalinSecurity) {

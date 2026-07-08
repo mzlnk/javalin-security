@@ -3,8 +3,7 @@ package io.github.mzlnk.javalin.security.http
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
-import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
-import io.github.mzlnk.javalin.security.http.authorize.AuthorizeRequestsConfigDsl
+import io.github.mzlnk.javalin.security.http.authorization.AccessDeniedHandler
 
 /**
  * Kotlin DSL receiver for the `http { }` security block.

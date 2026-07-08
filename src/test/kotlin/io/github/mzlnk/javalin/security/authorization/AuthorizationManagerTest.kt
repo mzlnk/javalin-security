@@ -2,6 +2,8 @@ package io.github.mzlnk.javalin.security.authorization
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.TestPrincipal
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRules
 import io.github.mzlnk.javalin.security.mockContext
 import io.javalin.http.HandlerType
 import org.assertj.core.api.Assertions.assertThat
@@ -91,11 +93,11 @@ class AuthorizationManagerTest {
     fun `should deny when the matching rule is not satisfied`() {
         // given
         val manager = AuthorizationManager(
-            listOf(AuthorizationManager.Entry("/api/**", HandlerType.GET, AuthorizationRules.hasRole("ADMIN"))),
+            listOf(AuthorizationManager.Entry("/api/**", HandlerType.GET, AuthorizationRules.hasAuthority("ADMIN"))),
         )
 
         // when
-        val granted = manager.isGranted(HandlerType.GET, "/api/x", authenticated("ROLE_USER"), mockContext())
+        val granted = manager.isGranted(HandlerType.GET, "/api/x", authenticated("USER"), mockContext())
 
         // then
         assertThat(granted).isFalse()
@@ -105,11 +107,11 @@ class AuthorizationManagerTest {
     fun `should grant access when the matching rule is satisfied`() {
         // given
         val manager = AuthorizationManager(
-            listOf(AuthorizationManager.Entry("/api/**", HandlerType.DELETE, AuthorizationRules.hasRole("ADMIN"))),
+            listOf(AuthorizationManager.Entry("/api/**", HandlerType.DELETE, AuthorizationRules.hasAuthority("ADMIN"))),
         )
 
         // when
-        val granted = manager.isGranted(HandlerType.DELETE, "/api/x", authenticated("ROLE_ADMIN"), mockContext())
+        val granted = manager.isGranted(HandlerType.DELETE, "/api/x", authenticated("ADMIN"), mockContext())
 
         // then
         assertThat(granted).isTrue()

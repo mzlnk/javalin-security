@@ -1,15 +1,15 @@
-package io.github.mzlnk.javalin.security.http.authorize
+package io.github.mzlnk.javalin.security.http
 
-import io.github.mzlnk.javalin.security.authorization.AuthorizationRule
-import io.github.mzlnk.javalin.security.authorization.AuthorizationRuleFactory
-import io.github.mzlnk.javalin.security.authorization.AuthorizationRules
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRule
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRuleFactory
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRules
 import io.javalin.http.HandlerType
 
 /**
  * Kotlin DSL receiver for the `authorizeRequests { }` block.
  *
  * Implements [AuthorizationRuleFactory] via delegation so the built-in rules ([permitAll],
- * [denyAll], [authenticated], [hasRole], etc.) are available as unqualified names inside the
+ * [denyAll], [authenticated], [hasAuthority], etc.) are available as unqualified names inside the
  * block, e.g. `authorize("/api/...", GET, permitAll)`.
  */
 class AuthorizeRequestsConfigDsl internal constructor() : AuthorizationRuleFactory by AuthorizationRules {

@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security.authorization
+package io.github.mzlnk.javalin.security.http.authorization
 
 /**
  * The set of built-in authorization rule factories.
@@ -24,12 +24,6 @@ interface AuthorizationRuleFactory {
     /** Grants access when the caller holds at least one of the given [authorities]. */
     fun hasAnyAuthority(vararg authorities: String): AuthorizationRule
 
-    /** Grants access when the caller holds the role, i.e. the authority `ROLE_<role>`. */
-    fun hasRole(role: String): AuthorizationRule
-
-    /** Grants access when the caller holds at least one of the given roles (`ROLE_<role>`). */
-    fun hasAnyRole(vararg roles: String): AuthorizationRule
-
 }
 
 /**
@@ -50,9 +44,5 @@ object AuthorizationRules : AuthorizationRuleFactory {
     override fun hasAuthority(authority: String): AuthorizationRule = Rules.hasAuthority(authority)
 
     override fun hasAnyAuthority(vararg authorities: String): AuthorizationRule = Rules.hasAnyAuthority(*authorities)
-
-    override fun hasRole(role: String): AuthorizationRule = Rules.hasRole(role)
-
-    override fun hasAnyRole(vararg roles: String): AuthorizationRule = Rules.hasAnyRole(*roles)
 
 }

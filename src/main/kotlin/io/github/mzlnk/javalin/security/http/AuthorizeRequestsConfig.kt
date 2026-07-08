@@ -1,6 +1,7 @@
-package io.github.mzlnk.javalin.security.http.authorize
+package io.github.mzlnk.javalin.security.http
 
-import io.github.mzlnk.javalin.security.authorization.AuthorizationRule
+import io.github.mzlnk.javalin.security.SecurityConfigurationException
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRule
 import io.javalin.http.HandlerType
 
 /**
@@ -23,6 +24,8 @@ class AuthorizeRequestsConfig internal constructor(
     class Builder {
 
         private val entries = mutableListOf<Entry>()
+        private var anyRequestSet = false
+        private var corsPreflightSet = false
 
         /**
          * Registers a rule for requests matching [pattern] with the given HTTP [method].
@@ -50,8 +53,16 @@ class AuthorizeRequestsConfig internal constructor(
          *
          * Because matching is first-match-wins, this should be declared last; it mirrors Spring
          * Security's `anyRequest()` and reduces the risk of leaving routes uncovered.
+         *
+         * May only be called once; a second call throws [SecurityConfigurationException].
          */
         fun anyRequest(rule: AuthorizationRule): Builder {
+            if (anyRequestSet) {
+                throw SecurityConfigurationException(
+                    "anyRequest was already configured; it may only be set once.",
+                )
+            }
+            anyRequestSet = true
             entries += Entry(pattern = "/**", method = null, rule = rule)
             return this
         }
@@ -67,8 +78,16 @@ class AuthorizeRequestsConfig internal constructor(
          * **Ordering:** Call this before `anyRequest(denyAll)` (first-match-wins). Javalin's CORS
          * plugin must be registered alongside security to add the required CORS response headers;
          * this helper only controls whether the security guard passes the preflight through.
+         *
+         * May only be called once; a second call throws [SecurityConfigurationException].
          */
         fun permitCorsPreflight(): Builder {
+            if (corsPreflightSet) {
+                throw SecurityConfigurationException(
+                    "permitCorsPreflight was already configured; it may only be set once.",
+                )
+            }
+            corsPreflightSet = true
             entries += Entry(
                 pattern = "/**",
                 method = HandlerType.OPTIONS,

@@ -160,7 +160,7 @@ class JavalinSecurityHardeningIT {
         Javalin.create { cfg ->
             cfg.security {
                 http {
-                    authorizeRequests { authorize("/api/v1/**", GET, hasRole("ADMIN")) }
+                    authorizeRequests { authorize("/api/v1/**", GET, hasAuthority("ADMIN")) }
                     accessDeniedHandler = { ctx, _ ->
                         throw io.javalin.http.ForbiddenResponse("custom denied")
                     }
@@ -226,7 +226,7 @@ class JavalinSecurityHardeningIT {
         Javalin.create { cfg ->
             cfg.security {
                 http {
-                    authorizeRequests { authorize("/api/v1/**", GET, hasRole("ADMIN")) }
+                    authorizeRequests { authorize("/api/v1/**", GET, hasAuthority("ADMIN")) }
                     // Render a 403 and return without throwing.
                     accessDeniedHandler = { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") }
                     authenticationManager = headerManager
@@ -438,5 +438,50 @@ class JavalinSecurityHardeningIT {
         // then: the handler never runs
         assertThat(response.code).isEqualTo(401)
         assertThat(response.body.string()).doesNotContain("protected-content")
+    }
+
+    @Test
+    fun `async manager should be fail-closed when the future completes exceptionally`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security {
+                http {
+                    authorizeRequests { authorize("/api/**", GET, permitAll) }
+                    asyncAuthenticationManager = { _ ->
+                        CompletableFuture.failedFuture(RuntimeException("internal IdP error"))
+                    }
+                }
+            }
+            cfg.routes.get("/api/resource") { it.result("protected-content") }
+        },
+    ) { _, client ->
+        // when: the provider future completes with an exception
+        val response = client.get("/api/resource")
+
+        // then: the request is denied with 401 (not a 500), the handler never runs, and the
+        // internal cause is not present in the response body
+        assertThat(response.code).isEqualTo(401)
+        assertThat(response.body.string()).doesNotContain("protected-content")
+        assertThat(response.body.string()).doesNotContain("internal IdP error")
+    }
+
+    @Test
+    fun `async manager should be fail-closed when authenticate throws synchronously`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security {
+                http {
+                    authorizeRequests { authorize("/api/**", GET, permitAll) }
+                    asyncAuthenticationManager = { _ -> throw IllegalStateException("sync crash in provider") }
+                }
+            }
+            cfg.routes.get("/api/resource") { it.result("protected-content") }
+        },
+    ) { _, client ->
+        // when: the provider throws before even returning a future
+        val response = client.get("/api/resource")
+
+        // then: the request is denied with 401, and no internal detail is leaked
+        assertThat(response.code).isEqualTo(401)
+        assertThat(response.body.string()).doesNotContain("protected-content")
+        assertThat(response.body.string()).doesNotContain("sync crash in provider")
     }
 }

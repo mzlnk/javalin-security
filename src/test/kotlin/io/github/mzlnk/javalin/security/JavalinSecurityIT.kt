@@ -40,7 +40,7 @@ class JavalinSecurityIT {
                     authorizeRequests {
                         authorize("/api/v1/**", GET, permitAll)
                         authorize("/api/v1/**", POST, authenticated)
-                        authorize("/api/v1/**", DELETE, hasRole("ADMIN"))
+                        authorize("/api/v1/**", DELETE, hasAuthority("ADMIN"))
                     }
                     manager?.let { authenticationManager = it }
                 }
@@ -93,7 +93,7 @@ class JavalinSecurityIT {
         // when
         val response = client.delete("/api/v1/resource", null) {
             it.header("X-User", "bob")
-            it.header("X-Authorities", "ROLE_USER")
+            it.header("X-Authorities", "USER")
         }
 
         // then
@@ -105,7 +105,7 @@ class JavalinSecurityIT {
         // when
         val response = client.delete("/api/v1/resource", null) {
             it.header("X-User", "admin")
-            it.header("X-Authorities", "ROLE_ADMIN")
+            it.header("X-Authorities", "ADMIN")
         }
 
         // then

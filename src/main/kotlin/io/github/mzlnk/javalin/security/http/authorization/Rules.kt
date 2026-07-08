@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security.authorization
+package io.github.mzlnk.javalin.security.http.authorization
 
 /**
  * The single source of truth for built-in [AuthorizationRule] logic.
@@ -10,8 +10,6 @@ package io.github.mzlnk.javalin.security.authorization
  * via [AuthorizationRuleFactory] delegation on [AuthorizationRules], which delegates here.
  */
 object Rules {
-
-    internal const val ROLE_PREFIX = "ROLE_"
 
     /** Always grants access, even to unauthenticated callers. */
     @JvmStatic
@@ -36,14 +34,5 @@ object Rules {
         AuthorizationRule { authentication, _ ->
             authentication.isAuthenticated && authorities.any { it in authentication.authorities }
         }
-
-    /** Grants access when the caller holds the role, i.e. the authority `ROLE_<role>`. */
-    @JvmStatic
-    fun hasRole(role: String): AuthorizationRule = hasAuthority(ROLE_PREFIX + role)
-
-    /** Grants access when the caller holds at least one of the given roles (`ROLE_<role>`). */
-    @JvmStatic
-    fun hasAnyRole(vararg roles: String): AuthorizationRule =
-        hasAnyAuthority(*roles.map { ROLE_PREFIX + it }.toTypedArray())
 
 }

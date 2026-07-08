@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security.authorization
+package io.github.mzlnk.javalin.security.http.authorization
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.javalin.http.Context
@@ -13,7 +13,7 @@ import io.javalin.http.HandlerType
  * [io.github.mzlnk.javalin.security.SecurityGuard].
  *
  * Matching operates on the already-normalized request path (see
- * [io.github.mzlnk.javalin.security.authorization.PathNormalizer]) so it stays consistent with
+ * [PathNormalizer]) so it stays consistent with
  * Javalin's own route matching.
  */
 internal class AuthorizationManager(

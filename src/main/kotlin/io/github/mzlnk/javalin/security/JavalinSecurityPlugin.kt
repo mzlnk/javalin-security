@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security
 
-import io.github.mzlnk.javalin.security.authorization.AuthorizationManager
-import io.github.mzlnk.javalin.security.authorization.PathNormalizer
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
+import io.github.mzlnk.javalin.security.http.authorization.PathNormalizer
 import io.javalin.config.JavalinState
 import io.javalin.plugin.Plugin
 import io.javalin.plugin.PluginPriority

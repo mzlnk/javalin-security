@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security.authorization
+package io.github.mzlnk.javalin.security.http.authorization
 
 /**
  * Normalizes an incoming request path so that authorization matching stays consistent with how

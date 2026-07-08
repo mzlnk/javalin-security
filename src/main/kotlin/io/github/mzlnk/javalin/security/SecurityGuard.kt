@@ -5,12 +5,13 @@ import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
-import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
-import io.github.mzlnk.javalin.security.authorization.AuthorizationManager
-import io.github.mzlnk.javalin.security.authorization.PathNormalizer
+import io.github.mzlnk.javalin.security.http.authorization.AccessDeniedHandler
+import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
+import io.github.mzlnk.javalin.security.http.authorization.PathNormalizer
 import io.javalin.http.Context
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 
 /**
  * The request-time pipeline and the sole bridge between the framework and Javalin.
@@ -72,7 +73,16 @@ internal class SecurityGuard(
 
     private fun handleAsync(context: Context, method: io.javalin.http.HandlerType, path: String) {
         context.future {
-            asyncAuthenticationManager!!.authenticate(context)
+            val authFuture = try {
+                asyncAuthenticationManager!!.authenticate(context)
+            } catch (t: Throwable) {
+                CompletableFuture.failedFuture(t)
+            }
+            authFuture
+                .exceptionally { throwable ->
+                    val cause = (throwable as? CompletionException)?.cause ?: throwable
+                    AuthenticationResult.Failure(message = "async authentication error", cause = cause)
+                }
                 .thenApply { result ->
                     when (result) {
                         is AuthenticationResult.Success -> result.authentication
