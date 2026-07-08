@@ -2,7 +2,7 @@ package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
-import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRules
+import io.github.mzlnk.javalin.security.authorization.AuthorizationRules
 import io.javalin.http.HandlerType.GET
 import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy

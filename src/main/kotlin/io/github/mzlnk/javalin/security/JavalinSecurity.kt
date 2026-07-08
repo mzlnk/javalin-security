@@ -1,6 +1,7 @@
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.http.HttpConfig
+import io.github.mzlnk.javalin.security.ws.WsConfig
 import io.javalin.config.JavalinConfig
 import java.util.function.Consumer
 
@@ -13,12 +14,15 @@ import java.util.function.Consumer
  */
 class JavalinSecurity internal constructor(
     internal val httpConfig: HttpConfig,
+    internal val wsConfig: WsConfig?,
 ) {
 
     class Builder {
 
         private var httpConfig: HttpConfig = HttpConfig.Builder().build()
+        private var wsConfig: WsConfig? = null
         private var httpSet = false
+        private var wsSet = false
 
         /**
          * Configures the HTTP security block.
@@ -49,7 +53,36 @@ class JavalinSecurity internal constructor(
             return this
         }
 
-        fun build(): JavalinSecurity = JavalinSecurity(httpConfig = httpConfig)
+        /**
+         * Configures the WebSocket security block.
+         *
+         * May only be called once; a second call throws [SecurityConfigurationException].
+         */
+        fun ws(configure: Consumer<WsConfig.Builder>): Builder {
+            if (wsSet) {
+                throw SecurityConfigurationException(
+                    "ws was already configured; it may only be set once.",
+                )
+            }
+            wsSet = true
+            val builder = WsConfig.Builder()
+            configure.accept(builder)
+            this.wsConfig = builder.build()
+            return this
+        }
+
+        internal fun ws(config: WsConfig): Builder {
+            if (wsSet) {
+                throw SecurityConfigurationException(
+                    "ws was already configured; it may only be set once.",
+                )
+            }
+            wsSet = true
+            this.wsConfig = config
+            return this
+        }
+
+        fun build(): JavalinSecurity = JavalinSecurity(httpConfig = httpConfig, wsConfig = wsConfig)
 
     }
 

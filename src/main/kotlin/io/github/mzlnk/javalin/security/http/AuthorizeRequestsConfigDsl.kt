@@ -1,8 +1,8 @@
 package io.github.mzlnk.javalin.security.http
 
-import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRule
-import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRuleFactory
-import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRules
+import io.github.mzlnk.javalin.security.authorization.AuthorizationRule
+import io.github.mzlnk.javalin.security.authorization.AuthorizationRuleFactory
+import io.github.mzlnk.javalin.security.authorization.AuthorizationRules
 import io.javalin.http.HandlerType
 
 /**

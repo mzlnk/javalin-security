@@ -1,27 +1,26 @@
-package io.github.mzlnk.javalin.security.http
+package io.github.mzlnk.javalin.security.ws
 
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
-import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
 import java.util.function.Consumer
 
 /**
- * The HTTP security configuration: request authorization rules, authentication orchestration,
- * and how authentication/authorization failures are rendered.
+ * The WebSocket security configuration: upgrade-time authorization rules, authentication
+ * orchestration, and how authentication/authorization failures are rendered.
  *
- * Use [Builder] to construct an instance. Companion libraries contribute their authentication
- * strategy by calling [Builder.authenticationManager] or [Builder.asyncAuthenticationManager].
+ * WebSocket authorization is evaluated once during the HTTP upgrade request (before the handshake
+ * completes). Once the WebSocket is established, all events (connect, message, close, error) are
+ * permitted. The authentication managers configured here are independent from the HTTP security
+ * block -- if not explicitly set, the WS guard authenticates requests for WS paths using its
+ * own configured manager.
  *
- * **Sync vs async authentication.** The default, zero-overhead path uses a blocking [AuthenticationManager].
- * For authentication that performs remote I/O (JWKS endpoint, database), the opt-in
- * [Builder.asyncAuthenticationManager] path releases the request thread while authentication is
- * in flight. With `config.useVirtualThreads = true`, the blocking manager is usually sufficient;
- * async is an advanced option.
+ * Use [Builder] to construct an instance.
  */
-class HttpConfig internal constructor(
-    val authorizeRequestsConfig: AuthorizeRequestsConfig,
+class WsConfig internal constructor(
+    val authorizeConfig: WsAuthorizeConfig,
     internal val authenticationManager: AuthenticationManager?,
     internal val asyncAuthenticationManager: AsyncAuthenticationManager?,
     internal val unauthorizedHandler: UnauthorizedHandler,
@@ -30,7 +29,7 @@ class HttpConfig internal constructor(
 
     class Builder {
 
-        private var authorizeRequestsConfig: AuthorizeRequestsConfig = AuthorizeRequestsConfig.Builder().build()
+        private var authorizeConfig: WsAuthorizeConfig = WsAuthorizeConfig.Builder().build()
         private var authenticationManager: AuthenticationManager? = null
         private var asyncAuthenticationManager: AsyncAuthenticationManager? = null
         private var unauthorizedHandler: UnauthorizedHandler = UnauthorizedHandler.DEFAULT
@@ -42,36 +41,35 @@ class HttpConfig internal constructor(
         private var unauthorizedHandlerSet = false
         private var accessDeniedHandlerSet = false
 
-        /** Configures the request authorization rules. */
-        fun authorizeRequests(configure: Consumer<AuthorizeRequestsConfig.Builder>): Builder {
+        /** Configures the WebSocket authorization rules. */
+        fun authorizeRequests(configure: Consumer<WsAuthorizeConfig.Builder>): Builder {
             if (authorizeRequestsSet) {
                 throw SecurityConfigurationException(
                     "authorizeRequests was already configured; it may only be set once.",
                 )
             }
             authorizeRequestsSet = true
-            val builder = AuthorizeRequestsConfig.Builder()
+            val builder = WsAuthorizeConfig.Builder()
             configure.accept(builder)
-            this.authorizeRequestsConfig = builder.build()
+            this.authorizeConfig = builder.build()
             return this
         }
 
-        internal fun authorizeRequests(config: AuthorizeRequestsConfig): Builder {
+        internal fun authorizeRequests(config: WsAuthorizeConfig): Builder {
             if (authorizeRequestsSet) {
                 throw SecurityConfigurationException(
                     "authorizeRequests was already configured; it may only be set once.",
                 )
             }
             authorizeRequestsSet = true
-            this.authorizeRequestsConfig = config
+            this.authorizeConfig = config
             return this
         }
 
         /**
-         * Registers a blocking [AuthenticationManager].
+         * Registers a blocking [AuthenticationManager] for WebSocket upgrade authentication.
          *
-         * This is the hook that companion libraries call from their own configuration extension
-         * functions. Mutually exclusive with [asyncAuthenticationManager].
+         * Mutually exclusive with [asyncAuthenticationManager].
          *
          * May only be called once; a second call throws [SecurityConfigurationException].
          */
@@ -87,15 +85,10 @@ class HttpConfig internal constructor(
         }
 
         /**
-         * Registers an opt-in async [AsyncAuthenticationManager] for I/O-bound authentication.
+         * Registers an opt-in async [AsyncAuthenticationManager] for I/O-bound WebSocket
+         * authentication.
          *
-         * The security guard integrates with Javalin's async machinery ([io.javalin.http.Context.future])
-         * to release the request thread while authentication is in flight. All fail-closed
-         * semantics and no-message-leak behaviour are preserved across the async boundary.
-         *
-         * Mutually exclusive with [authenticationManager]. For `config.useVirtualThreads = true`
-         * applications, the blocking path is typically preferred — virtual threads make blocking
-         * I/O cheap.
+         * Mutually exclusive with [authenticationManager].
          *
          * May only be called once; a second call throws [SecurityConfigurationException].
          */
@@ -111,7 +104,7 @@ class HttpConfig internal constructor(
         }
 
         /**
-         * Overrides how failed/absent authentication is rendered (HTTP 401 by default).
+         * Overrides how failed/absent WebSocket authentication is rendered (HTTP 401 by default).
          *
          * May only be called once; a second call throws [SecurityConfigurationException].
          */
@@ -127,7 +120,8 @@ class HttpConfig internal constructor(
         }
 
         /**
-         * Overrides how access-denied for an authenticated caller is rendered (HTTP 403 by default).
+         * Overrides how WebSocket access-denied for an authenticated caller is rendered
+         * (HTTP 403 by default).
          *
          * May only be called once; a second call throws [SecurityConfigurationException].
          */
@@ -142,17 +136,17 @@ class HttpConfig internal constructor(
             return this
         }
 
-        fun build(): HttpConfig {
+        fun build(): WsConfig {
             if (authenticationManager != null && asyncAuthenticationManager != null) {
                 throw SecurityConfigurationException(
                     "Both a blocking authenticationManager and an asyncAuthenticationManager were " +
-                        "configured, but they are mutually exclusive: choose one authentication " +
-                        "path (blocking or async) per security configuration.",
+                        "configured for the WS block, but they are mutually exclusive: choose one " +
+                        "authentication path (blocking or async) per security configuration.",
                 )
             }
 
-            return HttpConfig(
-                authorizeRequestsConfig = authorizeRequestsConfig,
+            return WsConfig(
+                authorizeConfig = authorizeConfig,
                 authenticationManager = authenticationManager,
                 asyncAuthenticationManager = asyncAuthenticationManager,
                 unauthorizedHandler = unauthorizedHandler,

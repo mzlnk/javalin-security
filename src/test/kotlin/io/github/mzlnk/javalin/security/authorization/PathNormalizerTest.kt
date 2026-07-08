@@ -1,6 +1,6 @@
 package io.github.mzlnk.javalin.security.authorization
 
-import io.github.mzlnk.javalin.security.http.authorization.PathNormalizer
+import io.github.mzlnk.javalin.security.PathNormalizer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 

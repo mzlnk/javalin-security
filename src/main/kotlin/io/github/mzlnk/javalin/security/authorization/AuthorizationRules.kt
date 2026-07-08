@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security.http.authorization
+package io.github.mzlnk.javalin.security.authorization
 
 /**
  * The set of built-in authorization rule factories.

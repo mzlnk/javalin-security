@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security.http.authorization
+package io.github.mzlnk.javalin.security
 
 /**
  * Normalizes an incoming request path so that authorization matching stays consistent with how
@@ -9,8 +9,9 @@ package io.github.mzlnk.javalin.security.http.authorization
  * authorization rule - an authorization bypass. The flags here mirror Javalin's
  * `io.javalin.config.RouterConfig` so the two layers agree.
  *
- * Case sensitivity is intentionally handled by [AntPathMatcher] (via a case-insensitive regex)
- * rather than here, so patterns and paths keep their original casing for logging.
+ * Case sensitivity is intentionally handled by [io.github.mzlnk.javalin.security.authorization.AntPathMatcher]
+ * (via a case-insensitive regex) rather than here, so patterns and paths keep their original casing
+ * for logging.
  *
  * The context path is supplied per call (from `context.contextPath()`) and stripped with a plain
  * `removePrefix`, mirroring Javalin's own `ctx.path().removePrefix(ctx.contextPath())` so the two

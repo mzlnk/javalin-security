@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security.http.authorization
+package io.github.mzlnk.javalin.security.authorization
 
 /**
  * A lightweight ant-style path matcher, decoupled from Javalin routing so that authorization

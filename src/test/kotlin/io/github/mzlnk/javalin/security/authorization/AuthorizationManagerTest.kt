@@ -3,7 +3,7 @@ package io.github.mzlnk.javalin.security.authorization
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.TestPrincipal
 import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
-import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRules
+import io.github.mzlnk.javalin.security.authorization.AuthorizationRules
 import io.github.mzlnk.javalin.security.mockContext
 import io.javalin.http.HandlerType
 import org.assertj.core.api.Assertions.assertThat

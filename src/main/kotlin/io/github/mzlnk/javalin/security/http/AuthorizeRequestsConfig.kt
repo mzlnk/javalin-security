@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security.http
 
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
-import io.github.mzlnk.javalin.security.http.authorization.AuthorizationRule
+import io.github.mzlnk.javalin.security.authorization.AuthorizationRule
 import io.javalin.http.HandlerType
 
 /**

@@ -1,6 +1,7 @@
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.http.HttpConfigDsl
+import io.github.mzlnk.javalin.security.ws.WsConfigDsl
 
 /**
  * Kotlin DSL receiver for the top-level security configuration block.
@@ -16,6 +17,11 @@ class JavalinSecurityDsl internal constructor() {
     /** Configures the HTTP security block. */
     fun http(init: HttpConfigDsl.() -> Unit) {
         builder.http(HttpConfigDsl().apply(init).build())
+    }
+
+    /** Configures the WebSocket security block. */
+    fun ws(init: WsConfigDsl.() -> Unit) {
+        builder.ws(WsConfigDsl().apply(init).build())
     }
 
     internal fun build(): JavalinSecurity = builder.build()

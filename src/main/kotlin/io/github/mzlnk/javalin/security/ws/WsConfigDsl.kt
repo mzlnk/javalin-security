@@ -1,28 +1,28 @@
-package io.github.mzlnk.javalin.security.http
+package io.github.mzlnk.javalin.security.ws
 
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
-import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
 
 /**
- * Kotlin DSL receiver for the `http { }` security block.
+ * Kotlin DSL receiver for the WebSocket `ws { }` security block.
  *
  * Companion libraries contribute their authentication strategy by assigning
  * [authenticationManager] or [asyncAuthenticationManager] from their own extension functions
  * on this receiver, for example a future `jwt { }` extension.
  */
-class HttpConfigDsl internal constructor() {
+class WsConfigDsl internal constructor() {
 
-    private val builder = HttpConfig.Builder()
+    private val builder = WsConfig.Builder()
 
-    /** Configures the request authorization rules. */
-    fun authorizeRequests(init: AuthorizeRequestsConfigDsl.() -> Unit) {
-        builder.authorizeRequests(AuthorizeRequestsConfigDsl().apply(init).build())
+    /** Configures the WebSocket authorization rules. */
+    fun authorizeRequests(init: WsAuthorizeConfigDsl.() -> Unit) {
+        builder.authorizeRequests(WsAuthorizeConfigDsl().apply(init).build())
     }
 
     /**
-     * Registers a blocking [AuthenticationManager].
+     * Registers a blocking [AuthenticationManager] for WebSocket upgrade authentication.
      *
      * Mutually exclusive with [asyncAuthenticationManager].
      */
@@ -33,7 +33,8 @@ class HttpConfigDsl internal constructor() {
         }
 
     /**
-     * Registers an opt-in async [AsyncAuthenticationManager] for I/O-bound authentication.
+     * Registers an opt-in async [AsyncAuthenticationManager] for I/O-bound WebSocket
+     * authentication.
      *
      * Mutually exclusive with [authenticationManager].
      */
@@ -43,20 +44,20 @@ class HttpConfigDsl internal constructor() {
             manager?.let { builder.asyncAuthenticationManager(it) }
         }
 
-    /** Overrides how failed/absent authentication is rendered (HTTP 401 by default). */
+    /** Overrides how failed/absent WebSocket authentication is rendered (HTTP 401 by default). */
     var unauthorizedHandler: UnauthorizedHandler? = null
         set(handler) {
             field = handler
             handler?.let { builder.unauthorizedHandler(it) }
         }
 
-    /** Overrides how access-denied for an authenticated caller is rendered (HTTP 403 by default). */
+    /** Overrides how WebSocket access-denied for an authenticated caller is rendered (HTTP 403 by default). */
     var accessDeniedHandler: AccessDeniedHandler? = null
         set(handler) {
             field = handler
             handler?.let { builder.accessDeniedHandler(it) }
         }
 
-    internal fun build(): HttpConfig = builder.build()
+    internal fun build(): WsConfig = builder.build()
 
 }

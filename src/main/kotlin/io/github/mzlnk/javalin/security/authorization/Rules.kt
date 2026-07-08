@@ -1,4 +1,4 @@
-package io.github.mzlnk.javalin.security.http.authorization
+package io.github.mzlnk.javalin.security.authorization
 
 /**
  * The single source of truth for built-in [AuthorizationRule] logic.
