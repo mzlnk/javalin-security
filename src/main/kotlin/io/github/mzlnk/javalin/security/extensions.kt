@@ -4,6 +4,7 @@ import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.javalin.config.JavalinConfig
 import io.javalin.http.Context
+import io.javalin.websocket.WsContext
 
 /**
  * Installs and configures the security framework into a Javalin application using an inline DSL.
@@ -36,3 +37,21 @@ fun Context.authentication(): Authentication =
 /** Convenience accessor for the principal of the current request. `null` when the request is unauthenticated. */
 @Suppress("UNCHECKED_CAST")
 fun <T : AuthenticatedPrincipal> Context.principal(): T = (authentication().principal ?: error("no principal")) as T
+
+/**
+ * Returns the [Authentication] resolved for the current WebSocket session.
+ *
+ * The [Authentication] is set on the HTTP upgrade [Context] during `wsBeforeUpgrade`. Because
+ * Javalin's [WsContext] shares the same underlying request attribute map as the upgrade context,
+ * attributes set during the upgrade are accessible here in [onConnect][io.javalin.websocket.WsConnectHandler],
+ * [onMessage][io.javalin.websocket.WsMessageHandler], and other WS event handlers.
+ *
+ * Falls back to an unauthenticated [Authentication] if the WS security block is not installed or
+ * the path was not covered by a WS authorization rule.
+ */
+fun WsContext.authentication(): Authentication =
+    attribute<Authentication>(AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()
+
+/** Convenience accessor for the principal of the current WebSocket session. Throws when the session is unauthenticated. */
+@Suppress("UNCHECKED_CAST")
+fun <T : AuthenticatedPrincipal> WsContext.principal(): T = (authentication().principal ?: error("no principal")) as T

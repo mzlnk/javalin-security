@@ -10,29 +10,36 @@ import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
 import io.github.mzlnk.javalin.security.PathNormalizer
 import io.javalin.http.Context
 import org.slf4j.LoggerFactory
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 
 /**
  * The WebSocket upgrade-time security pipeline.
  *
- * Registered as a [beforeMatched][io.javalin.config.RouterConfig.beforeMatched] handler that runs
- * *before* the HTTP security guard. The two-phase logic is:
+ * Registered as a [wsBeforeUpgrade][io.javalin.config.RouterConfig.wsBeforeUpgrade] handler, which
+ * runs on the HTTP upgrade request before the WebSocket handshake completes. The pipeline:
  *
- * 1. **Jurisdiction check** — if the resolved request path does not match any WS authorization
- *    rule, the guard returns immediately (pass-through to the HTTP guard).
- * 2. **Authenticate + authorize** — when the path is under WS jurisdiction, the guard
- *    authenticates the upgrade request, then evaluates the matching WS authorization rule. On
- *    grant, it calls [Context.skipRemainingHandlers] so the HTTP guard does not re-process the
- *    request. On deny, the configured [UnauthorizedHandler] (401) or [AccessDeniedHandler] (403)
- *    is invoked.
+ * 1. **Authenticate** — authenticate the upgrade request (sync, or async resolved by a blocking
+ *    join, see below).
+ * 2. **Authorize** — evaluate the configured WS authorization rules against the resolved identity.
+ *    On grant, the guard returns and the upgrade proceeds to [onConnect][io.javalin.websocket.WsConnectContext].
+ *    On deny, the configured [UnauthorizedHandler] (401) or [AccessDeniedHandler] (403) is invoked
+ *    and the upgrade is halted via [Context.skipRemainingHandlers].
  *
- * **Sync path (default, zero overhead):** When [authenticationManager] is present (or neither
- * manager is set, treating all requests as anonymous), the pipeline is entirely synchronous.
+ * **Deny-by-default:** a path that matches no configured WS rule is denied outright
+ * (anonymous caller → 401, authenticated caller → 403).
  *
- * **Async path (opt-in):** When [asyncAuthenticationManager] is present, authentication resolves
- * via [Context.future] so the request thread is released while the [CompletableFuture] is in
- * flight. Authorization and all fail-closed semantics run inside the completion stage.
+ * **Sync path (default, zero overhead):** when [authenticationManager] is present, or neither
+ * manager is set (anonymous), the pipeline is fully synchronous.
+ *
+ * **Async (blocking) path (opt-in):** when [asyncAuthenticationManager] is present, the returned
+ * [java.util.concurrent.CompletableFuture] is joined on the upgrade thread. `ctx.future` is not
+ * used because the WebSocket handshake is synchronous — deferring the upgrade via `ctx.future` is
+ * not a supported Javalin pattern. With `config.useVirtualThreads = true` the blocking join is
+ * cheap; for heavy I/O, virtual threads or a pre-fetched token cache are recommended.
+ *
+ * If the async future completes exceptionally, or [asyncAuthenticationManager] throws
+ * synchronously, the error is caught and converted to [AuthenticationResult.Failure] so the
+ * pipeline remains fail-closed and no internal detail is leaked to the caller.
  */
 internal class WsSecurityGuard(
     private val authenticationManager: AuthenticationManager?,
@@ -46,22 +53,7 @@ internal class WsSecurityGuard(
     fun handle(context: Context) {
         val path = authorizationPath(context)
 
-        if (!authorizationManager.hasRule(path)) {
-            return
-        }
-
-        if (asyncAuthenticationManager != null) {
-            handleAsync(context, path)
-        } else {
-            handleSync(context, path)
-        }
-    }
-
-    // ── synchronous path ─────────────────────────────────────────────────────
-
-    private fun handleSync(context: Context, path: String) {
-        val result = authenticationManager?.authenticate(context)
-            ?: AuthenticationResult.NotAuthenticated
+        val result = resolveAuthentication(context)
 
         val authentication = when (result) {
             is AuthenticationResult.Success -> result.authentication
@@ -78,42 +70,28 @@ internal class WsSecurityGuard(
         enforceAuthorization(context, path, authentication)
     }
 
-    // ── asynchronous path ─────────────────────────────────────────────────────
+    // ── authentication resolution ─────────────────────────────────────────────
 
-    private fun handleAsync(context: Context, path: String) {
-        context.future {
-            val authFuture = try {
-                asyncAuthenticationManager!!.authenticate(context)
+    private fun resolveAuthentication(context: Context): AuthenticationResult {
+        if (asyncAuthenticationManager != null) {
+            return try {
+                asyncAuthenticationManager.authenticate(context).join()
+            } catch (e: CompletionException) {
+                AuthenticationResult.Failure(
+                    message = "async WS authentication error",
+                    cause = e.cause ?: e,
+                )
             } catch (t: Throwable) {
-                CompletableFuture.failedFuture(t)
+                AuthenticationResult.Failure(
+                    message = "async WS authentication error",
+                    cause = t,
+                )
             }
-            authFuture
-                .exceptionally { throwable ->
-                    val cause = (throwable as? CompletionException)?.cause ?: throwable
-                    AuthenticationResult.Failure(message = "async WS authentication error", cause = cause)
-                }
-                .thenApply { result ->
-                    when (result) {
-                        is AuthenticationResult.Success -> result.authentication
-                        is AuthenticationResult.NotAuthenticated -> Authentication.unauthenticated()
-                        is AuthenticationResult.Failure -> {
-                            logAuthFailure(path, result)
-                            unauthorizedHandler.handle(context, result)
-                            context.skipRemainingHandlers()
-                            null
-                        }
-                    }
-                }
-                .thenAccept { authentication ->
-                    if (authentication != null) {
-                        context.attribute(AUTHENTICATION_ATTRIBUTE, authentication)
-                        enforceAuthorization(context, path, authentication)
-                    }
-                }
         }
+        return authenticationManager?.authenticate(context) ?: AuthenticationResult.NotAuthenticated
     }
 
-    // ── shared pipeline steps ─────────────────────────────────────────────────
+    // ── authorization ─────────────────────────────────────────────────────────
 
     private fun enforceAuthorization(
         context: Context,
@@ -124,7 +102,6 @@ internal class WsSecurityGuard(
             if (log.isDebugEnabled) {
                 log.debug("WS access granted to {} for {}", principalName(authentication), sanitize(path))
             }
-            context.skipRemainingHandlers()
             return
         }
 
@@ -139,10 +116,9 @@ internal class WsSecurityGuard(
         }
     }
 
-    private fun logAuthFailure(
-        path: String,
-        result: AuthenticationResult.Failure,
-    ) {
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    private fun logAuthFailure(path: String, result: AuthenticationResult.Failure) {
         log.warn(
             "WS authentication failed for {}: {}",
             sanitize(path),
@@ -152,17 +128,15 @@ internal class WsSecurityGuard(
     }
 
     /**
-     * Resolves the path that WS authorization rules are evaluated against.
+     * Resolves the path used for WS authorization rule matching.
      *
-     * For a matched dynamic route this is Javalin's own matched route template (e.g.
-     * `/ws/chat/{room}`), which is bypass-proof because it is exactly what the router dispatched
-     * to. For requests with no matched HTTP endpoint it falls back to the request path sourced
-     * from `context.path()` with the runtime context path removed — the same input Javalin
-     * routes on — normalized for trailing/duplicate slashes.
+     * WebSocket upgrade requests are matched by Javalin's WS router, not the HTTP router, so
+     * [io.javalin.http.Context.endpoints] does not return a matched HTTP endpoint for upgrades.
+     * The actual request path (with context path removed and trailing/duplicate slashes normalized)
+     * is used directly, which is the same input Javalin's WS router dispatches on.
      */
     private fun authorizationPath(context: Context): String =
-        context.endpoints().matchedHttpEndpoint()?.path
-            ?: pathNormalizer.normalize(context.path(), context.contextPath())
+        pathNormalizer.normalize(context.path(), context.contextPath())
 
     private fun principalName(authentication: Authentication): String =
         sanitize(authentication.principal?.name ?: "anonymous")

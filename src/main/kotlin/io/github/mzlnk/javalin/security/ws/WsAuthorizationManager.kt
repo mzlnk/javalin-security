@@ -8,10 +8,9 @@ import io.javalin.http.Context
 /**
  * Evaluates the configured WS authorization rules against a WebSocket upgrade request.
  *
- * Matching is first-match-wins in declaration order and secure-by-default: a request that matches
- * no entry is denied. However, the guard only invokes this manager for paths that have at least
- * one matching rule (WS jurisdiction check via [hasRule]). Paths without any matching WS rule are
- * passed through to the HTTP security guard.
+ * Matching is first-match-wins in declaration order and **deny-by-default**: a request that matches
+ * no entry is denied ([isGranted] returns `false`). This means every WS upgrade is evaluated here,
+ * and any path without an explicit rule is rejected.
  *
  * Matching operates on the already-normalized request path (see
  * [io.github.mzlnk.javalin.security.PathNormalizer]) so it stays consistent
@@ -32,18 +31,10 @@ internal class WsAuthorizationManager(
     }
 
     /**
-     * Returns `true` when at least one configured WS authorization rule matches the given [path].
-     *
-     * When no rule matches, the path is not under WS jurisdiction and the WS guard passes it
-     * through to the HTTP security guard without any WS-side authentication or authorization.
-     */
-    fun hasRule(path: String): Boolean = entries.any { it.matches(path) }
-
-    /**
      * Evaluates the first matching rule for the given [path].
      *
-     * Returns `true` when a matching rule grants access. If no entry matches the path (should not
-     * happen when [hasRule] returned `true`), it returns `false` (deny-by-default).
+     * Returns `true` when a matching rule grants access. Returns `false` (deny) when no entry
+     * matches the path — the deny-by-default guarantee.
      */
     fun isGranted(path: String, authentication: Authentication, context: Context): Boolean {
         val matched = entries.firstOrNull { it.matches(path) } ?: return false

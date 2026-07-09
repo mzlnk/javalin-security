@@ -11,11 +11,18 @@ import java.util.function.Consumer
  * The WebSocket security configuration: upgrade-time authorization rules, authentication
  * orchestration, and how authentication/authorization failures are rendered.
  *
- * WebSocket authorization is evaluated once during the HTTP upgrade request (before the handshake
- * completes). Once the WebSocket is established, all events (connect, message, close, error) are
- * permitted. The authentication managers configured here are independent from the HTTP security
- * block -- if not explicitly set, the WS guard authenticates requests for WS paths using its
- * own configured manager.
+ * Security is enforced once — during the HTTP upgrade request, before the WebSocket handshake
+ * completes — via Javalin's `wsBeforeUpgrade` hook. Once the connection is established, individual
+ * WS events (connect, message, close, error) are not subject to further authorization by this
+ * library (though handlers may read the [io.github.mzlnk.javalin.security.authentication.Authentication]
+ * from `ctx.authentication()` to make per-message decisions if desired).
+ *
+ * **Deny-by-default:** upgrade requests that match no configured rule are denied (anonymous → 401,
+ * authenticated → 403). Use `anyRequest = permitAll` inside `authorizeRequests` to open paths
+ * explicitly.
+ *
+ * The authentication managers configured here are independent from the HTTP security block.
+ * If no manager is set, all callers are treated as anonymous and authorization rules decide access.
  *
  * Use [Builder] to construct an instance.
  */

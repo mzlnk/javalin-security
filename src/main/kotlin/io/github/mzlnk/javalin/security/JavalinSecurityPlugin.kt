@@ -19,19 +19,17 @@ import io.javalin.plugin.PluginPriority
  * the order in which the user declares things. A mismatch there would be an authorization bypass,
  * so this ordering-independence is a security property, not just ergonomics.
  *
- * **Guards ordering:** When both HTTP and WS security are configured, the WS guard is registered as
- * a `beforeMatched` handler *before* the HTTP guard. The WS guard checks whether the request path
- * falls under WS jurisdiction (matches at least one WS authorization rule). If it does, the WS guard
- * handles authentication and authorization, then calls [io.javalin.http.Context.skipRemainingHandlers]
- * — preventing the HTTP guard from re-processing the request. If the path is not a WS path, the WS
- * guard passes through and the HTTP guard handles it normally.
+ * **HTTP guard:** registered as a `beforeMatched` handler. The plugin runs at [PluginPriority.EARLY]
+ * so the guard is registered before `beforeMatched` handlers added by other plugins (those with
+ * [PluginPriority.NORMAL] or [PluginPriority.LATE]). However, handlers added directly via
+ * `cfg.routes.beforeMatched()` inside `Javalin.create { }` are registered before any plugin's
+ * `onStart`, so they run before the guard. To observe a resolved [authentication.Authentication],
+ * add user `beforeMatched` handlers on the Javalin instance after creation (`app.beforeMatched { ... }`).
  *
- * The plugin runs at [PluginPriority.EARLY] so the security guard's `beforeMatched` handler is
- * registered before `beforeMatched` handlers added by other plugins (those with [PluginPriority.NORMAL]
- * or [PluginPriority.LATE]). However, handlers added directly via `cfg.routes.beforeMatched()` or
- * `cfg.routes.before()` inside `Javalin.create { }` are registered before any plugin's `onStart`,
- * so they run before the guard. To observe a resolved [authentication.Authentication], add user `beforeMatched`
- * handlers on the Javalin instance after creation (`app.beforeMatched { ... }`).
+ * **WS guard:** registered as a `wsBeforeUpgrade` handler, which runs on the HTTP upgrade request
+ * before the WebSocket handshake completes. This is the correct lifecycle hook for WS security —
+ * `beforeMatched` does not fire for WebSocket upgrade requests in Javalin 7. The WS guard and the
+ * HTTP guard are independent; they share no ordering coupling.
  *
  * The plugin is not [repeatable], so accidentally calling `security { }` twice fails fast.
  */
@@ -73,7 +71,7 @@ internal class JavalinSecurityPlugin(
                 accessDeniedHandler = ws.accessDeniedHandler,
             )
 
-            state.routes.beforeMatched(wsGuard::handle)
+            state.routes.wsBeforeUpgrade(wsGuard::handle)
         }
 
         // ── HTTP guard (runs second) ─────────────────────────────────────
