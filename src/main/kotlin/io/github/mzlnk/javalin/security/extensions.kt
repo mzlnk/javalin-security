@@ -14,12 +14,17 @@ import io.javalin.websocket.WsContext
  * declarations does not matter because the guard is wired in `onStart`, after the entire
  * `Javalin.create { }` block has been applied.
  *
- * It registers a `beforeMatched` guard that authenticates and authorizes every matched request.
- * Failures surface as Javalin's native `UnauthorizedResponse` (401) and `ForbiddenResponse` (403).
+ * **Both guards are opt-in.** An HTTP guard is registered only when an `http { }` block is
+ * configured; a WS guard is registered only when a `ws { }` block is configured. Calling
+ * `config.security { }` with neither block installs no guards and leaves all routes unprotected.
  *
- * This ordering-independence is a security property: the authorization matcher and the path
- * normalizer mirror the final router configuration at startup, so they cannot diverge from the
- * actual routing regardless of declaration order.
+ * When the HTTP guard is active, failures surface as Javalin's native `UnauthorizedResponse`
+ * (401) and `ForbiddenResponse` (403) by default, customizable via `unauthorizedHandler` and
+ * `accessDeniedHandler`.
+ *
+ * Ordering-independence is a security property: the authorization matcher and the path normalizer
+ * mirror the final router configuration at startup, so they cannot diverge from the actual routing
+ * regardless of declaration order.
  */
 fun JavalinConfig.security(init: JavalinSecurityDsl.() -> Unit) {
     registerPlugin(JavalinSecurityPlugin(JavalinSecurityDsl().apply(init).build()))
@@ -48,6 +53,21 @@ fun <T : AuthenticatedPrincipal> Context.principal(): T = (authentication().prin
  *
  * Falls back to an unauthenticated [Authentication] if the WS security block is not installed or
  * the path was not covered by a WS authorization rule.
+ *
+ * **Authorization scope:** the security guard enforces authorization once, at upgrade time. A
+ * long-lived connection is **not** re-checked if a token later expires mid-session. To
+ * re-validate credentials on individual messages, read `ctx.authentication()` inside your
+ * `onMessage` handler and close the session if the principal is no longer valid:
+ *
+ * ```kotlin
+ * ws.onMessage { ctx ->
+ *     if (!ctx.authentication().isAuthenticated) {
+ *         ctx.closeSession(4001, "session expired")
+ *         return@onMessage
+ *     }
+ *     // … handle message …
+ * }
+ * ```
  */
 fun WsContext.authentication(): Authentication =
     attribute<Authentication>(AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()

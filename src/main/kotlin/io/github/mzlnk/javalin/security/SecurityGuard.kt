@@ -114,17 +114,17 @@ internal class SecurityGuard(
     ) {
         if (authorizationManager.isGranted(method, path, authentication, context)) {
             if (log.isDebugEnabled) {
-                log.debug("Access granted to {} for {} {}", principalName(authentication), method, sanitize(path))
+                log.debug("Access granted to {} for {} {}", principalName(authentication), method, LogSanitizer.sanitize(path))
             }
             return
         }
 
         if (authentication.isAuthenticated) {
-            log.warn("Access denied to {} for {} {}", principalName(authentication), method, sanitize(path))
+            log.warn("Access denied to {} for {} {}", principalName(authentication), method, LogSanitizer.sanitize(path))
             accessDeniedHandler.handle(context, authentication)
             context.skipRemainingHandlers()
         } else {
-            log.warn("Access denied to anonymous caller for {} {}", method, sanitize(path))
+            log.warn("Access denied to anonymous caller for {} {}", method, LogSanitizer.sanitize(path))
             unauthorizedHandler.handle(context, null)
             context.skipRemainingHandlers()
         }
@@ -138,8 +138,8 @@ internal class SecurityGuard(
         log.warn(
             "Authentication failed for {} {}: {}",
             method,
-            sanitize(path),
-            sanitize(result.message ?: "no detail"),
+            LogSanitizer.sanitize(path),
+            LogSanitizer.sanitize(result.message ?: "no detail"),
             result.cause,
         )
     }
@@ -158,30 +158,9 @@ internal class SecurityGuard(
             ?: pathNormalizer.normalize(context.path(), context.contextPath())
 
     private fun principalName(authentication: Authentication): String =
-        sanitize(authentication.principal?.name ?: "anonymous")
+        LogSanitizer.sanitize(authentication.principal?.name ?: "anonymous")
 
     private companion object {
         val log = LoggerFactory.getLogger(SecurityGuard::class.java)
-
-        /** Matches ASCII control characters (including CR, LF and TAB). */
-        val CONTROL_CHARS = Regex("\\p{Cntrl}")
-
-        /** Upper bound on the length of any single value written to the log. */
-        const val MAX_LOGGED_LENGTH = 256
-
-        /**
-         * Sanitizes an attacker-influenced value (request path, principal name, provider message)
-         * before it is written to the log. Control characters are replaced so a crafted value
-         * cannot inject newlines to forge additional log lines (CRLF log injection), and overly
-         * long values are truncated to keep log lines bounded.
-         */
-        fun sanitize(value: String): String {
-            val cleaned = CONTROL_CHARS.replace(value, "_")
-            return if (cleaned.length > MAX_LOGGED_LENGTH) {
-                cleaned.substring(0, MAX_LOGGED_LENGTH) + "..."
-            } else {
-                cleaned
-            }
-        }
     }
 }

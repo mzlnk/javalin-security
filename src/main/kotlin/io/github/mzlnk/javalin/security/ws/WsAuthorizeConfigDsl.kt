@@ -19,6 +19,15 @@ class WsAuthorizeConfigDsl internal constructor() : AuthorizationRuleFactory by 
      * Registers an authorization rule for WebSocket upgrade requests matching [pattern].
      *
      * A custom rule may be supplied as a trailing lambda.
+     *
+     * **Pattern matching note:** Unlike the HTTP block, which evaluates authorization against the
+     * matched route template (e.g. `/users/{id}`), WS authorization matches the concrete request
+     * path. Path-template placeholders such as `{id}` are treated as literal characters by the
+     * underlying [io.github.mzlnk.javalin.security.authorization.AntPathMatcher] and will not
+     * match real request paths. Use Ant-style wildcards in the pattern instead: `*` matches a
+     * single path segment and `**` matches any number of path segments.
+     * A mis-written pattern such as `/ws/room/{id}` simply fails to match, so the upgrade is
+     * denied by the deny-by-default rule rather than inadvertently opened.
      */
     fun authorize(pattern: String, rule: AuthorizationRule) {
         builder.authorize(pattern, rule)

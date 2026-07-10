@@ -19,6 +19,12 @@ import io.javalin.plugin.PluginPriority
  * the order in which the user declares things. A mismatch there would be an authorization bypass,
  * so this ordering-independence is a security property, not just ergonomics.
  *
+ * **Both guards are opt-in.** A guard is registered only when the corresponding block is configured:
+ * the HTTP guard requires an `http { }` block, and the WS guard requires a `ws { }` block.
+ * Calling `config.security { }` with neither block configured installs no guards at all, leaving
+ * all routes unprotected. This keeps the two protocols symmetric and prevents silent over-protection
+ * of routes when only one protocol is in use.
+ *
  * **HTTP guard:** registered as a `beforeMatched` handler. The plugin runs at [PluginPriority.EARLY]
  * so the guard is registered before `beforeMatched` handlers added by other plugins (those with
  * [PluginPriority.NORMAL] or [PluginPriority.LATE]). However, handlers added directly via
@@ -49,7 +55,7 @@ internal class JavalinSecurityPlugin(
             treatMultipleSlashesAsSingleSlash = router.treatMultipleSlashesAsSingleSlash,
         )
 
-        // ── WebSocket guard (runs first) ──────────────────────────────────
+        // ── WebSocket guard ───────────────────────────────────────────────
 
         if (ws != null) {
             val wsAuthorizationManager = WsAuthorizationManager(
@@ -69,34 +75,37 @@ internal class JavalinSecurityPlugin(
                 pathNormalizer = pathNormalizer,
                 unauthorizedHandler = ws.unauthorizedHandler,
                 accessDeniedHandler = ws.accessDeniedHandler,
+                allowedOrigins = ws.allowedOrigins,
             )
 
             state.routes.wsBeforeUpgrade(wsGuard::handle)
         }
 
-        // ── HTTP guard (runs second) ─────────────────────────────────────
+        // ── HTTP guard ────────────────────────────────────────────────────
 
-        val authorizationManager = AuthorizationManager(
-            http.authorizeRequestsConfig.entries.map { entry ->
-                AuthorizationManager.Entry(
-                    pattern = entry.pattern,
-                    method = entry.method,
-                    rule = entry.rule,
-                    caseInsensitive = router.caseInsensitiveRoutes,
-                )
-            },
-        )
+        if (http != null) {
+            val authorizationManager = AuthorizationManager(
+                http.authorizeRequestsConfig.entries.map { entry ->
+                    AuthorizationManager.Entry(
+                        pattern = entry.pattern,
+                        method = entry.method,
+                        rule = entry.rule,
+                        caseInsensitive = router.caseInsensitiveRoutes,
+                    )
+                },
+            )
 
-        val guard = SecurityGuard(
-            authenticationManager = http.authenticationManager,
-            asyncAuthenticationManager = http.asyncAuthenticationManager,
-            authorizationManager = authorizationManager,
-            pathNormalizer = pathNormalizer,
-            unauthorizedHandler = http.unauthorizedHandler,
-            accessDeniedHandler = http.accessDeniedHandler,
-        )
+            val guard = SecurityGuard(
+                authenticationManager = http.authenticationManager,
+                asyncAuthenticationManager = http.asyncAuthenticationManager,
+                authorizationManager = authorizationManager,
+                pathNormalizer = pathNormalizer,
+                unauthorizedHandler = http.unauthorizedHandler,
+                accessDeniedHandler = http.accessDeniedHandler,
+            )
 
-        state.routes.beforeMatched(guard::handle)
+            state.routes.beforeMatched(guard::handle)
+        }
     }
 
 }

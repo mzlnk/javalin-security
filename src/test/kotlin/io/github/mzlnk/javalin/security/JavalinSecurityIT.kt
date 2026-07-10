@@ -161,4 +161,32 @@ class JavalinSecurityIT {
         assertThat(client.get("/api/v1/resource").code).isEqualTo(200)
         assertThat(client.post("/api/v1/resource").code).isEqualTo(401)
     }
+
+    @Test
+    fun `should leave HTTP routes unguarded when only ws block is configured`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security {
+                // no http { } block — HTTP guard is opt-in and must NOT be installed
+                ws {
+                    authorizeRequests { anyRequest = denyAll }
+                }
+            }
+            cfg.routes.get("/api/v1/resource") { it.result("ok") }
+        },
+    ) { _, client ->
+        // HTTP guard is absent, so the route is reachable without any credentials
+        assertThat(client.get("/api/v1/resource").code).isEqualTo(200)
+    }
+
+    @Test
+    fun `should leave HTTP routes unguarded when security block has no sub-blocks`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security {
+                // neither http { } nor ws { } — no guards installed at all
+            }
+            cfg.routes.get("/api/v1/resource") { it.result("ok") }
+        },
+    ) { _, client ->
+        assertThat(client.get("/api/v1/resource").code).isEqualTo(200)
+    }
 }

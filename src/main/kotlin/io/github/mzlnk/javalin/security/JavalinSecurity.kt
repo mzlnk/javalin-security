@@ -13,13 +13,13 @@ import java.util.function.Consumer
  * function (Kotlin).
  */
 class JavalinSecurity internal constructor(
-    internal val httpConfig: HttpConfig,
+    internal val httpConfig: HttpConfig?,
     internal val wsConfig: WsConfig?,
 ) {
 
     class Builder {
 
-        private var httpConfig: HttpConfig = HttpConfig.Builder().build()
+        private var httpConfig: HttpConfig? = null
         private var wsConfig: WsConfig? = null
         private var httpSet = false
         private var wsSet = false
@@ -102,8 +102,12 @@ class JavalinSecurity internal constructor(
          * Equivalent to the Kotlin `config.security { }` extension when the [JavalinSecurity]
          * object has already been constructed (e.g. by a [builder]).
          *
-         * The security guard always runs before the matched route handler — this is enforced by
-         * Javalin's own `beforeMatched` lifecycle. The plugin runs at
+         * **Both guards are opt-in.** The HTTP guard is installed only when an `http { }` block
+         * was configured; the WS guard is installed only when a `ws { }` block was configured.
+         * If neither block is configured, no guards are installed and all routes remain unprotected.
+         *
+         * When the HTTP guard is active, it runs before the matched route handler — this is
+         * enforced by Javalin's own `beforeMatched` lifecycle. The plugin runs at
          * [io.javalin.plugin.PluginPriority.EARLY], which orders the guard ahead of `beforeMatched`
          * handlers added by other plugins (`NORMAL` or `LATE` priority). However, `beforeMatched`
          * handlers registered directly via `cfg.routes.beforeMatched()` inside `Javalin.create { }`

@@ -1,6 +1,7 @@
 package io.github.mzlnk.javalin.security.ws
 
 import io.github.mzlnk.javalin.security.AUTHENTICATION_ATTRIBUTE
+import io.github.mzlnk.javalin.security.LogSanitizer
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
@@ -18,9 +19,12 @@ import java.util.concurrent.CompletionException
  * Registered as a [wsBeforeUpgrade][io.javalin.config.RouterConfig.wsBeforeUpgrade] handler, which
  * runs on the HTTP upgrade request before the WebSocket handshake completes. The pipeline:
  *
- * 1. **Authenticate** — authenticate the upgrade request (sync, or async resolved by a blocking
+ * 1. **Origin check (CSWSH)** — when [allowedOrigins] is configured, the `Origin` header is
+ *    validated first. A missing or unlisted origin invokes the configured [AccessDeniedHandler]
+ *    (403 by default) and halts the upgrade before authentication runs.
+ * 2. **Authenticate** — authenticate the upgrade request (sync, or async resolved by a blocking
  *    join, see below).
- * 2. **Authorize** — evaluate the configured WS authorization rules against the resolved identity.
+ * 3. **Authorize** — evaluate the configured WS authorization rules against the resolved identity.
  *    On grant, the guard returns and the upgrade proceeds to [onConnect][io.javalin.websocket.WsConnectContext].
  *    On deny, the configured [UnauthorizedHandler] (401) or [AccessDeniedHandler] (403) is invoked
  *    and the upgrade is halted via [Context.skipRemainingHandlers].
@@ -48,10 +52,25 @@ internal class WsSecurityGuard(
     private val pathNormalizer: PathNormalizer,
     private val unauthorizedHandler: UnauthorizedHandler,
     private val accessDeniedHandler: AccessDeniedHandler,
+    private val allowedOrigins: Set<String>?,
 ) {
 
     fun handle(context: Context) {
         val path = authorizationPath(context)
+
+        if (allowedOrigins != null) {
+            val origin = context.header("Origin")
+            if (origin == null || origin !in allowedOrigins) {
+                log.warn(
+                    "WS upgrade rejected: Origin {} not allowed for {}",
+                    LogSanitizer.sanitize(origin ?: "<none>"),
+                    LogSanitizer.sanitize(path),
+                )
+                accessDeniedHandler.handle(context, Authentication.unauthenticated())
+                context.skipRemainingHandlers()
+                return
+            }
+        }
 
         val result = resolveAuthentication(context)
 
@@ -100,17 +119,17 @@ internal class WsSecurityGuard(
     ) {
         if (authorizationManager.isGranted(path, authentication, context)) {
             if (log.isDebugEnabled) {
-                log.debug("WS access granted to {} for {}", principalName(authentication), sanitize(path))
+                log.debug("WS access granted to {} for {}", principalName(authentication), LogSanitizer.sanitize(path))
             }
             return
         }
 
         if (authentication.isAuthenticated) {
-            log.warn("WS access denied to {} for {}", principalName(authentication), sanitize(path))
+            log.warn("WS access denied to {} for {}", principalName(authentication), LogSanitizer.sanitize(path))
             accessDeniedHandler.handle(context, authentication)
             context.skipRemainingHandlers()
         } else {
-            log.warn("WS access denied to anonymous caller for {}", sanitize(path))
+            log.warn("WS access denied to anonymous caller for {}", LogSanitizer.sanitize(path))
             unauthorizedHandler.handle(context, null)
             context.skipRemainingHandlers()
         }
@@ -121,8 +140,8 @@ internal class WsSecurityGuard(
     private fun logAuthFailure(path: String, result: AuthenticationResult.Failure) {
         log.warn(
             "WS authentication failed for {}: {}",
-            sanitize(path),
-            sanitize(result.message ?: "no detail"),
+            LogSanitizer.sanitize(path),
+            LogSanitizer.sanitize(result.message ?: "no detail"),
             result.cause,
         )
     }
@@ -139,31 +158,10 @@ internal class WsSecurityGuard(
         pathNormalizer.normalize(context.path(), context.contextPath())
 
     private fun principalName(authentication: Authentication): String =
-        sanitize(authentication.principal?.name ?: "anonymous")
+        LogSanitizer.sanitize(authentication.principal?.name ?: "anonymous")
 
     private companion object {
         val log = LoggerFactory.getLogger(WsSecurityGuard::class.java)
-
-        /** Matches ASCII control characters (including CR, LF and TAB). */
-        val CONTROL_CHARS = Regex("\\p{Cntrl}")
-
-        /** Upper bound on the length of any single value written to the log. */
-        const val MAX_LOGGED_LENGTH = 256
-
-        /**
-         * Sanitizes an attacker-influenced value (request path, principal name, provider message)
-         * before it is written to the log. Control characters are replaced so a crafted value
-         * cannot inject newlines to forge additional log lines (CRLF log injection), and overly
-         * long values are truncated to keep log lines bounded.
-         */
-        fun sanitize(value: String): String {
-            val cleaned = CONTROL_CHARS.replace(value, "_")
-            return if (cleaned.length > MAX_LOGGED_LENGTH) {
-                cleaned.substring(0, MAX_LOGGED_LENGTH) + "..."
-            } else {
-                cleaned
-            }
-        }
     }
 
 }
