@@ -5,5 +5,7 @@ plugins {
 rootProject.name = "javalin-security"
 
 include("core")
-
 project(":core").name = "javalin-security"
+
+include("jwt")
+project(":jwt").name = "javalin-security-jwt"
