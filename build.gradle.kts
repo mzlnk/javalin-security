@@ -1,31 +1,26 @@
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+
 plugins {
-    kotlin("jvm") version "2.4.0"
+    alias(libs.plugins.kotlin.jvm) apply false
 }
 
-group = "io.github.mzlnk"
-version = "1.0.0-SNAPSHOT"
-
-repositories {
-    mavenCentral()
+allprojects {
+    group = "io.github.mzlnk"
+    version = "1.0.0-SNAPSHOT"
 }
 
-dependencies {
-    compileOnly("io.javalin:javalin:7.2.2")
-    compileOnly("org.slf4j:slf4j-api:2.0.16")
+subprojects {
+    apply(plugin = "org.jetbrains.kotlin.jvm")
 
-    testImplementation("io.javalin:javalin:7.2.2")
-    testImplementation("io.javalin:javalin-testtools:7.2.2")
-    testImplementation(platform("org.junit:junit-bom:5.11.4"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("org.assertj:assertj-core:3.27.3")
-    testImplementation("io.mockk:mockk:1.14.2")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
+    repositories {
+        mavenCentral()
+    }
 
-kotlin {
-    jvmToolchain(17)
-}
+    extensions.configure<KotlinJvmProjectExtension> {
+        jvmToolchain(17)
+    }
 
-tasks.test {
-    useJUnitPlatform()
+    tasks.withType<Test> {
+        useJUnitPlatform()
+    }
 }

@@ -1,0 +1,20 @@
+[versions]
+kotlin = "2.4.0"
+javalin = "7.2.2"
+slf4j = "2.0.16"
+junit-bom = "5.11.4"
+assertj = "3.27.3"
+mockk = "1.14.2"
+
+[libraries]
+javalin = { module = "io.javalin:javalin", version.ref = "javalin" }
+javalin-testtools = { module = "io.javalin:javalin-testtools", version.ref = "javalin" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit-bom" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
