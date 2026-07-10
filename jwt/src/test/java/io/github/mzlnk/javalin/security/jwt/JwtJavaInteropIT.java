@@ -2,6 +2,7 @@ package io.github.mzlnk.javalin.security.jwt;
 
 import io.github.mzlnk.javalin.security.JavalinSecurity;
 import io.github.mzlnk.javalin.security.authorization.Rules;
+import io.github.mzlnk.javalin.security.jwt.nimbus.NimbusJwtDecoder;
 import io.javalin.Javalin;
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
@@ -16,24 +17,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Verifies that the JWT addon provides a clean Java API:
  * - {@link JwtAuthenticationManager} built via its {@link JwtAuthenticationManager.Builder},
+ * - {@link JwtKeySource} and {@link JwtVerification} factory methods/builders callable from Java,
  * - {@link JwtAuthoritiesMapper} factory methods callable as static methods,
- * - {@link BearerChallengeUnauthorizedHandler} instantiable without generics or {@code Unit.INSTANCE}.
+ * - {@link BearerChallengeUnauthorizedHandler} instantiable without generics or {@code Unit.INSTANCE},
+ * - the {@code NimbusJwtDecoder} Kotlin object usable from Java as {@code NimbusJwtDecoder.INSTANCE}.
  *
- * This test is the Java-ergonomics guardrail: it must compile without raw casts, {@code Unit.INSTANCE},
- * or verbose Kotlin-object indirection.
+ * This test is the Java-ergonomics guardrail: it must compile without raw casts, {@code Unit.INSTANCE}
+ * leaking into decoder usage, or verbose Kotlin-object indirection.
  */
 class JwtJavaInteropIT {
 
-    private final JwtDecoder testDecoder = token -> {
+    private final JwtDecoder testDecoder = (token, verification) -> {
         if ("INVALID".equals(token)) throw new IllegalArgumentException("bad token");
         return new SimpleDecodedJwt(token, Map.of("sub", token, "roles", List.of("USER")));
     };
+
+    private final JwtVerification testVerification = JwtVerification.of(JwtKeySource.secret("test-secret"));
 
     // ── JwtAuthenticationManager builder ─────────────────────────────────────
 
     @Test
     void manager_builder_is_fluent_from_java() {
-        JwtAuthenticationManager manager = JwtAuthenticationManager.builder(testDecoder)
+        JwtAuthenticationManager manager = JwtAuthenticationManager.builder(testDecoder, testVerification)
                 .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
                 .build();
 
@@ -42,8 +47,36 @@ class JwtJavaInteropIT {
 
     @Test
     void manager_of_factory_works_from_java() {
-        JwtAuthenticationManager manager = JwtAuthenticationManager.of(testDecoder);
+        JwtAuthenticationManager manager = JwtAuthenticationManager.of(testDecoder, testVerification);
         assertThat(manager).isNotNull();
+    }
+
+    // ── JwtKeySource / JwtVerification factories ──────────────────────────────
+
+    @Test
+    void key_source_factories_are_accessible_as_static_methods() {
+        assertThat(JwtKeySource.secret("some-secret")).isNotNull();
+        assertThat(JwtKeySource.secretBytes("some-secret".getBytes(), "HS256")).isNotNull();
+        assertThat(JwtKeySource.jwks("https://auth.example.com/jwks.json")).isNotNull();
+    }
+
+    @Test
+    void verification_builder_is_fluent_from_java() {
+        JwtVerification verification = JwtVerification.builder(JwtKeySource.secret("some-secret"))
+                .issuer("https://auth.example.com")
+                .audience("my-api")
+                .clockSkew(30)
+                .build();
+
+        assertThat(verification).isNotNull();
+    }
+
+    // ── NimbusJwtDecoder as a stateless Java-usable object ────────────────────
+
+    @Test
+    void nimbus_decoder_object_is_usable_from_java() {
+        JwtDecoder decoder = NimbusJwtDecoder.INSTANCE;
+        assertThat(decoder).isNotNull();
     }
 
     // ── JwtAuthoritiesMapper static factories ─────────────────────────────────
@@ -70,7 +103,7 @@ class JwtJavaInteropIT {
 
     @Test
     void jwt_decoder_can_be_expressed_as_java_lambda() {
-        JwtDecoder decoder = token -> new SimpleDecodedJwt(token, Map.of("sub", token));
+        JwtDecoder decoder = (token, verification) -> new SimpleDecodedJwt(token, Map.of("sub", token));
         assertThat(decoder).isNotNull();
     }
 
@@ -86,7 +119,7 @@ class JwtJavaInteropIT {
 
     @Test
     void full_integration_via_builder_works_from_java() {
-        JwtAuthenticationManager manager = JwtAuthenticationManager.builder(testDecoder)
+        JwtAuthenticationManager manager = JwtAuthenticationManager.builder(testDecoder, testVerification)
                 .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
                 .build();
 
@@ -128,7 +161,7 @@ class JwtJavaInteropIT {
 
     @Test
     void bearer_challenge_handler_wires_via_builder() {
-        JwtAuthenticationManager manager = JwtAuthenticationManager.of(testDecoder);
+        JwtAuthenticationManager manager = JwtAuthenticationManager.of(testDecoder, testVerification);
         BearerChallengeUnauthorizedHandler challenge = BearerChallengeUnauthorizedHandler.withRealm("Test");
 
         Javalin app = Javalin.create(config -> {

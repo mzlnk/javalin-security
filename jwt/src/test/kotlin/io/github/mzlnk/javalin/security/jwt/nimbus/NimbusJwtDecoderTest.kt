@@ -12,7 +12,8 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
-import io.github.mzlnk.javalin.security.jwt.DecodedJwt
+import io.github.mzlnk.javalin.security.jwt.JwtKeySource
+import io.github.mzlnk.javalin.security.jwt.JwtVerification
 import io.javalin.Javalin
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -110,85 +111,87 @@ class NimbusJwtDecoderTest {
         return SignedJWT(header, claims).also { it.sign(signer) }.serialize()
     }
 
-    // ── withPublicKey (RSA) ───────────────────────────────────────────────────
+    // ── publicKey (RSA) ───────────────────────────────────────────────────────
 
     @Test
-    fun `withPublicKey(RSA) decodes a valid RS256 token`() {
-        val decoder = NimbusJwtDecoder.withPublicKey(rsaJwk.toRSAPublicKey()).build()
-        val decoded = decoder.decode(rsaToken(subject = "alice"))
+    fun `publicKey(RSA) decodes a valid RS256 token`() {
+        val verification = JwtVerification.of(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
+        val decoded = NimbusJwtDecoder.decode(rsaToken(subject = "alice"), verification)
         assertThat(decoded.subject).isEqualTo("alice")
     }
 
     @Test
-    fun `withPublicKey(RSA) rejects an expired token`() {
-        val decoder = NimbusJwtDecoder.withPublicKey(rsaJwk.toRSAPublicKey())
+    fun `publicKey(RSA) rejects an expired token`() {
+        val verification = JwtVerification.builder(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
             .clockSkew(0)
             .build()
         val expiredToken = rsaToken(expiresAt = Date(System.currentTimeMillis() - 5_000))
-        assertThatThrownBy { decoder.decode(expiredToken) }.isInstanceOf(Exception::class.java)
+        assertThatThrownBy { NimbusJwtDecoder.decode(expiredToken, verification) }.isInstanceOf(Exception::class.java)
     }
 
     @Test
-    fun `withPublicKey(RSA) rejects a token signed with a different key`() {
+    fun `publicKey(RSA) rejects a token signed with a different key`() {
         val otherKey = RSAKeyGenerator(2048).generate()
-        val decoder = NimbusJwtDecoder.withPublicKey(otherKey.toRSAPublicKey()).build()
-        assertThatThrownBy { decoder.decode(rsaToken()) }.isInstanceOf(Exception::class.java)
+        val verification = JwtVerification.of(JwtKeySource.publicKey(otherKey.toRSAPublicKey()))
+        assertThatThrownBy { NimbusJwtDecoder.decode(rsaToken(), verification) }.isInstanceOf(Exception::class.java)
     }
 
     @Test
-    fun `withPublicKey(RSA) rejects a tampered token`() {
-        val decoder = NimbusJwtDecoder.withPublicKey(rsaJwk.toRSAPublicKey()).build()
+    fun `publicKey(RSA) rejects a tampered token`() {
+        val verification = JwtVerification.of(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
         val tampered = rsaToken() + "tampered"
-        assertThatThrownBy { decoder.decode(tampered) }.isInstanceOf(Exception::class.java)
+        assertThatThrownBy { NimbusJwtDecoder.decode(tampered, verification) }.isInstanceOf(Exception::class.java)
     }
 
-    // ── withPublicKey (RSA) + issuer/audience validation ─────────────────────
+    // ── publicKey (RSA) + issuer/audience validation ─────────────────────────
 
     @Test
-    fun `withPublicKey(RSA) validates issuer when configured`() {
-        val decoder = NimbusJwtDecoder.withPublicKey(rsaJwk.toRSAPublicKey())
+    fun `publicKey(RSA) validates issuer when configured`() {
+        val verification = JwtVerification.builder(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
             .issuer("https://auth.example.com")
             .build()
 
         val validToken = rsaToken(issuer = "https://auth.example.com")
-        assertThat(decoder.decode(validToken).subject).isEqualTo("alice")
+        assertThat(NimbusJwtDecoder.decode(validToken, verification).subject).isEqualTo("alice")
 
         val wrongIssuerToken = rsaToken(issuer = "https://other.example.com")
-        assertThatThrownBy { decoder.decode(wrongIssuerToken) }.isInstanceOf(Exception::class.java)
+        assertThatThrownBy { NimbusJwtDecoder.decode(wrongIssuerToken, verification) }.isInstanceOf(Exception::class.java)
     }
 
     @Test
-    fun `withPublicKey(RSA) validates audience when configured`() {
-        val decoder = NimbusJwtDecoder.withPublicKey(rsaJwk.toRSAPublicKey())
+    fun `publicKey(RSA) validates audience when configured`() {
+        val verification = JwtVerification.builder(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
             .audience("my-api")
             .build()
 
         val validToken = rsaToken(audience = listOf("my-api"))
-        assertThat(decoder.decode(validToken).subject).isEqualTo("alice")
+        assertThat(NimbusJwtDecoder.decode(validToken, verification).subject).isEqualTo("alice")
 
         val wrongAudienceToken = rsaToken(audience = listOf("other-api"))
-        assertThatThrownBy { decoder.decode(wrongAudienceToken) }.isInstanceOf(Exception::class.java)
+        assertThatThrownBy {
+            NimbusJwtDecoder.decode(wrongAudienceToken, verification)
+        }.isInstanceOf(Exception::class.java)
     }
 
-    // ── withPublicKey (EC) ────────────────────────────────────────────────────
+    // ── publicKey (EC) ────────────────────────────────────────────────────────
 
     @Test
-    fun `withPublicKey(EC) decodes a valid ES256 token`() {
-        val decoder = NimbusJwtDecoder.withPublicKey(ecJwk.toECPublicKey()).build()
-        val decoded = decoder.decode(ecToken(subject = "carol"))
+    fun `publicKey(EC) decodes a valid ES256 token`() {
+        val verification = JwtVerification.of(JwtKeySource.publicKey(ecJwk.toECPublicKey()))
+        val decoded = NimbusJwtDecoder.decode(ecToken(subject = "carol"), verification)
         assertThat(decoded.subject).isEqualTo("carol")
     }
 
     @Test
-    fun `withPublicKey(EC) rejects a token signed with RSA key`() {
-        val decoder = NimbusJwtDecoder.withPublicKey(ecJwk.toECPublicKey()).build()
-        assertThatThrownBy { decoder.decode(rsaToken()) }.isInstanceOf(Exception::class.java)
+    fun `publicKey(EC) rejects a token signed with RSA key`() {
+        val verification = JwtVerification.of(JwtKeySource.publicKey(ecJwk.toECPublicKey()))
+        assertThatThrownBy { NimbusJwtDecoder.decode(rsaToken(), verification) }.isInstanceOf(Exception::class.java)
     }
 
-    // ── withPemString ─────────────────────────────────────────────────────────
+    // ── pem ────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `withPemString decodes valid RSA token from PEM public key`() {
+    fun `pem decodes valid RSA token from PEM public key`() {
         val pem = buildString {
             appendLine("-----BEGIN PUBLIC KEY-----")
             val encoded = Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(
@@ -197,13 +200,13 @@ class NimbusJwtDecoderTest {
             appendLine(encoded)
             append("-----END PUBLIC KEY-----")
         }
-        val decoder = NimbusJwtDecoder.withPemString(pem).build()
-        val decoded = decoder.decode(rsaToken(subject = "alice"))
+        val verification = JwtVerification.of(JwtKeySource.pem(pem))
+        val decoded = NimbusJwtDecoder.decode(rsaToken(subject = "alice"), verification)
         assertThat(decoded.subject).isEqualTo("alice")
     }
 
     @Test
-    fun `withPemString decodes valid EC token from PEM public key`() {
+    fun `pem decodes valid EC token from PEM public key`() {
         val pem = buildString {
             appendLine("-----BEGIN PUBLIC KEY-----")
             val encoded = Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(
@@ -212,54 +215,54 @@ class NimbusJwtDecoderTest {
             appendLine(encoded)
             append("-----END PUBLIC KEY-----")
         }
-        val decoder = NimbusJwtDecoder.withPemString(pem).build()
-        val decoded = decoder.decode(ecToken(subject = "dave"))
+        val verification = JwtVerification.of(JwtKeySource.pem(pem))
+        val decoded = NimbusJwtDecoder.decode(ecToken(subject = "dave"), verification)
         assertThat(decoded.subject).isEqualTo("dave")
     }
 
     @Test
-    fun `withPemString throws for invalid PEM`() {
+    fun `pem throws for invalid PEM`() {
         assertThatThrownBy {
-            NimbusJwtDecoder.withPemString("not-valid-pem").build()
+            JwtKeySource.pem("not-valid-pem")
         }.isInstanceOf(Exception::class.java)
     }
 
-    // ── withSecret (HMAC) ─────────────────────────────────────────────────────
+    // ── secret (HMAC) ──────────────────────────────────────────────────────────
 
     @Test
-    fun `withSecret decodes a valid HS256 token`() {
+    fun `secret decodes a valid HS256 token`() {
         val secret = "super-secret-key-with-enough-length"
-        val decoder = NimbusJwtDecoder.withSecret(secret).build()
-        val decoded = decoder.decode(hmacToken(subject = "eve", secret = secret))
+        val verification = JwtVerification.of(JwtKeySource.secret(secret))
+        val decoded = NimbusJwtDecoder.decode(hmacToken(subject = "eve", secret = secret), verification)
         assertThat(decoded.subject).isEqualTo("eve")
     }
 
     @Test
-    fun `withSecret rejects a token signed with a different secret`() {
-        val decoder = NimbusJwtDecoder.withSecret("correct-secret-key-123456789012345").build()
+    fun `secret rejects a token signed with a different secret`() {
+        val verification = JwtVerification.of(JwtKeySource.secret("correct-secret-key-123456789012345"))
         val token = hmacToken(secret = "wrong-secret-key-1234567890123456")
-        assertThatThrownBy { decoder.decode(token) }.isInstanceOf(Exception::class.java)
+        assertThatThrownBy { NimbusJwtDecoder.decode(token, verification) }.isInstanceOf(Exception::class.java)
     }
 
-    // ── withJwksUrl ───────────────────────────────────────────────────────────
+    // ── jwks ───────────────────────────────────────────────────────────────────
 
     @Test
-    fun `withJwksUrl decodes a valid RSA token via remote JWKS`() {
-        val decoder = NimbusJwtDecoder.withJwksUrl("http://localhost:$jwksPort/.well-known/jwks.json").build()
-        val decoded = decoder.decode(rsaToken(subject = "frank"))
+    fun `jwks decodes a valid RSA token via remote JWKS`() {
+        val verification = JwtVerification.of(JwtKeySource.jwks("http://localhost:$jwksPort/.well-known/jwks.json"))
+        val decoded = NimbusJwtDecoder.decode(rsaToken(subject = "frank"), verification)
         assertThat(decoded.subject).isEqualTo("frank")
     }
 
     @Test
-    fun `withJwksUrl decodes a valid EC token via remote JWKS`() {
-        val decoder = NimbusJwtDecoder.withJwksUrl("http://localhost:$jwksPort/.well-known/jwks.json").build()
-        val decoded = decoder.decode(ecToken(subject = "grace"))
+    fun `jwks decodes a valid EC token via remote JWKS`() {
+        val verification = JwtVerification.of(JwtKeySource.jwks("http://localhost:$jwksPort/.well-known/jwks.json"))
+        val decoded = NimbusJwtDecoder.decode(ecToken(subject = "grace"), verification)
         assertThat(decoded.subject).isEqualTo("grace")
     }
 
     @Test
-    fun `withJwksUrl rejects a token signed with a key not in the JWKS`() {
-        val decoder = NimbusJwtDecoder.withJwksUrl("http://localhost:$jwksPort/.well-known/jwks.json").build()
+    fun `jwks rejects a token signed with a key not in the JWKS`() {
+        val verification = JwtVerification.of(JwtKeySource.jwks("http://localhost:$jwksPort/.well-known/jwks.json"))
         val unknownKey = RSAKeyGenerator(2048).keyID("unknown-key").generate()
         val unknownKeyToken = run {
             val claims = JWTClaimsSet.Builder().subject("hank")
@@ -267,21 +270,25 @@ class NimbusJwtDecoderTest {
             val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID("unknown-key").build()
             SignedJWT(header, claims).also { it.sign(RSASSASigner(unknownKey)) }.serialize()
         }
-        assertThatThrownBy { decoder.decode(unknownKeyToken) }.isInstanceOf(Exception::class.java)
+        assertThatThrownBy {
+            NimbusJwtDecoder.decode(unknownKeyToken, verification)
+        }.isInstanceOf(Exception::class.java)
     }
 
     @Test
-    fun `withJwksUrl validates issuer and audience`() {
-        val decoder = NimbusJwtDecoder.withJwksUrl("http://localhost:$jwksPort/.well-known/jwks.json")
+    fun `jwks validates issuer and audience`() {
+        val verification = JwtVerification.builder(
+            JwtKeySource.jwks("http://localhost:$jwksPort/.well-known/jwks.json"),
+        )
             .issuer("https://auth.example.com")
             .audience("my-api")
             .build()
 
         val validToken = rsaToken(issuer = "https://auth.example.com", audience = listOf("my-api"))
-        assertThat(decoder.decode(validToken).subject).isEqualTo("alice")
+        assertThat(NimbusJwtDecoder.decode(validToken, verification).subject).isEqualTo("alice")
 
         val noIssuerToken = rsaToken()
-        assertThatThrownBy { decoder.decode(noIssuerToken) }.isInstanceOf(Exception::class.java)
+        assertThatThrownBy { NimbusJwtDecoder.decode(noIssuerToken, verification) }.isInstanceOf(Exception::class.java)
     }
 
     // ── DecodedJwt claim access ───────────────────────────────────────────────
@@ -297,8 +304,8 @@ class NimbusJwtDecoderTest {
         val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID("rsa-test-key").build()
         val token = SignedJWT(header, claims).also { it.sign(RSASSASigner(rsaJwk)) }.serialize()
 
-        val decoder = NimbusJwtDecoder.withPublicKey(rsaJwk.toRSAPublicKey()).build()
-        val decoded = decoder.decode(token)
+        val verification = JwtVerification.of(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
+        val decoded = NimbusJwtDecoder.decode(token, verification)
 
         assertThat(decoded.subject).isEqualTo("alice")
         assertThat(decoded.claim<List<String>>("roles")).containsExactlyInAnyOrder("ADMIN", "USER")
@@ -313,8 +320,8 @@ class NimbusJwtDecoderTest {
         val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID("rsa-test-key").build()
         val token = SignedJWT(header, claims).also { it.sign(RSASSASigner(rsaJwk)) }.serialize()
 
-        val decoder = NimbusJwtDecoder.withPublicKey(rsaJwk.toRSAPublicKey()).build()
-        val decoded = decoder.decode(token)
+        val verification = JwtVerification.of(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
+        val decoded = NimbusJwtDecoder.decode(token, verification)
 
         assertThat(decoded.subject).isBlank()
     }

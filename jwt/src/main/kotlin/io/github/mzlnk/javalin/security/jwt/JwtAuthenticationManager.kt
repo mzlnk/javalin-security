@@ -12,14 +12,17 @@ import org.slf4j.LoggerFactory
  * The pipeline is explicit and has no hidden side-effects:
  * 1. Extract the raw bearer token from the `Authorization` header via [BearerTokenResolver].
  *    No header -> [AuthenticationResult.NotAuthenticated] (anonymous; authorization rules decide access).
- * 2. Call [JwtDecoder.decode]. Any thrown exception -> [AuthenticationResult.Failure] (logged; 401).
+ * 2. Call [JwtDecoder.decode] with the configured [JwtVerification]. Any thrown exception ->
+ *    [AuthenticationResult.Failure] (logged; 401).
  * 3. Map the [DecodedJwt] to a [JwtPrincipal] and resolve authorities via [JwtAuthoritiesMapper].
  * 4. Return [AuthenticationResult.Success] with the populated [Authentication].
  *
- * Construct via the Kotlin DSL (`jwt { decoder = ... }` inside `http { }`) or use [Builder] from Java.
+ * Construct via the Kotlin DSL (`jwt { decoder = ...; keySource = ... }` inside `http { }`) or use
+ * [Builder] from Java.
  */
 class JwtAuthenticationManager private constructor(
     private val decoder: JwtDecoder,
+    private val verification: JwtVerification,
     private val authoritiesMapper: JwtAuthoritiesMapper,
 ) : AuthenticationManager {
 
@@ -28,7 +31,7 @@ class JwtAuthenticationManager private constructor(
             ?: return AuthenticationResult.NotAuthenticated
 
         val decoded = try {
-            decoder.decode(rawToken)
+            decoder.decode(rawToken, verification)
         } catch (ex: Exception) {
             log.debug("JWT verification failed: {}", ex.message, ex)
             return AuthenticationResult.Failure(message = ex.message, cause = ex)
@@ -45,12 +48,16 @@ class JwtAuthenticationManager private constructor(
      * Usage from Java:
      *
      * ```java
-     * JwtAuthenticationManager manager = JwtAuthenticationManager.builder(myDecoder)
+     * JwtVerification verification = JwtVerification.builder(JwtKeySource.publicKey(rsaKey)).build();
+     * JwtAuthenticationManager manager = JwtAuthenticationManager.builder(NimbusJwtDecoder.INSTANCE, verification)
      *     .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
      *     .build();
      * ```
      */
-    class Builder(private val decoder: JwtDecoder) {
+    class Builder(
+        private val decoder: JwtDecoder,
+        private val verification: JwtVerification,
+    ) {
 
         private var authoritiesMapper: JwtAuthoritiesMapper = JwtAuthoritiesMapper.noAuthorities()
 
@@ -61,6 +68,7 @@ class JwtAuthenticationManager private constructor(
 
         fun build(): JwtAuthenticationManager = JwtAuthenticationManager(
             decoder = decoder,
+            verification = verification,
             authoritiesMapper = authoritiesMapper,
         )
 
@@ -71,16 +79,17 @@ class JwtAuthenticationManager private constructor(
         private val log = LoggerFactory.getLogger(JwtAuthenticationManager::class.java)
 
         /**
-         * Creates a [Builder] pre-loaded with the required [decoder].
+         * Creates a [Builder] pre-loaded with the required [decoder] and [verification].
          *
-         * The [JwtDecoder] is the only required argument; all other settings have sensible defaults.
+         * These are the only required arguments; all other settings have sensible defaults.
          */
         @JvmStatic
-        fun builder(decoder: JwtDecoder): Builder = Builder(decoder)
+        fun builder(decoder: JwtDecoder, verification: JwtVerification): Builder = Builder(decoder, verification)
 
-        /** Creates a [JwtAuthenticationManager] with the given [decoder] and default settings. */
+        /** Creates a [JwtAuthenticationManager] with the given [decoder], [verification] and default settings. */
         @JvmStatic
-        fun of(decoder: JwtDecoder): JwtAuthenticationManager = Builder(decoder).build()
+        fun of(decoder: JwtDecoder, verification: JwtVerification): JwtAuthenticationManager =
+            Builder(decoder, verification).build()
 
     }
 

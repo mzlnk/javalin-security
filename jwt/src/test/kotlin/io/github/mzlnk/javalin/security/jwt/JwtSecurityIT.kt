@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test
  */
 class JwtSecurityIT {
 
-    private val testDecoder = JwtDecoder { token ->
+    private val testDecoder = JwtDecoder { token, _ ->
         if (token == "INVALID") throw IllegalArgumentException("bad token")
         SimpleDecodedJwt(
             subject = token,
@@ -30,6 +30,7 @@ class JwtSecurityIT {
             http {
                 jwt {
                     decoder = testDecoder
+                    keySource = JwtKeySource.secret("test-secret-not-actually-used-by-test-double")
                     authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
                     this.bearerChallenge = bearerChallenge
                     realm = "TestAPI"
@@ -91,7 +92,7 @@ class JwtSecurityIT {
 
     @Test
     fun `should allow access when caller holds required authority`() {
-        val adminDecoder = JwtDecoder { token ->
+        val adminDecoder = JwtDecoder { token, _ ->
             SimpleDecodedJwt(subject = token, claims = mapOf("roles" to listOf("ADMIN")))
         }
         val adminApp = Javalin.create { cfg ->
@@ -99,6 +100,7 @@ class JwtSecurityIT {
                 http {
                     jwt {
                         decoder = adminDecoder
+                        keySource = JwtKeySource.secret("test-secret")
                         authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
                     }
                     authorizeRequests { authorize("/admin/**", GET, hasAuthority("ADMIN")) }
@@ -119,7 +121,10 @@ class JwtSecurityIT {
         val accessibleApp = Javalin.create { cfg ->
             cfg.security {
                 http {
-                    jwt { decoder = testDecoder }
+                    jwt {
+                        decoder = testDecoder
+                        keySource = JwtKeySource.secret("test-secret")
+                    }
                     authorizeRequests { anyRequest = authenticated }
                 }
             }
@@ -174,6 +179,7 @@ class JwtSecurityIT {
                 cfg.security {
                     http {
                         jwt {
+                            keySource = JwtKeySource.secret("test-secret")
                             // decoder not set — should fail
                         }
                         authorizeRequests { anyRequest = permitAll }
@@ -182,6 +188,24 @@ class JwtSecurityIT {
             }
         }.isInstanceOf(SecurityConfigurationException::class.java)
             .hasMessageContaining("decoder")
+    }
+
+    @Test
+    fun `should throw SecurityConfigurationException when keySource is not configured`() {
+        assertThatThrownBy {
+            Javalin.create { cfg ->
+                cfg.security {
+                    http {
+                        jwt {
+                            decoder = testDecoder
+                            // keySource not set — should fail
+                        }
+                        authorizeRequests { anyRequest = permitAll }
+                    }
+                }
+            }
+        }.isInstanceOf(SecurityConfigurationException::class.java)
+            .hasMessageContaining("keySource")
     }
 
 }
