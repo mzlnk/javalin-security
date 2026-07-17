@@ -30,6 +30,11 @@ import javax.crypto.spec.SecretKeySpec
  * A [JwtDecoder] implementation backed by the [Nimbus JOSE+JWT](https://connect2id.com/products/nimbus-jose-jwt)
  * library (v10.x).
  *
+ * **Dependency:** `com.nimbusds:nimbus-jose-jwt` is a `compileOnly` dependency of this module, not
+ * bundled transitively — add it yourself (matching the version this module was built against) if
+ * you use this decoder. This keeps consumers who pick a different [JwtDecoder] adapter (e.g.
+ * `Auth0JwtDecoder`) free of Nimbus on their classpath.
+ *
  * This adapter is stateless: it holds no configuration of its own (other than an internal cache
  * for remote JWKS sources) and performs signature verification + claim checks purely from the
  * [JwtVerification] passed to [decode]. All key-source and claim-validation configuration lives
