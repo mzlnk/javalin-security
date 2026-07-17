@@ -3,6 +3,7 @@ package io.github.mzlnk.javalin.security.jwt
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
+import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.javalin.http.Context
 import org.slf4j.LoggerFactory
 
@@ -10,7 +11,7 @@ import org.slf4j.LoggerFactory
  * Implements JWT bearer-token authentication.
  *
  * The pipeline is explicit and has no hidden side-effects:
- * 1. Extract the raw token from the request via [JwtTokenResolver].
+ * 1. Extract the raw token from the request via [TokenResolver].
  *    No token -> [AuthenticationResult.NotAuthenticated] (anonymous; authorization rules decide access).
  * 2. Call [JwtDecoder.decode] with the configured [JwtVerification]. Any thrown exception ->
  *    [AuthenticationResult.Failure] (logged; 401).
@@ -24,7 +25,7 @@ class JwtAuthenticationManager private constructor(
     private val decoder: JwtDecoder,
     private val verification: JwtVerification,
     private val authoritiesMapper: JwtAuthoritiesMapper,
-    private val tokenResolver: JwtTokenResolver,
+    private val tokenResolver: TokenResolver,
 ) : AuthenticationManager {
 
     override fun authenticate(context: Context): AuthenticationResult {
@@ -61,7 +62,7 @@ class JwtAuthenticationManager private constructor(
     ) {
 
         private var authoritiesMapper: JwtAuthoritiesMapper = JwtAuthoritiesMapper.noAuthorities()
-        private var tokenResolver: JwtTokenResolver = JwtTokenResolver.DEFAULT
+        private var tokenResolver: TokenResolver = TokenResolver.DEFAULT
 
         fun authoritiesMapper(mapper: JwtAuthoritiesMapper): Builder {
             this.authoritiesMapper = mapper
@@ -69,10 +70,10 @@ class JwtAuthenticationManager private constructor(
         }
 
         /**
-         * Overrides how the raw token is located in the request (defaults to [JwtTokenResolver.DEFAULT],
+         * Overrides how the raw token is located in the request (defaults to [TokenResolver.DEFAULT],
          * i.e. the `Authorization: Bearer ...` header).
          */
-        fun tokenResolver(resolver: JwtTokenResolver): Builder {
+        fun tokenResolver(resolver: TokenResolver): Builder {
             this.tokenResolver = resolver
             return this
         }

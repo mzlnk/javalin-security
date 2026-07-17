@@ -1,6 +1,7 @@
 package io.github.mzlnk.javalin.security.jwt
 
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
+import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.github.mzlnk.javalin.security.principal
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
@@ -180,7 +181,7 @@ class JwtSecurityIT {
                     jwt {
                         decoder = testDecoder
                         keySource = JwtKeySource.secret("test-secret")
-                        tokenResolver = JwtTokenResolver.cookie("access_token")
+                        tokenResolver = TokenResolver.cookie("access_token")
                     }
                     authorizeRequests { anyRequest = authenticated }
                 }
@@ -205,7 +206,7 @@ class JwtSecurityIT {
                     jwt {
                         decoder = testDecoder
                         keySource = JwtKeySource.secret("test-secret")
-                        tokenResolver = JwtTokenResolver.cookie("access_token")
+                        tokenResolver = TokenResolver.cookie("access_token")
                     }
                     authorizeRequests { anyRequest = authenticated }
                 }

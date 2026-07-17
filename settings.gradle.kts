@@ -7,5 +7,8 @@ rootProject.name = "javalin-security"
 include("core")
 project(":core").name = "javalin-security"
 
+include("extensions/common")
+project(":extensions/common").name = "javalin-security-extensions-common"
+
 include("extensions/jwt")
 project(":extensions/jwt").name = "javalin-security-jwt"

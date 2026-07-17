@@ -1,6 +1,7 @@
 package io.github.mzlnk.javalin.security.jwt
 
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
+import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.github.mzlnk.javalin.security.http.HttpConfigDsl
 
 /**
@@ -97,17 +98,17 @@ class JwtDsl internal constructor() {
     /**
      * Locates the raw token within the incoming request.
      *
-     * Defaults to [JwtTokenResolver.DEFAULT], i.e. the `Authorization: Bearer ...` header. Swap
-     * in [JwtTokenResolver.cookie] for browser/SPA flows that store the JWT in a cookie instead:
+     * Defaults to [TokenResolver.DEFAULT], i.e. the `Authorization: Bearer ...` header. Swap
+     * in [TokenResolver.cookie] for browser/SPA flows that store the JWT in a cookie instead:
      *
      * ```kotlin
      * jwt {
      *     decoder = myDecoder
-     *     tokenResolver = JwtTokenResolver.cookie("access_token")
+     *     tokenResolver = TokenResolver.cookie("access_token")
      * }
      * ```
      */
-    var tokenResolver: JwtTokenResolver = JwtTokenResolver.DEFAULT
+    var tokenResolver: TokenResolver = TokenResolver.DEFAULT
 
     internal fun buildManager(): JwtAuthenticationManager {
         val d = decoder ?: throw SecurityConfigurationException(

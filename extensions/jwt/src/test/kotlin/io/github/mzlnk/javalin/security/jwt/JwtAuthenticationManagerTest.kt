@@ -1,6 +1,7 @@
 package io.github.mzlnk.javalin.security.jwt
 
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
+import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.javalin.http.Context
 import io.mockk.every
 import io.mockk.mockk
@@ -121,7 +122,7 @@ class JwtAuthenticationManagerTest {
     @Test
     fun `should authenticate from a cookie when a custom tokenResolver is configured`() {
         val manager = JwtAuthenticationManager.builder(successDecoder, verification)
-            .tokenResolver(JwtTokenResolver.cookie("access_token"))
+            .tokenResolver(TokenResolver.cookie("access_token"))
             .build()
 
         val cookieCtx: Context = mockk {
@@ -135,7 +136,7 @@ class JwtAuthenticationManagerTest {
     @Test
     fun `should return NotAuthenticated when custom tokenResolver finds no token`() {
         val manager = JwtAuthenticationManager.builder(successDecoder, verification)
-            .tokenResolver(JwtTokenResolver.cookie("access_token"))
+            .tokenResolver(TokenResolver.cookie("access_token"))
             .build()
 
         val cookieCtx: Context = mockk {

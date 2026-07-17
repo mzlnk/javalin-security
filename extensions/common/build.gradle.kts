@@ -1,12 +1,7 @@
 dependencies {
-    api(project(":javalin-security"))
-    api(project(":javalin-security-extensions-common"))
-    api(libs.nimbus.jose.jwt)
     compileOnly(libs.javalin)
-    compileOnly(libs.slf4j.api)
 
     testImplementation(libs.javalin)
-    testImplementation(libs.javalin.testtools)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)
