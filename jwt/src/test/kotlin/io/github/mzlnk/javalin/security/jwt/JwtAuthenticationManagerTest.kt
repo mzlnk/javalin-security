@@ -116,4 +116,34 @@ class JwtAuthenticationManagerTest {
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
     }
 
+    // ── tokenResolver ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `should authenticate from a cookie when a custom tokenResolver is configured`() {
+        val manager = JwtAuthenticationManager.builder(successDecoder, verification)
+            .tokenResolver(JwtTokenResolver.cookie("access_token"))
+            .build()
+
+        val cookieCtx: Context = mockk {
+            every { cookie("access_token") } returns validToken
+        }
+
+        val result = manager.authenticate(cookieCtx)
+        assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
+    }
+
+    @Test
+    fun `should return NotAuthenticated when custom tokenResolver finds no token`() {
+        val manager = JwtAuthenticationManager.builder(successDecoder, verification)
+            .tokenResolver(JwtTokenResolver.cookie("access_token"))
+            .build()
+
+        val cookieCtx: Context = mockk {
+            every { cookie("access_token") } returns null
+        }
+
+        val result = manager.authenticate(cookieCtx)
+        assertThat(result).isEqualTo(AuthenticationResult.NotAuthenticated)
+    }
+
 }

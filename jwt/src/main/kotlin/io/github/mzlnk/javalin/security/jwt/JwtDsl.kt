@@ -10,8 +10,9 @@ import io.github.mzlnk.javalin.security.http.HttpConfigDsl
  * [decoder] and [keySource] are the only required fields; all other settings have defaults.
  *
  * The addon (this DSL) owns the decision of *where the verification key comes from* and *which
- * claims are checked* — [keySource], [issuer], [audiences], [clockSkewSeconds]. The [decoder] is
- * a thin, stateless adapter (e.g. `NimbusJwtDecoder`) that only performs the actual signature
+ * claims are checked* — [keySource], [issuer], [audiences], [clockSkewSeconds] — as well as
+ * *where the raw token is located in the request* — [tokenResolver]. The [decoder] is a thin,
+ * stateless adapter (e.g. `NimbusJwtDecoder`) that only performs the actual signature
  * verification and claim checks for the [JwtVerification] built from these fields.
  *
  * What this block does explicitly:
@@ -93,6 +94,21 @@ class JwtDsl internal constructor() {
      */
     var realm: String = "API"
 
+    /**
+     * Locates the raw token within the incoming request.
+     *
+     * Defaults to [JwtTokenResolver.DEFAULT], i.e. the `Authorization: Bearer ...` header. Swap
+     * in [JwtTokenResolver.cookie] for browser/SPA flows that store the JWT in a cookie instead:
+     *
+     * ```kotlin
+     * jwt {
+     *     decoder = myDecoder
+     *     tokenResolver = JwtTokenResolver.cookie("access_token")
+     * }
+     * ```
+     */
+    var tokenResolver: JwtTokenResolver = JwtTokenResolver.DEFAULT
+
     internal fun buildManager(): JwtAuthenticationManager {
         val d = decoder ?: throw SecurityConfigurationException(
             "jwt.decoder is required but was not configured. " +
@@ -110,6 +126,7 @@ class JwtDsl internal constructor() {
             .build()
         return JwtAuthenticationManager.builder(d, verification)
             .authoritiesMapper(authoritiesMapper)
+            .tokenResolver(tokenResolver)
             .build()
     }
 

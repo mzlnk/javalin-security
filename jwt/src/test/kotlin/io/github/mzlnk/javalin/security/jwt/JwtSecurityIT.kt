@@ -170,6 +170,55 @@ class JwtSecurityIT {
             assertThat(response.headers().get("WWW-Authenticate")).isNull()
         }
 
+    // ── Custom tokenResolver ────────────────────────────────────────────────────
+
+    @Test
+    fun `should authenticate from a cookie when tokenResolver is set to cookie-based resolution`() {
+        val cookieApp = Javalin.create { cfg ->
+            cfg.security {
+                http {
+                    jwt {
+                        decoder = testDecoder
+                        keySource = JwtKeySource.secret("test-secret")
+                        tokenResolver = JwtTokenResolver.cookie("access_token")
+                    }
+                    authorizeRequests { anyRequest = authenticated }
+                }
+            }
+            cfg.routes.get("/me") { ctx ->
+                val principal = ctx.principal<JwtPrincipal>()
+                ctx.result(principal.name)
+            }
+        }
+        JavalinTest.test(cookieApp) { _, client ->
+            val response = client.get("/me") { it.header("Cookie", "access_token=alice") }
+            assertThat(response.code).isEqualTo(200)
+            assertThat(response.body!!.string()).isEqualTo("alice")
+        }
+    }
+
+    @Test
+    fun `should return 401 when tokenResolver is cookie-based and the cookie is absent`() {
+        val cookieApp = Javalin.create { cfg ->
+            cfg.security {
+                http {
+                    jwt {
+                        decoder = testDecoder
+                        keySource = JwtKeySource.secret("test-secret")
+                        tokenResolver = JwtTokenResolver.cookie("access_token")
+                    }
+                    authorizeRequests { anyRequest = authenticated }
+                }
+            }
+            cfg.routes.get("/me") { it.result("ok") }
+        }
+        JavalinTest.test(cookieApp) { _, client ->
+            // Bearer header is present, but the resolver only looks at the cookie.
+            val response = client.get("/me") { it.header("Authorization", "Bearer alice") }
+            assertThat(response.code).isEqualTo(401)
+        }
+    }
+
     // ── DSL validation ────────────────────────────────────────────────────────
 
     @Test

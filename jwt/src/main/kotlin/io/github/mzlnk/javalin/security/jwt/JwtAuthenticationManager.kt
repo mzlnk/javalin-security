@@ -10,8 +10,8 @@ import org.slf4j.LoggerFactory
  * Implements JWT bearer-token authentication.
  *
  * The pipeline is explicit and has no hidden side-effects:
- * 1. Extract the raw bearer token from the `Authorization` header via [BearerTokenResolver].
- *    No header -> [AuthenticationResult.NotAuthenticated] (anonymous; authorization rules decide access).
+ * 1. Extract the raw token from the request via [JwtTokenResolver].
+ *    No token -> [AuthenticationResult.NotAuthenticated] (anonymous; authorization rules decide access).
  * 2. Call [JwtDecoder.decode] with the configured [JwtVerification]. Any thrown exception ->
  *    [AuthenticationResult.Failure] (logged; 401).
  * 3. Map the [DecodedJwt] to a [JwtPrincipal] and resolve authorities via [JwtAuthoritiesMapper].
@@ -24,10 +24,11 @@ class JwtAuthenticationManager private constructor(
     private val decoder: JwtDecoder,
     private val verification: JwtVerification,
     private val authoritiesMapper: JwtAuthoritiesMapper,
+    private val tokenResolver: JwtTokenResolver,
 ) : AuthenticationManager {
 
     override fun authenticate(context: Context): AuthenticationResult {
-        val rawToken = BearerTokenResolver.resolve(context)
+        val rawToken = tokenResolver.resolve(context)
             ?: return AuthenticationResult.NotAuthenticated
 
         val decoded = try {
@@ -60,9 +61,19 @@ class JwtAuthenticationManager private constructor(
     ) {
 
         private var authoritiesMapper: JwtAuthoritiesMapper = JwtAuthoritiesMapper.noAuthorities()
+        private var tokenResolver: JwtTokenResolver = JwtTokenResolver.DEFAULT
 
         fun authoritiesMapper(mapper: JwtAuthoritiesMapper): Builder {
             this.authoritiesMapper = mapper
+            return this
+        }
+
+        /**
+         * Overrides how the raw token is located in the request (defaults to [JwtTokenResolver.DEFAULT],
+         * i.e. the `Authorization: Bearer ...` header).
+         */
+        fun tokenResolver(resolver: JwtTokenResolver): Builder {
+            this.tokenResolver = resolver
             return this
         }
 
@@ -70,6 +81,7 @@ class JwtAuthenticationManager private constructor(
             decoder = decoder,
             verification = verification,
             authoritiesMapper = authoritiesMapper,
+            tokenResolver = tokenResolver,
         )
 
     }
