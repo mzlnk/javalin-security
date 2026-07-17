@@ -12,3 +12,6 @@ project(":extensions/common").name = "javalin-security-extensions-common"
 
 include("extensions/jwt")
 project(":extensions/jwt").name = "javalin-security-jwt"
+
+include("extensions/basic-auth")
+project(":extensions/basic-auth").name = "javalin-security-basic-auth"
