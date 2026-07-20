@@ -3,6 +3,7 @@ package io.github.mzlnk.javalin.security.jwt
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.github.mzlnk.javalin.security.http.HttpConfigDsl
+import io.github.mzlnk.javalin.security.ws.WsConfigDsl
 
 /**
  * Kotlin DSL receiver for the `jwt { }` block inside `http { }`.
@@ -146,6 +147,42 @@ class JwtDsl internal constructor() {
  * The [JwtDsl.decoder] field is the only required setting.
  */
 fun HttpConfigDsl.jwt(init: JwtDsl.() -> Unit) {
+    val dsl = JwtDsl().apply(init)
+    authenticationManager = dsl.buildManager()
+    if (dsl.bearerChallenge) {
+        unauthorizedHandler = dsl.buildChallenge()
+    }
+}
+
+/**
+ * Configures JWT bearer-token authentication inside a `ws { }` block.
+ *
+ * Mirrors the `http { }` extension exactly — it builds the same [JwtAuthenticationManager] from
+ * [JwtDsl.decoder]/[JwtDsl.keySource]/[JwtDsl.authoritiesMapper] and sets it as
+ * [WsConfigDsl.authenticationManager]. When [JwtDsl.bearerChallenge] is `true`, it also sets
+ * [WsConfigDsl.unauthorizedHandler] to a [BearerChallengeUnauthorizedHandler].
+ *
+ * **Browser clients cannot set an `Authorization` header on a WebSocket handshake.** For
+ * browser/SPA flows, set `tokenResolver = TokenResolver.cookie("...")` and pair it with
+ * [WsConfigDsl.allowedOrigins] on the surrounding `ws { }` block — WebSocket handshakes are not
+ * protected by the browser same-origin policy or CORS, so an explicit origin allowlist is the
+ * CSWSH defense when authenticating via a cookie:
+ *
+ * ```kotlin
+ * ws {
+ *     jwt {
+ *         decoder = NimbusJwtDecoder
+ *         keySource = JwtKeySource.publicKey(rsaPublicKey)
+ *         tokenResolver = TokenResolver.cookie("access_token")
+ *     }
+ *     allowedOrigins = listOf("https://app.example.com")
+ *     authorizeRequests { authorize("/ws/chat", authenticated) }
+ * }
+ * ```
+ *
+ * The [JwtDsl.decoder] field is the only required setting.
+ */
+fun WsConfigDsl.jwt(init: JwtDsl.() -> Unit) {
     val dsl = JwtDsl().apply(init)
     authenticationManager = dsl.buildManager()
     if (dsl.bearerChallenge) {
