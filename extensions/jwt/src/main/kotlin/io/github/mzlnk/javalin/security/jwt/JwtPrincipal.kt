@@ -9,8 +9,8 @@ import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
  * read any claim without re-parsing the token:
  *
  * ```kotlin
- * val principal: JwtPrincipal = ctx.principal()
- * val roles: List<String>? = principal.token.claim("roles")
+ * val principal: JwtPrincipal? = ctx.principal()
+ * val roles: List<String>? = principal?.token?.claim("roles")
  * ```
  *
  * [name] is the `sub` (subject) claim; it is used for logging and as the human-readable identity.

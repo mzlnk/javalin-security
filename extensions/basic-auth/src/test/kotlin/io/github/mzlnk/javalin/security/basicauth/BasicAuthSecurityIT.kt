@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
 import java.util.Base64
 
 /**
- * Integration tests for the `basicAuth {}` DSL wired through `config.security { http { basicAuth { } } }`.
+ * Integration tests for the `basicAuth { }` extension wired through `config.security { it.http { } }`.
  */
 class BasicAuthSecurityIT {
 
@@ -29,18 +29,18 @@ class BasicAuthSecurityIT {
         "Basic " + Base64.getEncoder().encodeToString("$username:$password".toByteArray())
 
     private fun app(basicChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
-        cfg.security {
-            http {
-                basicAuth {
-                    userLookup = testUserLookup
-                    this.basicChallenge = basicChallenge
-                    realm = "TestAPI"
+        cfg.security { security ->
+            security.http { http ->
+                http.basicAuth { basic ->
+                    basic.userLookup = testUserLookup
+                    basic.basicChallenge = basicChallenge
+                    basic.realm = "TestAPI"
                 }
-                authorizeRequests {
-                    authorize("/public/**", GET, permitAll)
-                    authorize("/protected/**", POST, authenticated)
-                    authorize("/admin/**", GET, hasAuthority("ADMIN"))
-                    anyRequest = denyAll
+                http.rules { r ->
+                    r.add("/public/*", GET, r.allow)
+                    r.add("/protected/*", POST, r.authenticated)
+                    r.add("/admin/*", GET, r.hasAuthority("ADMIN"))
+                    r.fallback = r.deny
                 }
             }
         }
@@ -52,7 +52,7 @@ class BasicAuthSecurityIT {
     // ── Anonymous access ──────────────────────────────────────────────────────
 
     @Test
-    fun `should allow anonymous access to permitAll route`() = JavalinTest.test(app()) { _, client ->
+    fun `should allow anonymous access to allow route`() = JavalinTest.test(app()) { _, client ->
         assertThat(client.get("/public/info").code).isEqualTo(200)
     }
 
@@ -62,7 +62,7 @@ class BasicAuthSecurityIT {
     }
 
     @Test
-    fun `should return 401 on denyAll route even without credentials`() = JavalinTest.test(app()) { _, client ->
+    fun `should return 401 on deny route even without credentials`() = JavalinTest.test(app()) { _, client ->
         assertThat(client.get("/admin/dashboard").code).isEqualTo(401)
     }
 
@@ -114,21 +114,21 @@ class BasicAuthSecurityIT {
     @Test
     fun `should expose BasicAuthPrincipal on context with correct username`() {
         val accessibleApp = Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    basicAuth { userLookup = testUserLookup }
-                    authorizeRequests { anyRequest = authenticated }
+            cfg.security { security ->
+                security.http { http ->
+                    http.basicAuth { basic -> basic.userLookup = testUserLookup }
+                    http.rules { r -> r.fallback = r.authenticated }
                 }
             }
             cfg.routes.get("/me") { ctx ->
-                val principal = ctx.principal<BasicAuthPrincipal>()
+                val principal = ctx.principal<BasicAuthPrincipal>()!!
                 ctx.result(principal.name)
             }
         }
         JavalinTest.test(accessibleApp) { _, client ->
             val response = client.get("/me") { it.header("Authorization", basicHeader("alice", "alice-pw")) }
             assertThat(response.code).isEqualTo(200)
-            assertThat(response.body!!.string()).isEqualTo("alice")
+            assertThat(response.body.string()).isEqualTo("alice")
         }
     }
 
@@ -167,39 +167,39 @@ class BasicAuthSecurityIT {
     @Test
     fun `should authenticate from a custom header when credentialsResolver is set to a custom header`() {
         val customApp = Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    basicAuth {
-                        userLookup = testUserLookup
-                        credentialsResolver = BasicCredentialsResolver.basicHeader("X-Custom-Auth")
+            cfg.security { security ->
+                security.http { http ->
+                    http.basicAuth { basic ->
+                        basic.userLookup = testUserLookup
+                        basic.credentialsResolver = BasicCredentialsResolver.basicHeader("X-Custom-Auth")
                     }
-                    authorizeRequests { anyRequest = authenticated }
+                    http.rules { r -> r.fallback = r.authenticated }
                 }
             }
             cfg.routes.get("/me") { ctx ->
-                val principal = ctx.principal<BasicAuthPrincipal>()
+                val principal = ctx.principal<BasicAuthPrincipal>()!!
                 ctx.result(principal.name)
             }
         }
         JavalinTest.test(customApp) { _, client ->
             val response = client.get("/me") { it.header("X-Custom-Auth", basicHeader("alice", "alice-pw")) }
             assertThat(response.code).isEqualTo(200)
-            assertThat(response.body!!.string()).isEqualTo("alice")
+            assertThat(response.body.string()).isEqualTo("alice")
         }
     }
 
-    // ── DSL validation ────────────────────────────────────────────────────────
+    // ── Config validation ─────────────────────────────────────────────────────
 
     @Test
     fun `should throw SecurityConfigurationException when userLookup is not configured`() {
         assertThatThrownBy {
             Javalin.create { cfg ->
-                cfg.security {
-                    http {
-                        basicAuth {
+                cfg.security { security ->
+                    security.http { http ->
+                        http.basicAuth { basic ->
                             // userLookup not set — should fail
                         }
-                        authorizeRequests { anyRequest = permitAll }
+                        http.rules { r -> r.fallback = r.allow }
                     }
                 }
             }

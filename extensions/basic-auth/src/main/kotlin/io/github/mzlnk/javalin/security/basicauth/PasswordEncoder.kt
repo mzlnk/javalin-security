@@ -11,7 +11,7 @@ import java.security.MessageDigest
  * that responsibility belongs to whatever provisions [BasicUser] records (a migration script, an
  * admin tool, an identity provider, etc.), not to the request-time authentication pipeline.
  *
- * Register via `basicAuth { passwordEncoder = ... }`. Defaults to [noOp], which compares the raw
+ * Register via the `basicAuth { }` block (`passwordEncoder` field). Defaults to [noOp], which compares the raw
  * password directly against the stored value in constant time. Real deployments should supply an
  * encoder backed by a proper password-hashing algorithm (BCrypt, Argon2, PBKDF2, ...) so that
  * plaintext passwords are never persisted.

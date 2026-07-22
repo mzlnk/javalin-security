@@ -7,7 +7,7 @@ package io.github.mzlnk.javalin.security.jwt
  * [io.github.mzlnk.javalin.security.authentication.Authentication.authenticated] and is therefore
  * the value read by authorization rules such as `hasAuthority("ADMIN")`.
  *
- * Register via `jwt { authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles") }` or supply a
+ * Register via the `jwt { }` block (`authoritiesMapper` field, e.g. [fromClaim]) or supply a
  * lambda. The default (when not configured) returns an empty set.
  *
  * Custom mappers receive the fully-verified [DecodedJwt] and may read any claim:
@@ -32,7 +32,7 @@ fun interface JwtAuthoritiesMapper {
          * Returns an empty-set mapper. This is the default when no mapper is configured.
          *
          * Authorization rules that require specific authorities will never be satisfied; use this
-         * only when all protected routes rely solely on `authenticated()` / `permitAll()`.
+         * only when all protected routes rely solely on `authenticated` / `allow`.
          */
         @JvmStatic
         fun noAuthorities(): JwtAuthoritiesMapper = JwtAuthoritiesMapper { emptySet() }

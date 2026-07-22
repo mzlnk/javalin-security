@@ -1,12 +1,13 @@
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.Javalin
 import io.javalin.http.HandlerType.DELETE
 import io.javalin.http.HandlerType.GET
 import io.javalin.http.HandlerType.POST
+import io.javalin.security.RouteRole
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -14,10 +15,11 @@ import org.junit.jupiter.api.Test
 class JavalinSecurityIT {
 
     /**
-     * Test manager: authenticates when an `X-User` header is present, granting the authorities
-     * listed (comma separated) in `X-Authorities`. A user named "invalid" simulates a bad credential.
+     * Test authenticator: authenticates when an `X-User` header is present, granting the
+     * authorities listed (comma separated) in `X-Authorities`. A user named "invalid" simulates a
+     * bad credential.
      */
-    private val headerManager = AuthenticationManager { context ->
+    private val headerAuthenticator = Authenticator { context ->
         when (val user = context.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             "invalid" -> AuthenticationResult.Failure(message = "bad credentials")
@@ -33,26 +35,26 @@ class JavalinSecurityIT {
         }
     }
 
-    private fun app(manager: AuthenticationManager? = headerManager): Javalin =
+    private fun app(authenticator: Authenticator? = headerAuthenticator): Javalin =
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests {
-                        authorize("/api/v1/**", GET, permitAll)
-                        authorize("/api/v1/**", POST, authenticated)
-                        authorize("/api/v1/**", DELETE, hasAuthority("ADMIN"))
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r ->
+                        r.add("/api/v1/*", GET, r.allow)
+                        r.add("/api/v1/*", POST, r.authenticated)
+                        r.add("/api/v1/*", DELETE, r.hasAuthority("ADMIN"))
                     }
-                    manager?.let { authenticationManager = it }
+                    authenticator?.let { http.authenticator = it }
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
             cfg.routes.post("/api/v1/resource") { it.result("created") }
             cfg.routes.delete("/api/v1/resource") { it.result("deleted") }
-            cfg.routes.get("/api/v1/me") { it.result((it.principal() as TestPrincipal).name) }
+            cfg.routes.get("/api/v1/me") { it.result(it.principal<TestPrincipal>()!!.name) }
         }
 
     @Test
-    fun `should allow anonymous access when rule is permitAll`() = JavalinTest.test(app()) { _, client ->
+    fun `should allow anonymous access when rule is allow`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.get("/api/v1/resource")
 
@@ -114,7 +116,7 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should return 401 when provider reports a failure`() = JavalinTest.test(app()) { _, client ->
+    fun `should return 401 when the authenticator reports a failure`() = JavalinTest.test(app()) { _, client ->
         // when
         val response = client.post("/api/v1/resource", null) { it.header("X-User", "invalid") }
 
@@ -135,12 +137,10 @@ class JavalinSecurityIT {
     @Test
     fun `should deny by default when no rule matches the route`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests {
-                        authorize("/api/v1/**", GET, permitAll)
-                    }
-                    authenticationManager = headerManager
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/v1/*", GET, r.allow) }
+                    http.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.get("/internal") { it.result("secret") }
@@ -154,10 +154,10 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `should treat every request as anonymous when no manager is configured`() = JavalinTest.test(
-        app(manager = null),
+    fun `should treat every request as anonymous when no authenticator is configured`() = JavalinTest.test(
+        app(authenticator = null),
     ) { _, client ->
-        // when / then: permitAll succeeds, authenticated is rejected with 401
+        // when / then: allow succeeds, authenticated is rejected with 401
         assertThat(client.get("/api/v1/resource").code).isEqualTo(200)
         assertThat(client.post("/api/v1/resource").code).isEqualTo(401)
     }
@@ -165,11 +165,9 @@ class JavalinSecurityIT {
     @Test
     fun `should leave HTTP routes unguarded when only ws block is configured`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
+            cfg.security { security ->
                 // no http { } block — HTTP guard is opt-in and must NOT be installed
-                ws {
-                    authorizeRequests { anyRequest = denyAll }
-                }
+                security.ws { ws -> ws.rules { r -> r.fallback = r.deny } }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
         },
@@ -181,12 +179,100 @@ class JavalinSecurityIT {
     @Test
     fun `should leave HTTP routes unguarded when security block has no sub-blocks`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
+            cfg.security { security ->
                 // neither http { } nor ws { } — no guards installed at all
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
         },
     ) { _, client ->
         assertThat(client.get("/api/v1/resource").code).isEqualTo(200)
+    }
+
+    // ── RouteRole-first authorization ───────────────────────────────────────────
+
+    private enum class Role : RouteRole { ADMIN, USER }
+
+    @Test
+    fun `Anyone role grants access even to anonymous callers, bypassing the rule table`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security { security ->
+                security.http { http -> http.rules { r -> r.fallback = r.deny } } // rule table would deny everything
+            }
+            cfg.routes.get("/public", { it.result("ok") }, Anyone)
+        },
+    ) { _, client ->
+        assertThat(client.get("/public").code).isEqualTo(200)
+    }
+
+    @Test
+    fun `a route with declared roles is granted when roleMapper maps a matching role`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security { security ->
+                security.http { http ->
+                    http.authenticator = headerAuthenticator
+                    http.roleMapper = RoleMapper { authentication, _ ->
+                        authentication.authorities.mapNotNull { authority ->
+                            runCatching { Role.valueOf(authority) }.getOrNull()
+                        }.toSet()
+                    }
+                    http.rules { r -> r.fallback = r.deny } // rule table must NOT be consulted
+                }
+            }
+            cfg.routes.get("/admin", { it.result("admin-ok") }, Role.ADMIN)
+        },
+    ) { _, client ->
+        // anonymous → 401, roleMapper has nothing to map
+        assertThat(client.get("/admin").code).isEqualTo(401)
+
+        // authenticated without the role → 403
+        val forbidden = client.get("/admin") {
+            it.header("X-User", "bob")
+            it.header("X-Authorities", "USER")
+        }
+        assertThat(forbidden.code).isEqualTo(403)
+
+        // authenticated with the role → 200, granted by role mapping, not the (deny) rule table
+        val granted = client.get("/admin") {
+            it.header("X-User", "alice")
+            it.header("X-Authorities", "ADMIN")
+        }
+        assertThat(granted.code).isEqualTo(200)
+        assertThat(granted.body.string()).isEqualTo("admin-ok")
+    }
+
+    @Test
+    fun `a route with declared roles is denied when no roleMapper is configured`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security { security ->
+                security.http { http ->
+                    http.authenticator = headerAuthenticator
+                    // no roleMapper configured
+                    http.rules { r -> r.fallback = r.allow } // even a permissive fallback must not apply
+                }
+            }
+            cfg.routes.get("/admin", { it.result("admin-ok") }, Role.ADMIN)
+        },
+    ) { _, client ->
+        val response = client.get("/admin") {
+            it.header("X-User", "alice")
+            it.header("X-Authorities", "ADMIN")
+        }
+        assertThat(response.code).isEqualTo(403)
+    }
+
+    @Test
+    fun `a route with no declared roles falls through to the pattern rule table`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security { security ->
+                security.http { http ->
+                    http.roleMapper = RoleMapper { _, _ -> setOf(Role.ADMIN) } // would grant any role-based route
+                    http.rules { r -> r.add("/plain", GET, r.deny) }
+                }
+            }
+            cfg.routes.get("/plain") { it.result("ok") } // no roles declared
+        },
+    ) { _, client ->
+        // roleMapper is irrelevant here since the route declares no roles — the rule table decides
+        assertThat(client.get("/plain").code).isEqualTo(401)
     }
 }

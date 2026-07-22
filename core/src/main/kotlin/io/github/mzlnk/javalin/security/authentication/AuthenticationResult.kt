@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security.authentication
 
 /**
- * The outcome of an [AuthenticationManager.authenticate] call.
+ * The outcome of an [Authenticator.authenticate] call.
  *
  * Modelled as a sealed hierarchy to make all cases explicit and avoid nullable handling.
  */

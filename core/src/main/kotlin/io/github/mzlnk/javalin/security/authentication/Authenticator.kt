@@ -13,10 +13,10 @@ import io.javalin.http.Context
  *
  * Implementations must not throw for the "no credentials present" case.
  *
- * Register via `http { authenticationManager = { ctx -> ... } }` inside the security DSL, or via the
- * fluent Java builder: `.authenticationManager(ctx -> ...)`.
+ * Register via `http.authenticator = { ctx -> ... }`, or the fluent Java assignment
+ * `http.authenticator = ctx -> ...`.
  */
-fun interface AuthenticationManager {
+fun interface Authenticator {
 
     fun authenticate(context: Context): AuthenticationResult
 

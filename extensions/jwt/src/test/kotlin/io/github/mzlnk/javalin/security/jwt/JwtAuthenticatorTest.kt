@@ -8,7 +8,7 @@ import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
-class JwtAuthenticationManagerTest {
+class JwtAuthenticatorTest {
 
     private val validToken = "valid.jwt.token"
     private val decodedJwt = SimpleDecodedJwt(subject = "alice", claims = mapOf("sub" to "alice"))
@@ -25,14 +25,14 @@ class JwtAuthenticationManagerTest {
 
     @Test
     fun `should return NotAuthenticated when Authorization header is absent`() {
-        val manager = JwtAuthenticationManager.of(successDecoder, verification)
+        val manager = JwtAuthenticator.of(successDecoder, verification)
         val result = manager.authenticate(ctx(null))
         assertThat(result).isEqualTo(AuthenticationResult.NotAuthenticated)
     }
 
     @Test
     fun `should return NotAuthenticated when Authorization header has no Bearer scheme`() {
-        val manager = JwtAuthenticationManager.of(successDecoder, verification)
+        val manager = JwtAuthenticator.of(successDecoder, verification)
         val result = manager.authenticate(ctx("Basic dXNlcjpwYXNz"))
         assertThat(result).isEqualTo(AuthenticationResult.NotAuthenticated)
     }
@@ -41,7 +41,7 @@ class JwtAuthenticationManagerTest {
 
     @Test
     fun `should return Success with JwtPrincipal when decoder succeeds`() {
-        val manager = JwtAuthenticationManager.of(successDecoder, verification)
+        val manager = JwtAuthenticator.of(successDecoder, verification)
         val result = manager.authenticate(ctx("Bearer $validToken"))
 
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
@@ -56,14 +56,14 @@ class JwtAuthenticationManagerTest {
 
     @Test
     fun `should populate authorities from mapper`() {
-        val manager = JwtAuthenticationManager.builder(successDecoder, verification)
+        val manager = JwtAuthenticator.builder(successDecoder, verification)
             .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
             .build()
 
         val rolesJwt = SimpleDecodedJwt(subject = "bob", claims = mapOf("roles" to listOf("ADMIN", "USER")))
         val decoderWithRoles = JwtDecoder { _, _ -> rolesJwt }
 
-        val managerWithRoles = JwtAuthenticationManager.builder(decoderWithRoles, verification)
+        val managerWithRoles = JwtAuthenticator.builder(decoderWithRoles, verification)
             .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
             .build()
 
@@ -73,7 +73,7 @@ class JwtAuthenticationManagerTest {
 
     @Test
     fun `should return empty authorities when no mapper is configured`() {
-        val manager = JwtAuthenticationManager.of(successDecoder, verification)
+        val manager = JwtAuthenticator.of(successDecoder, verification)
         val result = manager.authenticate(ctx("Bearer $validToken")) as AuthenticationResult.Success
         assertThat(result.authentication.authorities).isEmpty()
     }
@@ -82,7 +82,7 @@ class JwtAuthenticationManagerTest {
 
     @Test
     fun `should return Failure when decoder throws`() {
-        val manager = JwtAuthenticationManager.of(failingDecoder, verification)
+        val manager = JwtAuthenticator.of(failingDecoder, verification)
         val result = manager.authenticate(ctx("Bearer $validToken"))
 
         assertThat(result).isInstanceOf(AuthenticationResult.Failure::class.java)
@@ -109,7 +109,7 @@ class JwtAuthenticationManagerTest {
 
     @Test
     fun `builder produces a functional manager`() {
-        val manager = JwtAuthenticationManager.builder(successDecoder, verification)
+        val manager = JwtAuthenticator.builder(successDecoder, verification)
             .authoritiesMapper(JwtAuthoritiesMapper.fromScope())
             .build()
 
@@ -121,7 +121,7 @@ class JwtAuthenticationManagerTest {
 
     @Test
     fun `should authenticate from a cookie when a custom tokenResolver is configured`() {
-        val manager = JwtAuthenticationManager.builder(successDecoder, verification)
+        val manager = JwtAuthenticator.builder(successDecoder, verification)
             .tokenResolver(TokenResolver.cookie("access_token"))
             .build()
 
@@ -135,7 +135,7 @@ class JwtAuthenticationManagerTest {
 
     @Test
     fun `should return NotAuthenticated when custom tokenResolver finds no token`() {
-        val manager = JwtAuthenticationManager.builder(successDecoder, verification)
+        val manager = JwtAuthenticator.builder(successDecoder, verification)
             .tokenResolver(TokenResolver.cookie("access_token"))
             .build()
 

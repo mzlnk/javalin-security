@@ -4,7 +4,7 @@ import io.javalin.http.Context
 import java.util.concurrent.CompletableFuture
 
 /**
- * The async counterpart of [AuthenticationManager] for authentication that performs remote I/O
+ * The async counterpart of [Authenticator] for authentication that performs remote I/O
  * (e.g. JWKS endpoint, database lookup).
  *
  * Implementations inspect the incoming request and return a [CompletableFuture] that resolves to
@@ -17,12 +17,11 @@ import java.util.concurrent.CompletableFuture
  * exceptionally (or the implementation throws synchronously), the guard treats it as an
  * [AuthenticationResult.Failure] and returns a logged 401, preserving fail-closed semantics.
  *
- * Register via `http { asyncAuthenticationManager = { ctx -> ... } }` inside the security DSL,
- * or via the fluent Java builder: `.asyncAuthenticationManager(ctx -> ...)`.
+ * Register via `http.asyncAuthenticator = { ctx -> ... }`.
  *
- * For `config.useVirtualThreads = true` applications the blocking [AuthenticationManager] is
+ * For `config.concurrency.useVirtualThreads = true` applications the blocking [Authenticator] is
  * usually sufficient — virtual threads make blocking I/O cheap. Async is an advanced option.
  */
-fun interface AsyncAuthenticationManager {
+fun interface AsyncAuthenticator {
     fun authenticate(context: Context): CompletableFuture<AuthenticationResult>
 }

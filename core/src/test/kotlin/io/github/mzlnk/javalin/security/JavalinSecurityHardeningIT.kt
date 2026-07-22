@@ -1,11 +1,10 @@
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.Javalin
 import io.javalin.http.HandlerType.GET
-import io.javalin.http.HandlerType.POST
 import io.javalin.http.UnauthorizedResponse
 import io.javalin.http.staticfiles.Location
 import io.javalin.plugin.bundled.CorsPlugin
@@ -20,7 +19,7 @@ import java.net.http.HttpRequest as JdkHttpRequest
 
 class JavalinSecurityHardeningIT {
 
-    private val headerManager = AuthenticationManager { context ->
+    private val headerAuthenticator = Authenticator { context ->
         when (val user = context.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             "invalid" -> AuthenticationResult.Failure(message = "super secret internal reason")
@@ -29,12 +28,10 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `should treat HEAD like GET for a permitAll GET rule`() = JavalinTest.test(
+    fun `should treat HEAD like GET for an allow GET rule`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", GET, permitAll) }
-                }
+            cfg.security { security ->
+                security.http { http -> http.rules { r -> r.add("/api/v1/*", GET, r.allow) } }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
         },
@@ -53,10 +50,8 @@ class JavalinSecurityHardeningIT {
     fun `should guard static files with deny-by-default`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.staticFiles.add("/public", Location.CLASSPATH)
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", GET, permitAll) }
-                }
+            cfg.security { security ->
+                security.http { http -> http.rules { r -> r.add("/api/v1/*", GET, r.allow) } }
             }
         },
     ) { _, client ->
@@ -72,10 +67,8 @@ class JavalinSecurityHardeningIT {
     fun `should serve a static file that is explicitly permitted`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.staticFiles.add("/public", Location.CLASSPATH)
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/**", GET, permitAll) }
-                }
+            cfg.security { security ->
+                security.http { http -> http.rules { r -> r.add("/*", GET, r.allow) } }
             }
         },
     ) { _, client ->
@@ -90,11 +83,11 @@ class JavalinSecurityHardeningIT {
     @Test
     fun `should not be bypassed by a trailing slash`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests {
-                        authorize("/api/v1/admin", GET, denyAll)
-                        authorize("/api/v1/**", GET, permitAll)
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r ->
+                        r.add("/api/v1/admin", GET, r.deny)
+                        r.add("/api/v1/*", GET, r.allow)
                     }
                 }
             }
@@ -110,18 +103,18 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `should use a custom authentication manager when provided`() = JavalinTest.test(
+    fun `should use a custom authenticator when provided`() = JavalinTest.test(
         Javalin.create { cfg ->
-            val alwaysBob = AuthenticationManager {
+            val alwaysBob = Authenticator {
                 AuthenticationResult.Success(Authentication.authenticated(TestPrincipal("bob")))
             }
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
-                    authenticationManager = alwaysBob
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
+                    http.authenticator = alwaysBob
                 }
             }
-            cfg.routes.get("/api/v1/me") { it.result((it.principal() as TestPrincipal).name) }
+            cfg.routes.get("/api/v1/me") { it.result(it.principal<TestPrincipal>()!!.name) }
         },
     ) { _, client ->
         // when
@@ -133,12 +126,12 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `should emit a challenge from a custom authentication entry point`() = JavalinTest.test(
+    fun `should emit a challenge from a custom unauthorizedHandler`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
-                    unauthorizedHandler = { ctx, _ ->
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
+                    http.unauthorizedHandler = { ctx, _ ->
                         ctx.header("WWW-Authenticate", "Bearer")
                         throw UnauthorizedResponse()
                     }
@@ -156,15 +149,15 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `should render a custom access denied response`() = JavalinTest.test(
+    fun `should render a custom forbidden response`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", GET, hasAuthority("ADMIN")) }
-                    accessDeniedHandler = { ctx, _ ->
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/v1/*", GET, r.hasAuthority("ADMIN")) }
+                    http.forbiddenHandler = { _, _ ->
                         throw io.javalin.http.ForbiddenResponse("custom denied")
                     }
-                    authenticationManager = headerManager
+                    http.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -179,12 +172,12 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `should not leak the provider failure message`() = JavalinTest.test(
+    fun `should not leak the authenticator failure message`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", GET, permitAll) }
-                    authenticationManager = headerManager
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/v1/*", GET, r.allow) }
+                    http.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -199,13 +192,13 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `should not run the matched handler when a custom entry point does not throw`() = JavalinTest.test(
+    fun `should not run the matched handler when a custom unauthorizedHandler does not throw`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
                     // A natural but unsafe implementation: render a 401 and return without throwing.
-                    unauthorizedHandler = { ctx, _ -> ctx.status(401).result("denied-without-throwing") }
+                    http.unauthorizedHandler = { ctx, _ -> ctx.status(401).result("denied-without-throwing") }
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("protected-content") }
@@ -222,14 +215,14 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `should not run the matched handler when a custom access denied handler does not throw`() = JavalinTest.test(
+    fun `should not run the matched handler when a custom forbiddenHandler does not throw`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", GET, hasAuthority("ADMIN")) }
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/v1/*", GET, r.hasAuthority("ADMIN")) }
                     // Render a 403 and return without throwing.
-                    accessDeniedHandler = { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") }
-                    authenticationManager = headerManager
+                    http.forbiddenHandler = { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") }
+                    http.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("protected-content") }
@@ -248,10 +241,10 @@ class JavalinSecurityHardeningIT {
     /**
      * Guard ordering constraint (documented, not asserted via a fragile ordering test):
      *
-     * [io.github.mzlnk.javalin.security.JavalinSecurityPlugin] runs at [PluginPriority.EARLY].
-     * The security guard is guaranteed to execute before the matched route handler — this is
-     * enforced by Javalin's own `beforeMatched` lifecycle, which runs all `beforeMatched` handlers
-     * before any route handler is invoked. This guarantee is implicit in all other IT tests.
+     * [JavalinSecurityPlugin] runs at [io.javalin.plugin.PluginPriority.EARLY]. The security guard
+     * is guaranteed to execute before the matched route handler — this is enforced by Javalin's own
+     * `beforeMatched` lifecycle, which runs all `beforeMatched` handlers before any route handler is
+     * invoked. This guarantee is implicit in all other IT tests.
      *
      * There is no strong guarantee on the relative order among *multiple* `beforeMatched` handlers.
      * In particular, Javalin does not expose a first-class API to insert a `beforeMatched` handler
@@ -259,16 +252,17 @@ class JavalinSecurityHardeningIT {
      * the position of `beforeMatched` registrations relative to other plugins or direct
      * `cfg.routes.beforeMatched()` calls.
      *
-     * For handlers that must observe the resolved [authentication.Authentication], the recommended pattern is to
-     * add them inside the matched route handler itself, which always runs after the guard.
+     * For handlers that must observe the resolved [authentication.Authentication], the recommended
+     * pattern is to add them inside the matched route handler itself, which always runs after the
+     * guard.
      */
     @Test
     fun `security guard intercepts authenticated request before the route handler runs`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/**", GET, authenticated) }
-                    authenticationManager = headerManager
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
+                    http.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.get("/api/v1/resource") { ctx ->
@@ -284,17 +278,17 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `permitCorsPreflight should allow a CORS preflight OPTIONS request`() = JavalinTest.test(
+    fun `allowCorsPreflight should allow a CORS preflight OPTIONS request`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.registerPlugin(CorsPlugin { cors ->
                 cors.addRule { it.anyHost() }
             })
-            cfg.security {
-                http {
-                    authorizeRequests {
-                        permitCorsPreflight = true
-                        authorize("/api/**", GET, permitAll)
-                        anyRequest = denyAll
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r ->
+                        r.allowCorsPreflight = true
+                        r.add("/api/*", GET, r.allow)
+                        r.fallback = r.deny
                     }
                 }
             }
@@ -319,14 +313,14 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `permitCorsPreflight should deny OPTIONS without Access-Control-Request-Method header`() = JavalinTest.test(
+    fun `allowCorsPreflight should deny OPTIONS without Access-Control-Request-Method header`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests {
-                        permitCorsPreflight = true
-                        authorize("/api/**", GET, permitAll)
-                        anyRequest = denyAll
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r ->
+                        r.allowCorsPreflight = true
+                        r.add("/api/*", GET, r.allow)
+                        r.fallback = r.deny
                     }
                 }
             }
@@ -344,12 +338,14 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `should authorize a parameterized route against the matched route template`() = JavalinTest.test(
+    fun `should authorize a parameterized route against the concrete request path`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/v1/users/**", GET, denyAll) }
-                    authenticationManager = headerManager
+            cfg.security { security ->
+                security.http { http ->
+                    // Unlike the legacy Ant-style matcher, {id} is a real path parameter here and
+                    // matches the concrete request path directly.
+                    http.rules { r -> r.add("/api/v1/users/{id}", GET, r.deny) }
+                    http.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.get("/api/v1/users/{id}") { it.result("user-${it.pathParam("id")}") }
@@ -358,7 +354,7 @@ class JavalinSecurityHardeningIT {
         // when: a concrete request to the parameterized route
         val response = client.get("/api/v1/users/42") { it.header("X-User", "bob") }
 
-        // then: authorization is evaluated against the matched template /api/v1/users/{id}
+        // then: authorization is evaluated directly against the concrete path via PathParser
         assertThat(response.code).isEqualTo(403)
         assertThat(response.body.string()).doesNotContain("user-42")
     }
@@ -366,12 +362,12 @@ class JavalinSecurityHardeningIT {
     // ── async authentication ──────────────────────────────────────────────────
 
     @Test
-    fun `async manager should authenticate and allow access`() = JavalinTest.test(
+    fun `async authenticator should authenticate and allow access`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/**", GET, authenticated) }
-                    asyncAuthenticationManager = { ctx ->
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/*", GET, r.authenticated) }
+                    http.asyncAuthenticator = { ctx ->
                         // Simulate I/O without blocking the request thread
                         CompletableFuture.supplyAsync {
                             val user = ctx.header("X-User")
@@ -395,12 +391,12 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `async manager should be fail-closed on authentication failure`() = JavalinTest.test(
+    fun `async authenticator should be fail-closed on authentication failure`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/**", GET, permitAll) }
-                    asyncAuthenticationManager = { _ ->
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/*", GET, r.allow) }
+                    http.asyncAuthenticator = { _ ->
                         CompletableFuture.completedFuture(
                             AuthenticationResult.Failure("async credential failure"),
                         )
@@ -410,7 +406,7 @@ class JavalinSecurityHardeningIT {
             cfg.routes.get("/api/resource") { it.result("ok") }
         },
     ) { _, client ->
-        // when: async provider reports a failure
+        // when: async authenticator reports a failure
         val response = client.get("/api/resource")
 
         // then: request is rejected (fail-closed) — content not served, failure message not leaked
@@ -419,12 +415,12 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `async manager should not run the handler after denial`() = JavalinTest.test(
+    fun `async authenticator should not run the handler after denial`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/**", GET, authenticated) }
-                    asyncAuthenticationManager = { _ ->
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/*", GET, r.authenticated) }
+                    http.asyncAuthenticator = { _ ->
                         CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated)
                     }
                 }
@@ -441,12 +437,12 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `async manager should be fail-closed when the future completes exceptionally`() = JavalinTest.test(
+    fun `async authenticator should be fail-closed when the future completes exceptionally`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/**", GET, permitAll) }
-                    asyncAuthenticationManager = { _ ->
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/*", GET, r.allow) }
+                    http.asyncAuthenticator = { _ ->
                         CompletableFuture.failedFuture(RuntimeException("internal IdP error"))
                     }
                 }
@@ -454,7 +450,7 @@ class JavalinSecurityHardeningIT {
             cfg.routes.get("/api/resource") { it.result("protected-content") }
         },
     ) { _, client ->
-        // when: the provider future completes with an exception
+        // when: the authenticator future completes with an exception
         val response = client.get("/api/resource")
 
         // then: the request is denied with 401 (not a 500), the handler never runs, and the
@@ -465,23 +461,23 @@ class JavalinSecurityHardeningIT {
     }
 
     @Test
-    fun `async manager should be fail-closed when authenticate throws synchronously`() = JavalinTest.test(
+    fun `async authenticator should be fail-closed when authenticate throws synchronously`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    authorizeRequests { authorize("/api/**", GET, permitAll) }
-                    asyncAuthenticationManager = { _ -> throw IllegalStateException("sync crash in provider") }
+            cfg.security { security ->
+                security.http { http ->
+                    http.rules { r -> r.add("/api/*", GET, r.allow) }
+                    http.asyncAuthenticator = { _ -> throw IllegalStateException("sync crash in authenticator") }
                 }
             }
             cfg.routes.get("/api/resource") { it.result("protected-content") }
         },
     ) { _, client ->
-        // when: the provider throws before even returning a future
+        // when: the authenticator throws before even returning a future
         val response = client.get("/api/resource")
 
         // then: the request is denied with 401, and no internal detail is leaked
         assertThat(response.code).isEqualTo(401)
         assertThat(response.body.string()).doesNotContain("protected-content")
-        assertThat(response.body.string()).doesNotContain("sync crash in provider")
+        assertThat(response.body.string()).doesNotContain("sync crash in authenticator")
     }
 }

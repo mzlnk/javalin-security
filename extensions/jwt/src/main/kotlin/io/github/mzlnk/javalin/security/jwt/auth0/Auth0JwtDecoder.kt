@@ -29,16 +29,16 @@ import java.util.concurrent.ConcurrentHashMap
  * This adapter is stateless: it holds no configuration of its own (other than an internal cache
  * for remote JWKS providers) and performs signature verification + claim checks purely from the
  * [JwtVerification] passed to [decode]. All key-source and claim-validation configuration lives
- * in the `jwt { }` DSL (or [JwtVerification.builder] for Java), not here — analogous to how
+ * in the `jwt { }` block (or [JwtVerification.builder]), not here — analogous to how
  * Javalin's `JavalinJackson` implements `JsonMapper` without owning any Jackson configuration
  * itself.
  *
  * Register it as the decoder:
  *
  * ```kotlin
- * jwt {
- *     decoder = Auth0JwtDecoder
- *     keySource = JwtKeySource.publicKey(rsaPublicKey)
+ * http.jwt { jwt ->
+ *     jwt.decoder = Auth0JwtDecoder
+ *     jwt.keySource = JwtKeySource.publicKey(rsaPublicKey)
  * }
  * ```
  *

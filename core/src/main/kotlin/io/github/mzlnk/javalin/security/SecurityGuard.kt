@@ -1,14 +1,14 @@
 package io.github.mzlnk.javalin.security
 
-import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticator
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
-import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
-import io.github.mzlnk.javalin.security.authorization.AccessDeniedHandler
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
+import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
-import io.github.mzlnk.javalin.security.PathNormalizer
 import io.javalin.http.Context
+import io.javalin.security.RouteRole
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
@@ -16,32 +16,41 @@ import java.util.concurrent.CompletionException
 /**
  * The request-time pipeline and the sole bridge between the framework and Javalin.
  *
- * It authenticates, publishes the [authentication.Authentication] on the [Context], then authorizes. Failures are
- * delegated to the configured [UnauthorizedHandler] (401) and [AccessDeniedHandler] (403); the
+ * It authenticates, publishes the [Authentication] on the [Context], then authorizes. Failures are
+ * delegated to the configured [UnauthorizedHandler] (401) and [ForbiddenHandler] (403); the
  * guard itself contains no interception, reflection or thread-locals.
  *
- * **Sync path (default, zero overhead):** When [authenticationManager] is present (or neither
- * manager is set, treating all requests as anonymous), the pipeline is entirely synchronous.
+ * **Authorization has two paths**, checked in order:
+ * 1. If the matched route declares [RouteRole]s (`ctx.routeRoles()` is non-empty), access is
+ *    granted when those roles include [Anyone], or when [roleMapper] maps the resolved
+ *    [Authentication] to a role set that intersects the declared ones. If no [roleMapper] is
+ *    configured, a route with declared roles is denied (logged) rather than silently falling
+ *    through to the rule table.
+ * 2. Otherwise, [authorizationManager] evaluates the pattern-based rule table.
  *
- * **Async path (opt-in):** When [asyncAuthenticationManager] is present, authentication resolves
- * via [Context.future] so the request thread is released while the [CompletableFuture] is in
- * flight. Authorization and all fail-closed semantics run inside the completion stage, so the same
+ * **Sync path (default, zero overhead):** When [authenticator] is present (or neither manager is
+ * set, treating all requests as anonymous), the pipeline is entirely synchronous.
+ *
+ * **Async path (opt-in):** When [asyncAuthenticator] is present, authentication resolves via
+ * [Context.future] so the request thread is released while the [CompletableFuture] is in flight.
+ * Authorization and all fail-closed semantics run inside the completion stage, so the same
  * security guarantees apply across the async boundary.
  */
 internal class SecurityGuard(
-    private val authenticationManager: AuthenticationManager?,
-    private val asyncAuthenticationManager: AsyncAuthenticationManager?,
+    private val authenticator: Authenticator?,
+    private val asyncAuthenticator: AsyncAuthenticator?,
     private val authorizationManager: AuthorizationManager,
+    private val roleMapper: RoleMapper?,
     private val pathNormalizer: PathNormalizer,
     private val unauthorizedHandler: UnauthorizedHandler,
-    private val accessDeniedHandler: AccessDeniedHandler,
+    private val forbiddenHandler: ForbiddenHandler,
 ) {
 
     fun handle(context: Context) {
         val method = context.method()
-        val path = authorizationPath(context)
+        val path = pathNormalizer.normalize(context.path())
 
-        if (asyncAuthenticationManager != null) {
+        if (asyncAuthenticator != null) {
             handleAsync(context, method, path)
         } else {
             handleSync(context, method, path)
@@ -51,7 +60,7 @@ internal class SecurityGuard(
     // ── synchronous path ─────────────────────────────────────────────────────
 
     private fun handleSync(context: Context, method: io.javalin.http.HandlerType, path: String) {
-        val result = authenticationManager?.authenticate(context)
+        val result = authenticator?.authenticate(context)
             ?: AuthenticationResult.NotAuthenticated
 
         val authentication = when (result) {
@@ -65,7 +74,7 @@ internal class SecurityGuard(
             }
         }
 
-        context.attribute(AUTHENTICATION_ATTRIBUTE, authentication)
+        context.attribute(JavalinSecurityPlugin.AUTHENTICATION_ATTRIBUTE, authentication)
         enforceAuthorization(context, method, path, authentication)
     }
 
@@ -74,7 +83,7 @@ internal class SecurityGuard(
     private fun handleAsync(context: Context, method: io.javalin.http.HandlerType, path: String) {
         context.future {
             val authFuture = try {
-                asyncAuthenticationManager!!.authenticate(context)
+                asyncAuthenticator!!.authenticate(context)
             } catch (t: Throwable) {
                 CompletableFuture.failedFuture(t)
             }
@@ -97,7 +106,7 @@ internal class SecurityGuard(
                 }
                 .thenAccept { authentication ->
                     if (authentication != null) {
-                        context.attribute(AUTHENTICATION_ATTRIBUTE, authentication)
+                        context.attribute(JavalinSecurityPlugin.AUTHENTICATION_ATTRIBUTE, authentication)
                         enforceAuthorization(context, method, path, authentication)
                     }
                 }
@@ -112,7 +121,15 @@ internal class SecurityGuard(
         path: String,
         authentication: Authentication,
     ) {
-        if (authorizationManager.isGranted(method, path, authentication, context)) {
+        val routeRoles = context.routeRoles()
+
+        val granted = if (routeRoles.isNotEmpty()) {
+            grantedByRole(routeRoles, authentication, context)
+        } else {
+            authorizationManager.isGranted(method, path, authentication, context)
+        }
+
+        if (granted) {
             if (log.isDebugEnabled) {
                 log.debug("Access granted to {} for {} {}", principalName(authentication), method, LogSanitizer.sanitize(path))
             }
@@ -121,13 +138,37 @@ internal class SecurityGuard(
 
         if (authentication.isAuthenticated) {
             log.warn("Access denied to {} for {} {}", principalName(authentication), method, LogSanitizer.sanitize(path))
-            accessDeniedHandler.handle(context, authentication)
+            forbiddenHandler.handle(context, authentication)
             context.skipRemainingHandlers()
         } else {
             log.warn("Access denied to anonymous caller for {} {}", method, LogSanitizer.sanitize(path))
             unauthorizedHandler.handle(context, null)
             context.skipRemainingHandlers()
         }
+    }
+
+    /**
+     * Grants access when the matched route's declared [RouteRole]s include [Anyone], or when
+     * [roleMapper] resolves the caller to at least one of the declared roles. A route with
+     * declared roles and no configured [roleMapper] is denied (logged) rather than silently
+     * falling through to the pattern rule table - declaring roles is an explicit signal that
+     * role-based access control is expected here.
+     */
+    private fun grantedByRole(routeRoles: Set<RouteRole>, authentication: Authentication, context: Context): Boolean {
+        if (Anyone in routeRoles) return true
+
+        val mapper = roleMapper
+        if (mapper == null) {
+            log.warn(
+                "Route declares roles {} but no roleMapper is configured on the HTTP security " +
+                    "block; denying. Set 'http.roleMapper = { authentication, ctx -> ... }'.",
+                routeRoles,
+            )
+            return false
+        }
+
+        val callerRoles = mapper.map(authentication, context)
+        return routeRoles.any { it in callerRoles }
     }
 
     private fun logAuthFailure(
@@ -143,19 +184,6 @@ internal class SecurityGuard(
             result.cause,
         )
     }
-
-    /**
-     * Resolves the path that authorization rules are evaluated against.
-     *
-     * For a matched dynamic route this is Javalin's own matched route template (e.g. `/users/{id}`),
-     * which is bypass-proof because it is exactly what the router dispatched to. For requests with no
-     * matched HTTP endpoint (static files, single-page-app fallback, HEAD served by a GET resource)
-     * it falls back to the request path sourced from `context.path()` with the runtime context path
-     * removed - the same input Javalin routes on - normalized for trailing/duplicate slashes.
-     */
-    private fun authorizationPath(context: Context): String =
-        context.endpoints().matchedHttpEndpoint()?.path
-            ?: pathNormalizer.normalize(context.path(), context.contextPath())
 
     private fun principalName(authentication: Authentication): String =
         LogSanitizer.sanitize(authentication.principal?.name ?: "anonymous")

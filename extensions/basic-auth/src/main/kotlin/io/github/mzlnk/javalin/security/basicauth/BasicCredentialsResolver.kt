@@ -13,7 +13,7 @@ import java.util.Base64
  *
  * Unlike the "absent" case, a *malformed* `Basic` header (invalid Base64, or a decoded value with
  * no `:` separator) is a genuine authentication failure, not an anonymous request — resolvers
- * should throw an [IllegalArgumentException] in that case so [BasicAuthAuthenticationManager] can
+ * should throw an [IllegalArgumentException] in that case so [BasicAuthenticator] can
  * surface it as [io.github.mzlnk.javalin.security.authentication.AuthenticationResult.Failure].
  */
 fun interface BasicCredentialsResolver {

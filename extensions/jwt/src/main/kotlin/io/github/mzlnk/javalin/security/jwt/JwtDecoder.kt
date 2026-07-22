@@ -7,7 +7,7 @@ package io.github.mzlnk.javalin.security.jwt
  * [JwtVerification.keySource] and check standard claims (expiry, issuer, audience, etc.) as
  * described by the rest of [JwtVerification]. They return a [DecodedJwt] on success. Any
  * validation failure — expired token, bad signature, missing required claim — must be signalled
- * by throwing an exception; the [JwtAuthenticationManager] catches it and converts it to an
+ * by throwing an exception; the [JwtAuthenticator] catches it and converts it to an
  * [io.github.mzlnk.javalin.security.authentication.AuthenticationResult.Failure].
  *
  * The implementation is deliberately thin: it does only verification and decoding for the given
@@ -19,7 +19,7 @@ package io.github.mzlnk.javalin.security.jwt
  * `object`s — analogous to how Javalin's `JavalinJackson` implements `JsonMapper` — since all
  * configuration lives in [JwtVerification], not in the adapter itself.
  *
- * Register via the `jwt { decoder = ... }` DSL block or pass to [JwtAuthenticationManager.Builder].
+ * Register via the `jwt { }` block (`decoder` field) or pass to [JwtAuthenticator.Builder].
  */
 fun interface JwtDecoder {
 

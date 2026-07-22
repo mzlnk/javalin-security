@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference
 import java.net.http.HttpClient as JdkHttpClient
 
 /**
- * Integration tests for the `jwt {}` DSL wired through `config.security { ws { jwt { } } }`.
+ * Integration tests for the `jwt { }` extension wired through `config.security { it.ws { jwt { } } }`.
  *
  * Mirrors [JwtSecurityIT] (HTTP) and reuses the WS upgrade-attempt harness pattern from
  * `JavalinSecurityWsIT` in `javalin-security-core` — the decoder here is the real
@@ -48,16 +48,16 @@ class JwtWsSecurityIT {
     }
 
     private fun bearerApp(): Javalin = Javalin.create { cfg ->
-        cfg.security {
-            ws {
-                jwt {
-                    decoder = NimbusJwtDecoder
-                    keySource = JwtKeySource.publicKey(keyPair.public)
-                    authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
+        cfg.security { security ->
+            security.ws { ws ->
+                ws.jwt { jwt ->
+                    jwt.decoder = NimbusJwtDecoder
+                    jwt.keySource = JwtKeySource.publicKey(keyPair.public)
+                    jwt.authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
                 }
-                authorizeRequests {
-                    authorize("/ws/chat", authenticated)
-                    authorize("/ws/admin", hasAuthority("ADMIN"))
+                ws.rules { r ->
+                    r.add("/ws/chat", r.authenticated)
+                    r.add("/ws/admin", r.hasAuthority("ADMIN"))
                 }
             }
         }
@@ -66,14 +66,14 @@ class JwtWsSecurityIT {
     }
 
     private fun cookieApp(): Javalin = Javalin.create { cfg ->
-        cfg.security {
-            ws {
-                jwt {
-                    decoder = NimbusJwtDecoder
-                    keySource = JwtKeySource.publicKey(keyPair.public)
-                    tokenResolver = TokenResolver.cookie("access_token")
+        cfg.security { security ->
+            security.ws { ws ->
+                ws.jwt { jwt ->
+                    jwt.decoder = NimbusJwtDecoder
+                    jwt.keySource = JwtKeySource.publicKey(keyPair.public)
+                    jwt.tokenResolver = TokenResolver.cookie("access_token")
                 }
-                authorizeRequests { authorize("/ws/chat", authenticated) }
+                ws.rules { r -> r.add("/ws/chat", r.authenticated) }
             }
         }
         cfg.routes.ws("/ws/chat") { }

@@ -1,44 +1,51 @@
 package io.github.mzlnk.javalin.security.ws
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authorization.AntPathMatcher
-import io.github.mzlnk.javalin.security.authorization.AuthorizationRule
+import io.github.mzlnk.javalin.security.authorization.Rule
+import io.github.mzlnk.javalin.security.authorization.compilePattern
+import io.javalin.config.RouterConfig
 import io.javalin.http.Context
+import io.javalin.router.matcher.PathParser
 
 /**
- * Evaluates the configured WS authorization rules against a WebSocket upgrade request.
+ * Evaluates the configured WS pattern-based rule table against an upgrade request whose endpoint
+ * declares no [io.javalin.security.RouteRole]s.
  *
- * Matching is first-match-wins in declaration order and **deny-by-default**: a request that matches
- * no entry is denied ([isGranted] returns `false`). This means every WS upgrade is evaluated here,
- * and any path without an explicit rule is rejected.
+ * Matching is first-match-wins in declaration order. Each pattern is compiled once, at plugin
+ * startup, into a Javalin [PathParser] - the same primitive Javalin's own router uses to match the
+ * WS endpoint itself - and evaluated against the concrete (already context-path-stripped) upgrade
+ * request path.
  *
- * Matching operates on the already-normalized request path (see
- * [io.github.mzlnk.javalin.security.PathNormalizer]) so it stays consistent
- * with Javalin's own route matching.
+ * A request that matches no entry falls through to [fallback] (deny, by default) - this is the
+ * deny-by-default guarantee.
  */
 internal class WsAuthorizationManager(
     private val entries: List<Entry>,
+    private val fallback: Rule?,
 ) {
 
     class Entry(
         pattern: String,
-        val rule: AuthorizationRule,
-        caseInsensitive: Boolean = false,
+        val rule: Rule,
+        routerConfig: RouterConfig,
     ) {
-        private val matcher = AntPathMatcher(pattern, caseInsensitive)
+        private val parser = compilePattern(pattern, routerConfig)
 
-        fun matches(path: String): Boolean = matcher.matches(path)
+        fun matches(path: String): Boolean = parser.matches(path)
     }
 
     /**
      * Evaluates the first matching rule for the given [path].
      *
-     * Returns `true` when a matching rule grants access. Returns `false` (deny) when no entry
-     * matches the path — the deny-by-default guarantee.
+     * Returns `true` when a matching rule grants access, or when no entry matches but [fallback]
+     * grants access. Returns `false` (deny) otherwise - the deny-by-default guarantee.
      */
     fun isGranted(path: String, authentication: Authentication, context: Context): Boolean {
-        val matched = entries.firstOrNull { it.matches(path) } ?: return false
-        return matched.rule.isGranted(authentication, context)
+        val matched = entries.firstOrNull { it.matches(path) }
+        if (matched != null) {
+            return matched.rule.isGranted(authentication, context)
+        }
+        return fallback?.isGranted(authentication, context) ?: false
     }
 
 }

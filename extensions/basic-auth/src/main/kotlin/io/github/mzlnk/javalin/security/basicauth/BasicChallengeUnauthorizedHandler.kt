@@ -9,14 +9,14 @@ import io.javalin.http.Context
  * 401 response.
  *
  * This is opt-in behavior. To activate it, set `basicChallenge = true` inside the `basicAuth { }`
- * DSL block, or pass an instance to `unauthorizedHandler(...)` on the builder:
+ * block, or assign an instance directly to `http.unauthorizedHandler`:
  *
  * ```kotlin
- * http {
- *     basicAuth {
- *         userLookup = myUserLookup
- *         basicChallenge = true         // emits WWW-Authenticate header
- *         realm = "My API"              // optional, defaults to "API"
+ * http { http ->
+ *     http.basicAuth { basic ->
+ *         basic.userLookup = myUserLookup
+ *         basic.basicChallenge = true   // emits WWW-Authenticate header
+ *         basic.realm = "My API"        // optional, defaults to "API"
  *     }
  * }
  * ```

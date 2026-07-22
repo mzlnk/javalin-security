@@ -13,7 +13,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for the `jwt {}` DSL wired through `config.security { http { jwt { } } }`.
+ * Integration tests for the `jwt { }` extension wired through `config.security { it.http { } }`.
  * The decoder is a test double that reads the raw token string directly as the subject.
  */
 class JwtSecurityIT {
@@ -27,20 +27,20 @@ class JwtSecurityIT {
     }
 
     private fun app(bearerChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
-        cfg.security {
-            http {
-                jwt {
-                    decoder = testDecoder
-                    keySource = JwtKeySource.secret("test-secret-not-actually-used-by-test-double")
-                    authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
-                    this.bearerChallenge = bearerChallenge
-                    realm = "TestAPI"
+        cfg.security { security ->
+            security.http { http ->
+                http.jwt { jwt ->
+                    jwt.decoder = testDecoder
+                    jwt.keySource = JwtKeySource.secret("test-secret-not-actually-used-by-test-double")
+                    jwt.authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
+                    jwt.bearerChallenge = bearerChallenge
+                    jwt.realm = "TestAPI"
                 }
-                authorizeRequests {
-                    authorize("/public/**", GET, permitAll)
-                    authorize("/protected/**", POST, authenticated)
-                    authorize("/admin/**", GET, hasAuthority("ADMIN"))
-                    anyRequest = denyAll
+                http.rules { r ->
+                    r.add("/public/*", GET, r.allow)
+                    r.add("/protected/*", POST, r.authenticated)
+                    r.add("/admin/*", GET, r.hasAuthority("ADMIN"))
+                    r.fallback = r.deny
                 }
             }
         }
@@ -52,7 +52,7 @@ class JwtSecurityIT {
     // ── Anonymous access ──────────────────────────────────────────────────────
 
     @Test
-    fun `should allow anonymous access to permitAll route`() = JavalinTest.test(app()) { _, client ->
+    fun `should allow anonymous access to allow route`() = JavalinTest.test(app()) { _, client ->
         assertThat(client.get("/public/info").code).isEqualTo(200)
     }
 
@@ -62,7 +62,7 @@ class JwtSecurityIT {
     }
 
     @Test
-    fun `should return 401 on denyAll route even without a token`() = JavalinTest.test(app()) { _, client ->
+    fun `should return 401 on deny route even without a token`() = JavalinTest.test(app()) { _, client ->
         assertThat(client.get("/admin/dashboard").code).isEqualTo(401)
     }
 
@@ -97,14 +97,14 @@ class JwtSecurityIT {
             SimpleDecodedJwt(subject = token, claims = mapOf("roles" to listOf("ADMIN")))
         }
         val adminApp = Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    jwt {
-                        decoder = adminDecoder
-                        keySource = JwtKeySource.secret("test-secret")
-                        authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
+            cfg.security { security ->
+                security.http { http ->
+                    http.jwt { jwt ->
+                        jwt.decoder = adminDecoder
+                        jwt.keySource = JwtKeySource.secret("test-secret")
+                        jwt.authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
                     }
-                    authorizeRequests { authorize("/admin/**", GET, hasAuthority("ADMIN")) }
+                    http.rules { r -> r.add("/admin/*", GET, r.hasAuthority("ADMIN")) }
                 }
             }
             cfg.routes.get("/admin/dashboard") { it.result("ok") }
@@ -120,24 +120,24 @@ class JwtSecurityIT {
     @Test
     fun `should expose JwtPrincipal on context with correct subject`() {
         val accessibleApp = Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    jwt {
-                        decoder = testDecoder
-                        keySource = JwtKeySource.secret("test-secret")
+            cfg.security { security ->
+                security.http { http ->
+                    http.jwt { jwt ->
+                        jwt.decoder = testDecoder
+                        jwt.keySource = JwtKeySource.secret("test-secret")
                     }
-                    authorizeRequests { anyRequest = authenticated }
+                    http.rules { r -> r.fallback = r.authenticated }
                 }
             }
             cfg.routes.get("/me") { ctx ->
-                val principal = ctx.principal<JwtPrincipal>()
+                val principal = ctx.principal<JwtPrincipal>()!!
                 ctx.result(principal.name)
             }
         }
         JavalinTest.test(accessibleApp) { _, client ->
             val response = client.get("/me") { it.header("Authorization", "Bearer alice") }
             assertThat(response.code).isEqualTo(200)
-            assertThat(response.body!!.string()).isEqualTo("alice")
+            assertThat(response.body.string()).isEqualTo("alice")
         }
     }
 
@@ -176,39 +176,39 @@ class JwtSecurityIT {
     @Test
     fun `should authenticate from a cookie when tokenResolver is set to cookie-based resolution`() {
         val cookieApp = Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    jwt {
-                        decoder = testDecoder
-                        keySource = JwtKeySource.secret("test-secret")
-                        tokenResolver = TokenResolver.cookie("access_token")
+            cfg.security { security ->
+                security.http { http ->
+                    http.jwt { jwt ->
+                        jwt.decoder = testDecoder
+                        jwt.keySource = JwtKeySource.secret("test-secret")
+                        jwt.tokenResolver = TokenResolver.cookie("access_token")
                     }
-                    authorizeRequests { anyRequest = authenticated }
+                    http.rules { r -> r.fallback = r.authenticated }
                 }
             }
             cfg.routes.get("/me") { ctx ->
-                val principal = ctx.principal<JwtPrincipal>()
+                val principal = ctx.principal<JwtPrincipal>()!!
                 ctx.result(principal.name)
             }
         }
         JavalinTest.test(cookieApp) { _, client ->
             val response = client.get("/me") { it.header("Cookie", "access_token=alice") }
             assertThat(response.code).isEqualTo(200)
-            assertThat(response.body!!.string()).isEqualTo("alice")
+            assertThat(response.body.string()).isEqualTo("alice")
         }
     }
 
     @Test
     fun `should return 401 when tokenResolver is cookie-based and the cookie is absent`() {
         val cookieApp = Javalin.create { cfg ->
-            cfg.security {
-                http {
-                    jwt {
-                        decoder = testDecoder
-                        keySource = JwtKeySource.secret("test-secret")
-                        tokenResolver = TokenResolver.cookie("access_token")
+            cfg.security { security ->
+                security.http { http ->
+                    http.jwt { jwt ->
+                        jwt.decoder = testDecoder
+                        jwt.keySource = JwtKeySource.secret("test-secret")
+                        jwt.tokenResolver = TokenResolver.cookie("access_token")
                     }
-                    authorizeRequests { anyRequest = authenticated }
+                    http.rules { r -> r.fallback = r.authenticated }
                 }
             }
             cfg.routes.get("/me") { it.result("ok") }
@@ -220,19 +220,19 @@ class JwtSecurityIT {
         }
     }
 
-    // ── DSL validation ────────────────────────────────────────────────────────
+    // ── Config validation ─────────────────────────────────────────────────────
 
     @Test
     fun `should throw SecurityConfigurationException when decoder is not configured`() {
         assertThatThrownBy {
             Javalin.create { cfg ->
-                cfg.security {
-                    http {
-                        jwt {
-                            keySource = JwtKeySource.secret("test-secret")
+                cfg.security { security ->
+                    security.http { http ->
+                        http.jwt { jwt ->
+                            jwt.keySource = JwtKeySource.secret("test-secret")
                             // decoder not set — should fail
                         }
-                        authorizeRequests { anyRequest = permitAll }
+                        http.rules { r -> r.fallback = r.allow }
                     }
                 }
             }
@@ -244,13 +244,13 @@ class JwtSecurityIT {
     fun `should throw SecurityConfigurationException when keySource is not configured`() {
         assertThatThrownBy {
             Javalin.create { cfg ->
-                cfg.security {
-                    http {
-                        jwt {
-                            decoder = testDecoder
+                cfg.security { security ->
+                    security.http { http ->
+                        http.jwt { jwt ->
+                            jwt.decoder = testDecoder
                             // keySource not set — should fail
                         }
-                        authorizeRequests { anyRequest = permitAll }
+                        http.rules { r -> r.fallback = r.allow }
                     }
                 }
             }

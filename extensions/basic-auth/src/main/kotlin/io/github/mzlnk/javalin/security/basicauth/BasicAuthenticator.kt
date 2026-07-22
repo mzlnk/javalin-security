@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security.basicauth
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.http.Context
 import org.slf4j.LoggerFactory
@@ -22,14 +22,14 @@ import org.slf4j.LoggerFactory
  *    [PasswordEncoder]. A mismatch -> [AuthenticationResult.Failure].
  * 4. Return [AuthenticationResult.Success] with a [BasicAuthPrincipal] and the user's authorities.
  *
- * Construct via the Kotlin DSL (`basicAuth { userLookup = ... }` inside `http { }`) or use
- * [Builder] from Java.
+ * Construct via the `basicAuth { }` block (which assigns it to `http.authenticator`) or use
+ * [Builder] to obtain an instance directly.
  */
-class BasicAuthAuthenticationManager private constructor(
+class BasicAuthenticator private constructor(
     private val userLookup: UserLookup,
     private val passwordEncoder: PasswordEncoder,
     private val credentialsResolver: BasicCredentialsResolver,
-) : AuthenticationManager {
+) : Authenticator {
 
     override fun authenticate(context: Context): AuthenticationResult {
         val credentials = try {
@@ -63,7 +63,7 @@ class BasicAuthAuthenticationManager private constructor(
      * Usage from Java:
      *
      * ```java
-     * BasicAuthAuthenticationManager manager = BasicAuthAuthenticationManager.builder(userLookup)
+     * BasicAuthenticator authenticator = BasicAuthenticator.builder(userLookup)
      *     .passwordEncoder(PasswordEncoder.noOp())
      *     .build();
      * ```
@@ -87,7 +87,7 @@ class BasicAuthAuthenticationManager private constructor(
             return this
         }
 
-        fun build(): BasicAuthAuthenticationManager = BasicAuthAuthenticationManager(
+        fun build(): BasicAuthenticator = BasicAuthenticator(
             userLookup = userLookup,
             passwordEncoder = passwordEncoder,
             credentialsResolver = credentialsResolver,
@@ -97,7 +97,7 @@ class BasicAuthAuthenticationManager private constructor(
 
     companion object {
 
-        private val log = LoggerFactory.getLogger(BasicAuthAuthenticationManager::class.java)
+        private val log = LoggerFactory.getLogger(BasicAuthenticator::class.java)
 
         // Never matches a real password; only used to keep the comparison path uniform for
         // unknown usernames.
@@ -111,9 +111,9 @@ class BasicAuthAuthenticationManager private constructor(
         @JvmStatic
         fun builder(userLookup: UserLookup): Builder = Builder(userLookup)
 
-        /** Creates a [BasicAuthAuthenticationManager] with the given [userLookup] and default settings. */
+        /** Creates a [BasicAuthenticator] with the given [userLookup] and default settings. */
         @JvmStatic
-        fun of(userLookup: UserLookup): BasicAuthAuthenticationManager = Builder(userLookup).build()
+        fun of(userLookup: UserLookup): BasicAuthenticator = Builder(userLookup).build()
 
     }
 

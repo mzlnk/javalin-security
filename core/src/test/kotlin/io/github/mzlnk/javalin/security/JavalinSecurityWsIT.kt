@@ -1,9 +1,10 @@
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.Javalin
+import io.javalin.security.RouteRole
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -31,13 +32,23 @@ class JavalinSecurityWsIT {
 
     // ── test helpers ──────────────────────────────────────────────────────────
 
-    private val headerAuthManager = AuthenticationManager { ctx ->
+    private val headerAuthenticator = Authenticator { ctx ->
         when (val user = ctx.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             "invalid" -> AuthenticationResult.Failure(message = "super secret internal reason")
-            else -> AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user)))
+            else -> {
+                val authorities = ctx.header("X-Authorities")
+                    ?.split(",")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotEmpty() }
+                    ?.toSet()
+                    ?: emptySet()
+                AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user), authorities))
+            }
         }
     }
+
+    private enum class Role : RouteRole { ADMIN }
 
     /**
      * Attempts a WebSocket upgrade and returns (connected, statusCodeOnFailure).
@@ -118,10 +129,10 @@ class JavalinSecurityWsIT {
     @Test
     fun `anonymous upgrade to authenticated WS path is rejected - guard runs`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", authenticated) }
-                    authenticationManager = headerAuthManager
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
+                    ws.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -138,10 +149,10 @@ class JavalinSecurityWsIT {
     @Test
     fun `upgrade to WS path with no matching rule is denied by default for anonymous caller`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
+            cfg.security { security ->
+                security.ws { ws ->
                     // empty rule set — everything denied by default
-                    authenticationManager = headerAuthManager
+                    ws.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -156,12 +167,10 @@ class JavalinSecurityWsIT {
     @Test
     fun `upgrade to WS path with no matching rule is denied by default for authenticated caller`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests {
-                        authorize("/ws/other/**", authenticated) // rule for a different path
-                    }
-                    authenticationManager = headerAuthManager
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/other/*", r.authenticated) } // rule for a different path
+                    ws.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -173,15 +182,13 @@ class JavalinSecurityWsIT {
         assertThat(code).isEqualTo(403)
     }
 
-    // ── permitAll allows the upgrade ──────────────────────────────────────────
+    // ── allow permits the upgrade ──────────────────────────────────────────
 
     @Test
-    fun `permitAll rule allows anonymous upgrade`() = JavalinTest.test(
+    fun `allow rule permits anonymous upgrade`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", permitAll) }
-                }
+            cfg.security { security ->
+                security.ws { ws -> ws.rules { r -> r.add("/ws/*", r.allow) } }
             }
             cfg.routes.ws("/ws/chat") { }
         },
@@ -196,10 +203,10 @@ class JavalinSecurityWsIT {
     @Test
     fun `authenticated upgrade to an authenticated rule succeeds`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", authenticated) }
-                    authenticationManager = headerAuthManager
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
+                    ws.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -213,10 +220,10 @@ class JavalinSecurityWsIT {
     @Test
     fun `authenticated caller with required authority is allowed`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", hasAuthority("ADMIN")) }
-                    authenticationManager = AuthenticationManager {
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.hasAuthority("ADMIN")) }
+                    ws.authenticator = Authenticator {
                         AuthenticationResult.Success(
                             Authentication.authenticated(TestPrincipal("alice"), "ADMIN"),
                         )
@@ -236,10 +243,10 @@ class JavalinSecurityWsIT {
     @Test
     fun `authenticated caller without required authority is denied with 403`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", hasAuthority("ADMIN")) }
-                    authenticationManager = headerAuthManager
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.hasAuthority("ADMIN")) }
+                    ws.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.ws("/ws/admin") { }
@@ -259,10 +266,8 @@ class JavalinSecurityWsIT {
 
         JavalinTest.test(
             Javalin.create { cfg ->
-                cfg.security {
-                    ws {
-                        authorizeRequests { authorize("/ws/**", denyAll) }
-                    }
+                cfg.security { security ->
+                    security.ws { ws -> ws.rules { r -> r.add("/ws/*", r.deny) } }
                 }
                 cfg.routes.ws("/ws/chat") { ws ->
                     ws.onConnect { onConnectRan.set(true) }
@@ -282,10 +287,10 @@ class JavalinSecurityWsIT {
     @Test
     fun `invalid credentials trigger 401`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", permitAll) }
-                    authenticationManager = headerAuthManager
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.allow) }
+                    ws.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -298,12 +303,12 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `authentication failure does not leak internal provider message`() = JavalinTest.test(
+    fun `authentication failure does not leak internal authenticator message`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", permitAll) }
-                    authenticationManager = headerAuthManager
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.allow) }
+                    ws.authenticator = headerAuthenticator
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -319,10 +324,10 @@ class JavalinSecurityWsIT {
     @Test
     fun `custom unauthorizedHandler is invoked on anonymous denial`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", authenticated) }
-                    unauthorizedHandler = { ctx, _ ->
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
+                    ws.unauthorizedHandler = { ctx, _ ->
                         ctx.status(401).result("custom-ws-401")
                     }
                 }
@@ -337,13 +342,13 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `custom accessDeniedHandler is invoked on forbidden upgrade`() = JavalinTest.test(
+    fun `custom forbiddenHandler is invoked on forbidden upgrade`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", hasAuthority("ADMIN")) }
-                    authenticationManager = headerAuthManager
-                    accessDeniedHandler = { ctx, _ ->
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.hasAuthority("ADMIN")) }
+                    ws.authenticator = headerAuthenticator
+                    ws.forbiddenHandler = { ctx, _ ->
                         ctx.status(403).result("custom-ws-403")
                     }
                 }
@@ -357,16 +362,16 @@ class JavalinSecurityWsIT {
         assertThat(code).isEqualTo(403)
     }
 
-    // ── anyRequest catch-all ──────────────────────────────────────────────────
+    // ── fallback catch-all ──────────────────────────────────────────────────
 
     @Test
-    fun `anyRequest denyAll denies upgrades not matched by a specific rule`() = JavalinTest.test(
+    fun `fallback deny denies upgrades not matched by a specific rule`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests {
-                        authorize("/ws/public/**", permitAll)
-                        anyRequest = denyAll
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r ->
+                        r.add("/ws/public/*", r.allow)
+                        r.fallback = r.deny
                     }
                 }
             }
@@ -374,11 +379,11 @@ class JavalinSecurityWsIT {
             cfg.routes.ws("/ws/secret") { }
         },
     ) { _, client ->
-        // explicit permitAll rule → allowed
+        // explicit allow rule → allowed
         val (publicConnected, _) = tryConnect(client.origin, "/ws/public/chat")
         assertThat(publicConnected).isTrue()
 
-        // caught by anyRequest = denyAll
+        // caught by fallback = deny
         val (secretConnected, secretCode) = tryConnect(client.origin, "/ws/secret")
         assertThat(secretConnected).isFalse()
         assertThat(secretCode).isEqualTo(401)
@@ -387,12 +392,12 @@ class JavalinSecurityWsIT {
     // ── async (blocking) authentication ──────────────────────────────────────
 
     @Test
-    fun `async manager (blocking join) denies anonymous and allows authenticated upgrade`() = JavalinTest.test(
+    fun `async authenticator (blocking join) denies anonymous and allows authenticated upgrade`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", authenticated) }
-                    asyncAuthenticationManager = { ctx ->
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
+                    ws.asyncAuthenticator = { ctx ->
                         CompletableFuture.supplyAsync {
                             val user = ctx.header("X-User")
                             if (user != null) {
@@ -418,12 +423,12 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `async manager is fail-closed when future completes with Failure`() = JavalinTest.test(
+    fun `async authenticator is fail-closed when future completes with Failure`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", permitAll) }
-                    asyncAuthenticationManager = { _ ->
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.allow) }
+                    ws.asyncAuthenticator = { _ ->
                         CompletableFuture.completedFuture(
                             AuthenticationResult.Failure("async credential failure"),
                         )
@@ -440,12 +445,12 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `async manager is fail-closed when future completes with Failure - no message leaked`() = JavalinTest.test(
+    fun `async authenticator is fail-closed when future completes with Failure - no message leaked`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", permitAll) }
-                    asyncAuthenticationManager = { _ ->
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.allow) }
+                    ws.asyncAuthenticator = { _ ->
                         CompletableFuture.completedFuture(
                             AuthenticationResult.Failure("async credential failure"),
                         )
@@ -461,12 +466,12 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `async manager is fail-closed when future completes exceptionally`() = JavalinTest.test(
+    fun `async authenticator is fail-closed when future completes exceptionally`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", permitAll) }
-                    asyncAuthenticationManager = { _ ->
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.allow) }
+                    ws.asyncAuthenticator = { _ ->
                         CompletableFuture.failedFuture(RuntimeException("internal IdP crash"))
                     }
                 }
@@ -481,12 +486,12 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `async manager is fail-closed when future completes exceptionally - no cause leaked`() = JavalinTest.test(
+    fun `async authenticator is fail-closed when future completes exceptionally - no cause leaked`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", permitAll) }
-                    asyncAuthenticationManager = { _ ->
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.allow) }
+                    ws.asyncAuthenticator = { _ ->
                         CompletableFuture.failedFuture(RuntimeException("internal IdP crash"))
                     }
                 }
@@ -500,13 +505,13 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `async manager is fail-closed when authenticate throws synchronously`() = JavalinTest.test(
+    fun `async authenticator is fail-closed when authenticate throws synchronously`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", permitAll) }
-                    asyncAuthenticationManager = { _ ->
-                        throw IllegalStateException("sync crash in async ws provider")
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.allow) }
+                    ws.asyncAuthenticator = { _ ->
+                        throw IllegalStateException("sync crash in async ws authenticator")
                     }
                 }
             }
@@ -520,13 +525,13 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `async manager is fail-closed when authenticate throws synchronously - no cause leaked`() = JavalinTest.test(
+    fun `async authenticator is fail-closed when authenticate throws synchronously - no cause leaked`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/**", permitAll) }
-                    asyncAuthenticationManager = { _ ->
-                        throw IllegalStateException("sync crash in async ws provider")
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.add("/ws/*", r.allow) }
+                    ws.asyncAuthenticator = { _ ->
+                        throw IllegalStateException("sync crash in async ws authenticator")
                     }
                 }
             }
@@ -535,7 +540,7 @@ class JavalinSecurityWsIT {
     ) { _, client ->
         val body = upgradeRejectionBody(client.origin, "/ws/chat")
 
-        assertThat(body).doesNotContain("sync crash in async ws provider")
+        assertThat(body).doesNotContain("sync crash in async ws authenticator")
     }
 
     // ── WsContext.authentication() accessor ───────────────────────────────────
@@ -547,10 +552,10 @@ class JavalinSecurityWsIT {
 
         JavalinTest.test(
             Javalin.create { cfg ->
-                cfg.security {
-                    ws {
-                        authorizeRequests { authorize("/ws/**", authenticated) }
-                        authenticationManager = headerAuthManager
+                cfg.security { security ->
+                    security.ws { ws ->
+                        ws.rules { r -> r.add("/ws/*", r.authenticated) }
+                        ws.authenticator = headerAuthenticator
                     }
                 }
                 cfg.routes.ws("/ws/chat") { ws ->
@@ -567,4 +572,48 @@ class JavalinSecurityWsIT {
         }
     }
 
+    // ── RouteRole-first authorization ───────────────────────────────────────────
+
+    @Test
+    fun `Anyone role permits an anonymous upgrade, bypassing the rule table`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security { security ->
+                security.ws { ws -> ws.rules { r -> r.fallback = r.deny } } // rule table would deny everything
+            }
+            cfg.routes.ws("/ws/public", { }, Anyone)
+        },
+    ) { _, client ->
+        val (connected, _) = tryConnect(client.origin, "/ws/public")
+        assertThat(connected).isTrue()
+    }
+
+    @Test
+    fun `a WS endpoint with declared roles is granted when roleMapper maps a matching role`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.authenticator = headerAuthenticator
+                    ws.roleMapper = RoleMapper { authentication, _ ->
+                        authentication.authorities.mapNotNull { authority ->
+                            runCatching { Role.valueOf(authority) }.getOrNull()
+                        }.toSet()
+                    }
+                    ws.rules { r -> r.fallback = r.deny } // rule table must NOT be consulted
+                }
+            }
+            cfg.routes.ws("/ws/admin", { }, Role.ADMIN)
+        },
+    ) { _, client ->
+        // anonymous → 401
+        val (_, anonCode) = tryConnect(client.origin, "/ws/admin")
+        assertThat(anonCode).isEqualTo(401)
+
+        // authenticated without the role → 403
+        val (_, forbiddenCode) = tryConnect(client.origin, "/ws/admin", "X-User" to "bob")
+        assertThat(forbiddenCode).isEqualTo(403)
+
+        // authenticated with the role, granted by role mapping (not the deny rule table)
+        val (granted, _) = tryConnect(client.origin, "/ws/admin", "X-User" to "alice", "X-Authorities" to "ADMIN")
+        assertThat(granted).isTrue()
+    }
 }

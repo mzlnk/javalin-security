@@ -9,7 +9,7 @@ import io.javalin.http.Context
  * Implementations receive the current [Authentication] and the request [Context] and return
  * whether access is granted. Custom rules can be supplied as lambdas thanks to the SAM conversion.
  */
-fun interface AuthorizationRule {
+fun interface Rule {
 
     fun isGranted(authentication: Authentication, context: Context): Boolean
 

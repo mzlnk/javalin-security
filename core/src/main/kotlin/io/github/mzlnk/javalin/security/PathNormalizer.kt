@@ -1,47 +1,26 @@
 package io.github.mzlnk.javalin.security
 
 /**
- * Normalizes an incoming request path so that authorization matching stays consistent with how
- * Javalin's router matches routes.
+ * Strips the router's configured context path from an incoming request path so that rule
+ * patterns - compiled with Javalin's own [io.javalin.router.matcher.PathParser] - are matched
+ * against the same path Javalin's router itself would match against.
  *
- * Without this, quirks such as a trailing slash (`/admin/`), duplicate slashes (`/admin//x`) or a
- * configured context path could let a request reach a protected handler while slipping past its
- * authorization rule - an authorization bypass. The flags here mirror Javalin's
- * `io.javalin.config.RouterConfig` so the two layers agree.
- *
- * Case sensitivity is intentionally handled by [io.github.mzlnk.javalin.security.authorization.AntPathMatcher]
- * (via a case-insensitive regex) rather than here, so patterns and paths keep their original casing
- * for logging.
- *
- * The context path is supplied per call (from `context.contextPath()`) and stripped with a plain
- * `removePrefix`, mirroring Javalin's own `ctx.path().removePrefix(ctx.contextPath())` so the two
- * layers operate on the exact same request path and cannot diverge.
+ * Trailing-slash handling, duplicate-slash handling and case-insensitivity all live inside
+ * [io.javalin.router.matcher.PathParser] itself (driven by the same
+ * [io.javalin.config.RouterConfig] flags Javalin's router reads), so this class does only the one
+ * thing a compiled pattern cannot do on its own: remove the context path.
  */
-internal class PathNormalizer(
-    private val ignoreTrailingSlashes: Boolean,
-    private val treatMultipleSlashesAsSingleSlash: Boolean,
-) {
+internal class PathNormalizer(private val contextPath: String) {
 
-    fun normalize(rawPath: String, contextPath: String): String {
+    fun normalize(rawPath: String): String {
         var path = rawPath.removePrefix(contextPath)
-
         if (path.isEmpty()) {
             path = "/"
         }
         if (!path.startsWith("/")) {
             path = "/$path"
         }
-        if (treatMultipleSlashesAsSingleSlash) {
-            path = MULTIPLE_SLASHES.replace(path, "/")
-        }
-        if (ignoreTrailingSlashes && path.length > 1 && path.endsWith("/")) {
-            path = path.trimEnd('/').ifEmpty { "/" }
-        }
         return path
-    }
-
-    private companion object {
-        val MULTIPLE_SLASHES = Regex("/{2,}")
     }
 
 }

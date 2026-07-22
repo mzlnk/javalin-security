@@ -5,43 +5,40 @@ import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.javalin.config.JavalinConfig
 import io.javalin.http.Context
 import io.javalin.websocket.WsContext
+import java.util.function.Consumer
 
 /**
- * Installs and configures the security framework into a Javalin application using an inline DSL.
+ * Installs and configures the security framework into a Javalin application.
  *
- * Call this inside `Javalin.create { }` and configure authorization rules, providers, and failure
- * handlers directly inline — no separate config class required. The call order relative to route
- * declarations does not matter because the guard is wired in `onStart`, after the entire
- * `Javalin.create { }` block has been applied.
+ * Discoverable sugar for `config.registerPlugin(JavalinSecurityPlugin(configure))` — the
+ * canonical, language-neutral installation path used from Java. Call this inside
+ * `Javalin.create { }` and configure authentication, RouteRole mapping, and rule tables directly
+ * inline:
  *
- * **Both guards are opt-in.** An HTTP guard is registered only when an `http { }` block is
- * configured; a WS guard is registered only when a `ws { }` block is configured. Calling
- * `config.security { }` with neither block installs no guards and leaves all routes unprotected.
+ * ```kotlin
+ * config.security { security ->
+ *     security.http { http -> ... }
+ * }
+ * ```
  *
- * When the HTTP guard is active, failures surface as Javalin's native `UnauthorizedResponse`
- * (401) and `ForbiddenResponse` (403) by default, customizable via `unauthorizedHandler` and
- * `accessDeniedHandler`.
+ * The call order relative to route declarations does not matter because the guard is wired in
+ * `onStart`, after the entire `Javalin.create { }` block has been applied.
  *
- * Ordering-independence is a security property: the authorization matcher and the path normalizer
- * mirror the final router configuration at startup, so they cannot diverge from the actual routing
- * regardless of declaration order.
+ * See [JavalinSecurityPlugin] for the full opt-in/ordering/lifecycle contract.
  */
-fun JavalinConfig.security(init: JavalinSecurityDsl.() -> Unit) {
-    registerPlugin(JavalinSecurityPlugin(JavalinSecurityDsl().apply(init).build()))
+fun JavalinConfig.security(configure: Consumer<SecurityConfig>) {
+    registerPlugin(JavalinSecurityPlugin(configure))
 }
 
 /**
- * Returns the [authentication.Authentication] resolved for the current request.
+ * Returns the [Authentication] resolved for the current request.
  *
- * After the security guard has run this is always populated (an unauthenticated [authentication.Authentication]
- * when no credentials were provided). If security is not installed it falls back to unauthenticated.
+ * Kotlin sugar for `ctx.with(JavalinSecurityPlugin::class).authentication()`.
  */
-fun Context.authentication(): Authentication =
-    attribute<Authentication>(AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()
+fun Context.authentication(): Authentication = with(JavalinSecurityPlugin::class).authentication()
 
 /** Convenience accessor for the principal of the current request. `null` when the request is unauthenticated. */
-@Suppress("UNCHECKED_CAST")
-fun <T : AuthenticatedPrincipal> Context.principal(): T = (authentication().principal ?: error("no principal")) as T
+fun <T : AuthenticatedPrincipal> Context.principal(): T? = with(JavalinSecurityPlugin::class).principal()
 
 /**
  * Returns the [Authentication] resolved for the current WebSocket session.
@@ -51,8 +48,12 @@ fun <T : AuthenticatedPrincipal> Context.principal(): T = (authentication().prin
  * attributes set during the upgrade are accessible here in [onConnect][io.javalin.websocket.WsConnectHandler],
  * [onMessage][io.javalin.websocket.WsMessageHandler], and other WS event handlers.
  *
+ * [WsContext] is not a Javalin [Context], so the `ctx.with(...)` extension-plugin lookup used by
+ * [Context.authentication] does not apply here; this reads the same request attribute directly
+ * (see [JavalinSecurityPlugin.AUTHENTICATION_ATTRIBUTE]).
+ *
  * Falls back to an unauthenticated [Authentication] if the WS security block is not installed or
- * the path was not covered by a WS authorization rule.
+ * the endpoint declared no rule/role that granted access.
  *
  * **Authorization scope:** the security guard enforces authorization once, at upgrade time. A
  * long-lived connection is **not** re-checked if a token later expires mid-session. To
@@ -70,8 +71,8 @@ fun <T : AuthenticatedPrincipal> Context.principal(): T = (authentication().prin
  * ```
  */
 fun WsContext.authentication(): Authentication =
-    attribute<Authentication>(AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()
+    attribute<Authentication>(JavalinSecurityPlugin.AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()
 
-/** Convenience accessor for the principal of the current WebSocket session. Throws when the session is unauthenticated. */
+/** Convenience accessor for the principal of the current WebSocket session. `null` when the session is unauthenticated. */
 @Suppress("UNCHECKED_CAST")
-fun <T : AuthenticatedPrincipal> WsContext.principal(): T = (authentication().principal ?: error("no principal")) as T
+fun <T : AuthenticatedPrincipal> WsContext.principal(): T? = authentication().principal as T?

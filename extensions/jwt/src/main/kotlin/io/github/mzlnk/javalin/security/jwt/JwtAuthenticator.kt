@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security.jwt
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.javalin.http.Context
@@ -18,15 +18,15 @@ import org.slf4j.LoggerFactory
  * 3. Map the [DecodedJwt] to a [JwtPrincipal] and resolve authorities via [JwtAuthoritiesMapper].
  * 4. Return [AuthenticationResult.Success] with the populated [Authentication].
  *
- * Construct via the Kotlin DSL (`jwt { decoder = ...; keySource = ... }` inside `http { }`) or use
- * [Builder] from Java.
+ * Construct via the `jwt { }` block (which assigns it to `http.authenticator` or
+ * `ws.authenticator`) or use [Builder] to obtain an instance directly.
  */
-class JwtAuthenticationManager private constructor(
+class JwtAuthenticator private constructor(
     private val decoder: JwtDecoder,
     private val verification: JwtVerification,
     private val authoritiesMapper: JwtAuthoritiesMapper,
     private val tokenResolver: TokenResolver,
-) : AuthenticationManager {
+) : Authenticator {
 
     override fun authenticate(context: Context): AuthenticationResult {
         val rawToken = tokenResolver.resolve(context)
@@ -51,7 +51,7 @@ class JwtAuthenticationManager private constructor(
      *
      * ```java
      * JwtVerification verification = JwtVerification.builder(JwtKeySource.publicKey(rsaKey)).build();
-     * JwtAuthenticationManager manager = JwtAuthenticationManager.builder(NimbusJwtDecoder.INSTANCE, verification)
+     * JwtAuthenticator authenticator = JwtAuthenticator.builder(NimbusJwtDecoder.INSTANCE, verification)
      *     .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
      *     .build();
      * ```
@@ -78,7 +78,7 @@ class JwtAuthenticationManager private constructor(
             return this
         }
 
-        fun build(): JwtAuthenticationManager = JwtAuthenticationManager(
+        fun build(): JwtAuthenticator = JwtAuthenticator(
             decoder = decoder,
             verification = verification,
             authoritiesMapper = authoritiesMapper,
@@ -89,7 +89,7 @@ class JwtAuthenticationManager private constructor(
 
     companion object {
 
-        private val log = LoggerFactory.getLogger(JwtAuthenticationManager::class.java)
+        private val log = LoggerFactory.getLogger(JwtAuthenticator::class.java)
 
         /**
          * Creates a [Builder] pre-loaded with the required [decoder] and [verification].
@@ -99,9 +99,9 @@ class JwtAuthenticationManager private constructor(
         @JvmStatic
         fun builder(decoder: JwtDecoder, verification: JwtVerification): Builder = Builder(decoder, verification)
 
-        /** Creates a [JwtAuthenticationManager] with the given [decoder], [verification] and default settings. */
+        /** Creates a [JwtAuthenticator] with the given [decoder], [verification] and default settings. */
         @JvmStatic
-        fun of(decoder: JwtDecoder, verification: JwtVerification): JwtAuthenticationManager =
+        fun of(decoder: JwtDecoder, verification: JwtVerification): JwtAuthenticator =
             Builder(decoder, verification).build()
 
     }

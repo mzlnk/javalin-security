@@ -1,17 +1,20 @@
+@file:JvmName("JwtSecurity")
+
 package io.github.mzlnk.javalin.security.jwt
 
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
-import io.github.mzlnk.javalin.security.http.HttpConfigDsl
-import io.github.mzlnk.javalin.security.ws.WsConfigDsl
+import io.github.mzlnk.javalin.security.http.HttpSecurityConfig
+import io.github.mzlnk.javalin.security.ws.WsSecurityConfig
+import java.util.function.Consumer
 
 /**
- * Kotlin DSL receiver for the `jwt { }` block inside `http { }`.
+ * Configuration object for the `jwt { }` block inside `http { }` / `ws { }`.
  *
- * Configures JWT bearer-token authentication and wires it into the HTTP security pipeline.
+ * Configures JWT bearer-token authentication and wires it into the security pipeline.
  * [decoder] and [keySource] are the only required fields; all other settings have defaults.
  *
- * The addon (this DSL) owns the decision of *where the verification key comes from* and *which
+ * The addon (this config) owns the decision of *where the verification key comes from* and *which
  * claims are checked* — [keySource], [issuer], [audiences], [clockSkewSeconds] — as well as
  * *where the raw token is located in the request* — [tokenResolver]. The [decoder] is a thin,
  * stateless adapter (e.g. `NimbusJwtDecoder`) that only performs the actual signature
@@ -19,16 +22,16 @@ import io.github.mzlnk.javalin.security.ws.WsConfigDsl
  *
  * What this block does explicitly:
  * - Builds a [JwtVerification] from [keySource], [issuer], [audiences] and [clockSkewSeconds].
- * - Sets [HttpConfigDsl.authenticationManager] to a [JwtAuthenticationManager] built from
- *   [decoder], that [JwtVerification], and [authoritiesMapper].
- * - When [bearerChallenge] is `true`, also sets [HttpConfigDsl.unauthorizedHandler] to a
+ * - Sets `authenticator` on the receiving [HttpSecurityConfig]/[WsSecurityConfig] to a
+ *   [JwtAuthenticator] built from [decoder], that [JwtVerification], and [authoritiesMapper].
+ * - When [bearerChallenge] is `true`, also sets `unauthorizedHandler` to a
  *   [BearerChallengeUnauthorizedHandler]. This is the only additional side-effect and is opt-in.
  *
  * What this block does NOT do:
- * - It does not configure authorization rules — use `authorizeRequests { }` alongside `jwt { }`.
- * - It does not override [HttpConfigDsl.accessDeniedHandler] — configure it separately if needed.
+ * - It does not configure the rule table — use `http.rules { }` / `ws.rules { }` alongside `jwt { }`.
+ * - It does not override `forbiddenHandler` — configure it separately if needed.
  */
-class JwtDsl internal constructor() {
+class JwtConfig internal constructor() {
 
     /**
      * The [JwtDecoder] adapter used to verify and decode incoming bearer tokens. **Required.**
@@ -36,7 +39,7 @@ class JwtDsl internal constructor() {
      * Expected to be a stateless implementation (e.g. the `NimbusJwtDecoder` object) that performs
      * verification purely from the [JwtVerification] built from this block's other fields.
      *
-     * Throws [SecurityConfigurationException] if `null` when the manager is built.
+     * Throws [SecurityConfigurationException] if `null` when the authenticator is built.
      */
     var decoder: JwtDecoder? = null
 
@@ -46,7 +49,7 @@ class JwtDsl internal constructor() {
      *
      * See [JwtKeySource]'s factory methods (`publicKey`, `pem`, `pemFile`, `secret`, `jwks`, ...).
      *
-     * Throws [SecurityConfigurationException] if `null` when the manager is built.
+     * Throws [SecurityConfigurationException] if `null` when the authenticator is built.
      */
     var keySource: JwtKeySource? = null
 
@@ -103,15 +106,15 @@ class JwtDsl internal constructor() {
      * in [TokenResolver.cookie] for browser/SPA flows that store the JWT in a cookie instead:
      *
      * ```kotlin
-     * jwt {
-     *     decoder = myDecoder
-     *     tokenResolver = TokenResolver.cookie("access_token")
+     * http.jwt { jwt ->
+     *     jwt.decoder = myDecoder
+     *     jwt.tokenResolver = TokenResolver.cookie("access_token")
      * }
      * ```
      */
     var tokenResolver: TokenResolver = TokenResolver.DEFAULT
 
-    internal fun buildManager(): JwtAuthenticationManager {
+    internal fun buildAuthenticator(): JwtAuthenticator {
         val d = decoder ?: throw SecurityConfigurationException(
             "jwt.decoder is required but was not configured. " +
                 "Set 'decoder = NimbusJwtDecoder' (or another JwtDecoder adapter) inside the 'jwt { }' block.",
@@ -126,7 +129,7 @@ class JwtDsl internal constructor() {
             .apply { if (audiences.isNotEmpty()) audience(*audiences.toTypedArray()) }
             .clockSkew(clockSkewSeconds)
             .build()
-        return JwtAuthenticationManager.builder(d, verification)
+        return JwtAuthenticator.builder(d, verification)
             .authoritiesMapper(authoritiesMapper)
             .tokenResolver(tokenResolver)
             .build()
@@ -140,52 +143,68 @@ class JwtDsl internal constructor() {
 /**
  * Configures JWT bearer-token authentication inside an `http { }` block.
  *
- * This is a Kotlin convenience extension on [HttpConfigDsl]; Java users construct a
- * [JwtAuthenticationManager] directly via [JwtAuthenticationManager.builder] and pass it to
- * `http.authenticationManager(...)`.
+ * The same one-stop configuration works from both languages — the [JwtConfig] arrives as an
+ * explicit `Consumer` parameter, just like every other configuration block in this library:
  *
- * The [JwtDsl.decoder] field is the only required setting.
+ * ```kotlin
+ * http.jwt { jwt ->
+ *     jwt.decoder = NimbusJwtDecoder
+ *     jwt.keySource = JwtKeySource.pemFile(path)
+ * }
+ * ```
+ *
+ * ```java
+ * JwtSecurity.jwt(http, jwt -> {
+ *     jwt.setDecoder(NimbusJwtDecoder.INSTANCE);
+ *     jwt.setKeySource(JwtKeySource.pemFile(path));
+ * });
+ * ```
+ *
+ * Users who want the authenticator object itself (e.g. to share it between blocks) can build one
+ * via [JwtAuthenticator.builder] and assign it to `http.authenticator` directly.
+ *
+ * The [JwtConfig.decoder] and [JwtConfig.keySource] fields are the only required settings.
  */
-fun HttpConfigDsl.jwt(init: JwtDsl.() -> Unit) {
-    val dsl = JwtDsl().apply(init)
-    authenticationManager = dsl.buildManager()
-    if (dsl.bearerChallenge) {
-        unauthorizedHandler = dsl.buildChallenge()
+fun HttpSecurityConfig.jwt(configure: Consumer<JwtConfig>) {
+    val config = JwtConfig().also(configure::accept)
+    authenticator = config.buildAuthenticator()
+    if (config.bearerChallenge) {
+        unauthorizedHandler = config.buildChallenge()
     }
 }
 
 /**
  * Configures JWT bearer-token authentication inside a `ws { }` block.
  *
- * Mirrors the `http { }` extension exactly — it builds the same [JwtAuthenticationManager] from
- * [JwtDsl.decoder]/[JwtDsl.keySource]/[JwtDsl.authoritiesMapper] and sets it as
- * [WsConfigDsl.authenticationManager]. When [JwtDsl.bearerChallenge] is `true`, it also sets
- * [WsConfigDsl.unauthorizedHandler] to a [BearerChallengeUnauthorizedHandler].
+ * Mirrors the `http { }` extension exactly — it builds the same [JwtAuthenticator] from
+ * [JwtConfig.decoder]/[JwtConfig.keySource]/[JwtConfig.authoritiesMapper] and assigns it to
+ * `ws.authenticator`. When [JwtConfig.bearerChallenge] is `true`, it also sets
+ * `ws.unauthorizedHandler` to a [BearerChallengeUnauthorizedHandler].
  *
  * **Browser clients cannot set an `Authorization` header on a WebSocket handshake.** For
  * browser/SPA flows, set `tokenResolver = TokenResolver.cookie("...")` and pair it with
- * [WsConfigDsl.allowedOrigins] on the surrounding `ws { }` block — WebSocket handshakes are not
+ * `ws.allowedOrigins` on the surrounding `ws { }` block — WebSocket handshakes are not
  * protected by the browser same-origin policy or CORS, so an explicit origin allowlist is the
  * CSWSH defense when authenticating via a cookie:
  *
  * ```kotlin
- * ws {
- *     jwt {
- *         decoder = NimbusJwtDecoder
- *         keySource = JwtKeySource.publicKey(rsaPublicKey)
- *         tokenResolver = TokenResolver.cookie("access_token")
+ * ws { ws ->
+ *     ws.jwt { jwt ->
+ *         jwt.decoder = NimbusJwtDecoder
+ *         jwt.keySource = JwtKeySource.publicKey(rsaPublicKey)
+ *         jwt.tokenResolver = TokenResolver.cookie("access_token")
  *     }
- *     allowedOrigins = listOf("https://app.example.com")
- *     authorizeRequests { authorize("/ws/chat", authenticated) }
+ *     ws.allowedOrigins = listOf("https://app.example.com")
+ *     ws.rules { r -> r.add("/ws/chat", r.authenticated) }
  * }
  * ```
  *
- * The [JwtDsl.decoder] field is the only required setting.
+ * The [JwtConfig.decoder] and [JwtConfig.keySource] fields are the only required settings.
  */
-fun WsConfigDsl.jwt(init: JwtDsl.() -> Unit) {
-    val dsl = JwtDsl().apply(init)
-    authenticationManager = dsl.buildManager()
-    if (dsl.bearerChallenge) {
-        unauthorizedHandler = dsl.buildChallenge()
+fun WsSecurityConfig.jwt(configure: Consumer<JwtConfig>) {
+    val config = JwtConfig().also(configure::accept)
+    authenticator = config.buildAuthenticator()
+    if (config.bearerChallenge) {
+        unauthorizedHandler = config.buildChallenge()
     }
 }

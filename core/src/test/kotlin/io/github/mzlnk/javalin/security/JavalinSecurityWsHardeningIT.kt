@@ -1,9 +1,10 @@
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.Authentication
-import io.github.mzlnk.javalin.security.authentication.AuthenticationManager
+import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.Javalin
+import io.javalin.config.JavalinState
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -26,19 +27,24 @@ import java.net.http.HttpClient as JdkHttpClient
  *   bypass authorization rules.
  * - `allowedOrigins` allowlist: correct Origin allowed, incorrect/missing Origin rejected before
  *   authentication, allowlist unset is backward-compatible.
- * - Pattern matching: `{param}`-style patterns are literal in [AntPathMatcher] and do NOT match
- *   concrete paths (documents the known limitation and registers it as a regression guard).
- * - `allowedOrigins` configuration validation (empty set, blank entries, double-set).
+ * - Pattern matching: `{param}`-style patterns are real path parameters (not literal, unlike the
+ *   legacy Ant-style matcher) and correctly match concrete paths.
+ * - `allowedOrigins` configuration validation (empty set, blank entries).
  */
 class JavalinSecurityWsHardeningIT {
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private val headerAuthManager = AuthenticationManager { ctx ->
+    private val headerAuthenticator = Authenticator { ctx ->
         when (val user = ctx.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             else -> AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user)))
         }
+    }
+
+    /** Builds a fresh [JavalinSecurityPlugin] and runs its startup wiring/validation without booting a real server. */
+    private fun start(configure: (SecurityConfig) -> Unit) {
+        JavalinSecurityPlugin { configure(it) }.onStart(JavalinState())
     }
 
     private fun tryConnect(
@@ -112,17 +118,16 @@ class JavalinSecurityWsHardeningIT {
     // ── path normalization: trailing slash ────────────────────────────────────
 
     @Test
-    fun `denyAll rule on exact path also governs request with trailing slash`() = JavalinTest.test(
+    fun `deny rule on exact path also governs request with trailing slash`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { authorize("/ws/admin", denyAll) }
-                }
+            cfg.security { security ->
+                security.ws { ws -> ws.rules { r -> r.add("/ws/admin", r.deny) } }
             }
             cfg.routes.ws("/ws/admin") { }
         },
     ) { _, client ->
-        // denyAll + anonymous → 401; the path /ws/admin/ is normalized to /ws/admin by PathNormalizer
+        // deny + anonymous → 401; PathParser's ignoreTrailingSlashes (default true) matches
+        // "/ws/admin/" against the "/ws/admin" pattern with no extra normalization needed.
         val (_, code) = tryConnect(client.origin, "/ws/admin/")
         assertThat(code).isEqualTo(401)
     }
@@ -130,21 +135,20 @@ class JavalinSecurityWsHardeningIT {
     // ── path normalization: duplicate slashes ─────────────────────────────────
 
     @Test
-    fun `denyAll rule governs request with duplicate slashes when normalization is enabled`() {
+    fun `deny rule governs request with duplicate slashes when normalization is enabled`() {
         JavalinTest.test(
             Javalin.create { cfg ->
                 cfg.router.treatMultipleSlashesAsSingleSlash = true
-                cfg.security {
-                    ws {
-                        authorizeRequests { authorize("/ws/admin", denyAll) }
-                    }
+                cfg.security { security ->
+                    security.ws { ws -> ws.rules { r -> r.add("/ws/admin", r.deny) } }
                 }
                 cfg.routes.ws("/ws/admin") { }
             },
         ) { server, _ ->
             // raw socket so the path "/ws//admin" is sent literally without URI normalization
             val code = rawUpgradeStatusCode("localhost", server.port(), "/ws//admin")
-            // PathNormalizer collapses the duplicate slash; denyAll + anonymous → 401
+            // PathParser's treatMultipleSlashesAsSingleSlash handling matches the duplicate slash;
+            // deny + anonymous → 401
             assertThat(code).isEqualTo(401)
         }
     }
@@ -156,10 +160,10 @@ class JavalinSecurityWsHardeningIT {
         JavalinTest.test(
             Javalin.create { cfg ->
                 cfg.router.contextPath = "/ctx"
-                cfg.security {
-                    ws {
-                        authorizeRequests { authorize("/ws/**", authenticated) }
-                        authenticationManager = headerAuthManager
+                cfg.security { security ->
+                    security.ws { ws ->
+                        ws.rules { r -> r.add("/ws/*", r.authenticated) }
+                        ws.authenticator = headerAuthenticator
                     }
                 }
                 cfg.routes.ws("/ws/chat") { }
@@ -181,10 +185,10 @@ class JavalinSecurityWsHardeningIT {
     fun `allowedOrigins - upgrade with disallowed Origin is rejected with 403`() {
         JavalinTest.test(
             Javalin.create { cfg ->
-                cfg.security {
-                    ws {
-                        authorizeRequests { anyRequest = permitAll }
-                        allowedOrigins = listOf("https://allowed.example.com")
+                cfg.security { security ->
+                    security.ws { ws ->
+                        ws.rules { r -> r.fallback = r.allow }
+                        ws.allowedOrigins = listOf("https://allowed.example.com")
                     }
                 }
                 cfg.routes.ws("/ws/chat") { }
@@ -204,10 +208,10 @@ class JavalinSecurityWsHardeningIT {
     fun `allowedOrigins - upgrade without Origin header is rejected with 403`() {
         JavalinTest.test(
             Javalin.create { cfg ->
-                cfg.security {
-                    ws {
-                        authorizeRequests { anyRequest = permitAll }
-                        allowedOrigins = listOf("https://allowed.example.com")
+                cfg.security { security ->
+                    security.ws { ws ->
+                        ws.rules { r -> r.fallback = r.allow }
+                        ws.allowedOrigins = listOf("https://allowed.example.com")
                     }
                 }
                 cfg.routes.ws("/ws/chat") { }
@@ -225,10 +229,10 @@ class JavalinSecurityWsHardeningIT {
     fun `allowedOrigins - upgrade with allowed Origin is accepted`() {
         JavalinTest.test(
             Javalin.create { cfg ->
-                cfg.security {
-                    ws {
-                        authorizeRequests { anyRequest = permitAll }
-                        allowedOrigins = listOf("https://allowed.example.com")
+                cfg.security { security ->
+                    security.ws { ws ->
+                        ws.rules { r -> r.fallback = r.allow }
+                        ws.allowedOrigins = listOf("https://allowed.example.com")
                     }
                 }
                 cfg.routes.ws("/ws/chat") { }
@@ -248,9 +252,9 @@ class JavalinSecurityWsHardeningIT {
     @Test
     fun `allowedOrigins unset - any Origin is accepted (backward compatible)`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    authorizeRequests { anyRequest = permitAll }
+            cfg.security { security ->
+                security.ws { ws ->
+                    ws.rules { r -> r.fallback = r.allow }
                     // allowedOrigins NOT configured — no Origin check performed
                 }
             }
@@ -267,11 +271,11 @@ class JavalinSecurityWsHardeningIT {
     fun `allowedOrigins - Origin check fires before authentication even with valid credentials`() {
         JavalinTest.test(
             Javalin.create { cfg ->
-                cfg.security {
-                    ws {
-                        authorizeRequests { anyRequest = authenticated }
-                        allowedOrigins = listOf("https://allowed.example.com")
-                        authenticationManager = headerAuthManager
+                cfg.security { security ->
+                    security.ws { ws ->
+                        ws.rules { r -> r.fallback = r.authenticated }
+                        ws.allowedOrigins = listOf("https://allowed.example.com")
+                        ws.authenticator = headerAuthenticator
                     }
                 }
                 cfg.routes.ws("/ws/chat") { }
@@ -289,12 +293,10 @@ class JavalinSecurityWsHardeningIT {
     // ── allowedOrigins: configuration validation ──────────────────────────────
 
     @Test
-    fun `allowedOrigins - empty collection is rejected at configuration time`() {
+    fun `allowedOrigins - empty collection is rejected at startup`() {
         assertThatThrownBy {
-            javalinSecurity {
-                ws {
-                    allowedOrigins = emptyList()
-                }
+            start { security ->
+                security.ws { ws -> ws.allowedOrigins = emptyList() }
             }
         }
             .isInstanceOf(SecurityConfigurationException::class.java)
@@ -302,12 +304,10 @@ class JavalinSecurityWsHardeningIT {
     }
 
     @Test
-    fun `allowedOrigins - collection containing blank entries is rejected at configuration time`() {
+    fun `allowedOrigins - collection containing blank entries is rejected at startup`() {
         assertThatThrownBy {
-            javalinSecurity {
-                ws {
-                    allowedOrigins = listOf("https://ok.example.com", "  ")
-                }
+            start { security ->
+                security.ws { ws -> ws.allowedOrigins = listOf("https://ok.example.com", "  ") }
             }
         }
             .isInstanceOf(SecurityConfigurationException::class.java)
@@ -315,30 +315,28 @@ class JavalinSecurityWsHardeningIT {
     }
 
     @Test
-    fun `allowedOrigins - setting it twice is rejected at configuration time`() {
-        assertThatThrownBy {
-            javalinSecurity {
-                ws {
-                    allowedOrigins = listOf("https://first.example.com")
-                    allowedOrigins = listOf("https://second.example.com")
+    fun `allowedOrigins - setting it twice keeps only the last value, with no exception`() {
+        org.assertj.core.api.Assertions.assertThatCode {
+            start { security ->
+                security.ws { ws ->
+                    ws.allowedOrigins = listOf("https://first.example.com")
+                    ws.allowedOrigins = listOf("https://second.example.com")
                 }
             }
-        }
-            .isInstanceOf(SecurityConfigurationException::class.java)
-            .hasMessageContaining("allowedOrigins")
+        }.doesNotThrowAnyException()
     }
 
-    // ── allowedOrigins: custom accessDeniedHandler ────────────────────────────
+    // ── allowedOrigins: custom forbiddenHandler ────────────────────────────
 
     @Test
-    fun `allowedOrigins - custom accessDeniedHandler is invoked when Origin is disallowed`() {
+    fun `allowedOrigins - custom forbiddenHandler is invoked when Origin is disallowed`() {
         JavalinTest.test(
             Javalin.create { cfg ->
-                cfg.security {
-                    ws {
-                        authorizeRequests { anyRequest = permitAll }
-                        allowedOrigins = listOf("https://allowed.example.com")
-                        accessDeniedHandler = { ctx, _ ->
+                cfg.security { security ->
+                    security.ws { ws ->
+                        ws.rules { r -> r.fallback = r.allow }
+                        ws.allowedOrigins = listOf("https://allowed.example.com")
+                        ws.forbiddenHandler = { ctx, _ ->
                             ctx.status(403).result("custom-origin-denied")
                         }
                     }
@@ -354,39 +352,16 @@ class JavalinSecurityWsHardeningIT {
         }
     }
 
-    // ── {param} placeholder does not match concrete paths ────────────────────
+    // ── {param} correctly matches concrete paths (aspect-2 win) ────────────────
 
     @Test
-    fun `authorize pattern with param placeholder does not match a concrete request path`() = JavalinTest.test(
+    fun `rule pattern with a path parameter correctly matches a concrete request path`() = JavalinTest.test(
         Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    // Intentionally mis-written with {id}: AntPathMatcher treats { and } as
-                    // literal characters, so this rule will NOT match /ws/room/5.
-                    // Use wildcards instead: /ws/room/* or /ws/**
-                    authorizeRequests {
-                        authorize("/ws/room/{id}", permitAll)
-                        // no anyRequest — deny-by-default catches everything else
-                    }
-                }
-            }
-            cfg.routes.ws("/ws/room/{id}") { }
-        },
-    ) { _, client ->
-        // {id} is a literal in AntPathMatcher; /ws/room/5 matches no rule → deny-by-default
-        val (connected, code) = tryConnect(client.origin, "/ws/room/5")
-        assertThat(connected).isFalse()
-        // anonymous caller → 401 (deny-by-default)
-        assertThat(code).isEqualTo(401)
-    }
-
-    @Test
-    fun `authorize pattern with wildcard correctly matches concrete request path`() = JavalinTest.test(
-        Javalin.create { cfg ->
-            cfg.security {
-                ws {
-                    // Correctly written with a wildcard
-                    authorizeRequests { authorize("/ws/room/*", permitAll) }
+            cfg.security { security ->
+                security.ws { ws ->
+                    // Unlike the legacy Ant-style matcher (where { and } were literal characters),
+                    // {id} is a real Javalin path parameter and matches concrete segments.
+                    ws.rules { r -> r.add("/ws/room/{id}", r.allow) }
                 }
             }
             cfg.routes.ws("/ws/room/{id}") { }
@@ -396,4 +371,16 @@ class JavalinSecurityWsHardeningIT {
         assertThat(connected).isTrue()
     }
 
+    @Test
+    fun `rule pattern with a wildcard correctly matches concrete request path`() = JavalinTest.test(
+        Javalin.create { cfg ->
+            cfg.security { security ->
+                security.ws { ws -> ws.rules { r -> r.add("/ws/room/*", r.allow) } }
+            }
+            cfg.routes.ws("/ws/room/{id}") { }
+        },
+    ) { _, client ->
+        val (connected, _) = tryConnect(client.origin, "/ws/room/5")
+        assertThat(connected).isTrue()
+    }
 }
