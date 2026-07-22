@@ -3,16 +3,19 @@ package io.github.mzlnk.javalin.security.authorization
 import io.github.mzlnk.javalin.security.TestPrincipal
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.mockContext
+import io.javalin.security.RouteRole
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class RulesTest {
 
+    private enum class Role : RouteRole { READ, WRITE, ADMIN, USER }
+
     private val context = mockContext()
     private val anonymous = Authentication.unauthenticated()
 
-    private fun authenticated(vararg authorities: String): Authentication =
-        Authentication.authenticated(TestPrincipal("bob"), *authorities)
+    private fun authenticated(vararg roles: RouteRole): Authentication =
+        Authentication.authenticated(TestPrincipal("bob"), *roles)
 
     @Test
     fun `should grant when rule is allow even for anonymous caller`() {
@@ -51,28 +54,28 @@ class RulesTest {
     }
 
     @Test
-    fun `should grant when caller has the required authority`() {
+    fun `should grant when caller has the required role`() {
         // when
-        val granted = Rules.hasAuthority("SCOPE_read").isGranted(authenticated("SCOPE_read"), context)
+        val granted = Rules.hasRole(Role.READ).isGranted(authenticated(Role.READ), context)
 
         // then
         assertThat(granted).isTrue()
     }
 
     @Test
-    fun `should deny when caller lacks the required authority`() {
+    fun `should deny when caller lacks the required role`() {
         // when
-        val granted = Rules.hasAuthority("SCOPE_read").isGranted(authenticated("SCOPE_write"), context)
+        val granted = Rules.hasRole(Role.READ).isGranted(authenticated(Role.WRITE), context)
 
         // then
         assertThat(granted).isFalse()
     }
 
     @Test
-    fun `should grant when caller has any of the required authorities`() {
+    fun `should grant when caller has any of the required roles`() {
         // when
-        val granted = Rules.hasAnyAuthority("SCOPE_read", "SCOPE_write")
-            .isGranted(authenticated("SCOPE_write"), context)
+        val granted = Rules.hasAnyRole(Role.READ, Role.WRITE)
+            .isGranted(authenticated(Role.WRITE), context)
 
         // then
         assertThat(granted).isTrue()
@@ -85,7 +88,7 @@ class RulesTest {
         assertThat(DefaultRules.allow.isGranted(anonymous, context)).isTrue()
         assertThat(DefaultRules.deny.isGranted(authenticated(), context)).isFalse()
         assertThat(DefaultRules.authenticated.isGranted(authenticated(), context)).isTrue()
-        assertThat(DefaultRules.hasAuthority("ADMIN").isGranted(authenticated("ADMIN"), context)).isTrue()
-        assertThat(DefaultRules.hasAnyAuthority("ADMIN", "USER").isGranted(authenticated("USER"), context)).isTrue()
+        assertThat(DefaultRules.hasRole(Role.ADMIN).isGranted(authenticated(Role.ADMIN), context)).isTrue()
+        assertThat(DefaultRules.hasAnyRole(Role.ADMIN, Role.USER).isGranted(authenticated(Role.USER), context)).isTrue()
     }
 }

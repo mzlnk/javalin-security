@@ -22,25 +22,30 @@ import java.util.concurrent.CompletionException
  *
  * **Authorization has two paths**, checked in order:
  * 1. If the matched route declares [RouteRole]s (`ctx.routeRoles()` is non-empty), access is
- *    granted when those roles include [Anyone], or when [roleMapper] maps the resolved
- *    [Authentication] to a role set that intersects the declared ones. If no [roleMapper] is
- *    configured, a route with declared roles is denied (logged) rather than silently falling
- *    through to the rule table.
+ *    granted when those roles include [Anyone], or when they intersect the resolved
+ *    [Authentication]'s own [Authentication.roles]. Matching is a plain set-membership check,
+ *    relying on [RouteRole] equality.
  * 2. Otherwise, [authorizationManager] evaluates the pattern-based rule table.
  *
- * **Sync path (default, zero overhead):** When [authenticator] is present (or neither manager is
- * set, treating all requests as anonymous), the pipeline is entirely synchronous.
+ * **Sync path (default, zero overhead):** When [authenticator] is present (or no
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme] is configured, treating
+ * all requests as anonymous), the pipeline is entirely synchronous.
  *
  * **Async path (opt-in):** When [asyncAuthenticator] is present, authentication resolves via
  * [Context.future] so the request thread is released while the [CompletableFuture] is in flight.
  * Authorization and all fail-closed semantics run inside the completion stage, so the same
  * security guarantees apply across the async boundary.
+ *
+ * [authenticator] and [asyncAuthenticator] are resolved by [io.github.mzlnk.javalin.security.JavalinSecurityPlugin]
+ * from the single [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme] assigned
+ * to `http.authentication`; the two are mutually exclusive by construction (a scheme is either
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Sync] or
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Async], never both).
  */
 internal class SecurityGuard(
     private val authenticator: Authenticator?,
     private val asyncAuthenticator: AsyncAuthenticator?,
     private val authorizationManager: AuthorizationManager,
-    private val roleMapper: RoleMapper?,
     private val pathNormalizer: PathNormalizer,
     private val unauthorizedHandler: UnauthorizedHandler,
     private val forbiddenHandler: ForbiddenHandler,
@@ -124,7 +129,7 @@ internal class SecurityGuard(
         val routeRoles = context.routeRoles()
 
         val granted = if (routeRoles.isNotEmpty()) {
-            grantedByRole(routeRoles, authentication, context)
+            grantedByRole(routeRoles, authentication)
         } else {
             authorizationManager.isGranted(method, path, authentication, context)
         }
@@ -149,27 +154,11 @@ internal class SecurityGuard(
 
     /**
      * Grants access when the matched route's declared [RouteRole]s include [Anyone], or when
-     * [roleMapper] resolves the caller to at least one of the declared roles. A route with
-     * declared roles and no configured [roleMapper] is denied (logged) rather than silently
-     * falling through to the pattern rule table - declaring roles is an explicit signal that
-     * role-based access control is expected here.
+     * they intersect the caller's own [Authentication.roles]. A plain set-membership check,
+     * relying on [RouteRole] equality.
      */
-    private fun grantedByRole(routeRoles: Set<RouteRole>, authentication: Authentication, context: Context): Boolean {
-        if (Anyone in routeRoles) return true
-
-        val mapper = roleMapper
-        if (mapper == null) {
-            log.warn(
-                "Route declares roles {} but no roleMapper is configured on the HTTP security " +
-                    "block; denying. Set 'http.roleMapper = { authentication, ctx -> ... }'.",
-                routeRoles,
-            )
-            return false
-        }
-
-        val callerRoles = mapper.map(authentication, context)
-        return routeRoles.any { it in callerRoles }
-    }
+    private fun grantedByRole(routeRoles: Set<RouteRole>, authentication: Authentication): Boolean =
+        Anyone in routeRoles || routeRoles.any { it in authentication.roles }
 
     private fun logAuthFailure(
         method: io.javalin.http.HandlerType,

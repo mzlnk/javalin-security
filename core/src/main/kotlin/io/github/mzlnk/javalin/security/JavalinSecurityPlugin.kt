@@ -1,5 +1,10 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticator
+import io.github.mzlnk.javalin.security.authentication.Authenticator
+import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
+import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
 import io.github.mzlnk.javalin.security.ws.WsAuthorizationManager
 import io.github.mzlnk.javalin.security.ws.WsSecurityGuard
@@ -73,7 +78,6 @@ class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
         val ws = pluginConfig.ws
         val router = state.router
 
-        http?.validate()
         ws?.validate()
 
         val pathNormalizer = PathNormalizer(contextPath = router.contextPath)
@@ -88,14 +92,14 @@ class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
                 fallback = ws.rules.fallback,
             )
 
+            val scheme = ws.authentication
             val wsGuard = WsSecurityGuard(
-                authenticator = ws.authenticator,
-                asyncAuthenticator = ws.asyncAuthenticator,
+                authenticator = scheme.resolvedAuthenticator(),
+                asyncAuthenticator = scheme.resolvedAsyncAuthenticator(),
                 authorizationManager = wsAuthorizationManager,
-                roleMapper = ws.roleMapper,
                 pathNormalizer = pathNormalizer,
-                unauthorizedHandler = ws.unauthorizedHandler,
-                forbiddenHandler = ws.forbiddenHandler,
+                unauthorizedHandler = scheme.resolvedUnauthorizedHandler(),
+                forbiddenHandler = scheme.resolvedForbiddenHandler(),
                 allowedOrigins = ws.allowedOrigins?.toSet(),
             )
 
@@ -118,14 +122,14 @@ class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
                 allowCorsPreflight = http.rules.allowCorsPreflight,
             )
 
+            val scheme = http.authentication
             val guard = SecurityGuard(
-                authenticator = http.authenticator,
-                asyncAuthenticator = http.asyncAuthenticator,
+                authenticator = scheme.resolvedAuthenticator(),
+                asyncAuthenticator = scheme.resolvedAsyncAuthenticator(),
                 authorizationManager = authorizationManager,
-                roleMapper = http.roleMapper,
                 pathNormalizer = pathNormalizer,
-                unauthorizedHandler = http.unauthorizedHandler,
-                forbiddenHandler = http.forbiddenHandler,
+                unauthorizedHandler = scheme.resolvedUnauthorizedHandler(),
+                forbiddenHandler = scheme.resolvedForbiddenHandler(),
             )
 
             state.routes.beforeMatched(guard::handle)
@@ -140,3 +144,21 @@ class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
     }
 
 }
+
+// ── AuthenticationScheme resolution helpers ────────────────────────────────
+//
+// A block with no [AuthenticationScheme] configured (`null`) treats every caller as anonymous —
+// the pattern-based rule table alone decides access — while still applying the scheme-agnostic
+// defaults for the unauthorized/forbidden handlers.
+
+private fun AuthenticationScheme?.resolvedAuthenticator(): Authenticator? =
+    (this as? AuthenticationScheme.Sync)?.authenticator()
+
+private fun AuthenticationScheme?.resolvedAsyncAuthenticator(): AsyncAuthenticator? =
+    (this as? AuthenticationScheme.Async)?.asyncAuthenticator()
+
+private fun AuthenticationScheme?.resolvedUnauthorizedHandler(): UnauthorizedHandler =
+    this?.unauthorizedHandler ?: UnauthorizedHandler.DEFAULT
+
+private fun AuthenticationScheme?.resolvedForbiddenHandler(): ForbiddenHandler =
+    this?.forbiddenHandler ?: ForbiddenHandler.DEFAULT

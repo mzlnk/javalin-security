@@ -1,17 +1,12 @@
 package io.github.mzlnk.javalin.security.ws
 
-import io.github.mzlnk.javalin.security.RoleMapper
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
-import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticator
-import io.github.mzlnk.javalin.security.authentication.Authenticator
-import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
-import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
+import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme
 import java.util.function.Consumer
 
 /**
- * The WebSocket security configuration: upgrade-time authentication orchestration, RouteRole
- * mapping, the pattern-based rule table, and how authentication/authorization failures are
- * rendered.
+ * The WebSocket security configuration: the authentication scheme, the pattern-based rule table,
+ * and CSWSH origin protection.
  *
  * A single mutable, field-assignment config, same shape as [io.github.mzlnk.javalin.security.http.HttpSecurityConfig].
  *
@@ -21,11 +16,17 @@ import java.util.function.Consumer
  * library (though handlers may read the [io.github.mzlnk.javalin.security.authentication.Authentication]
  * from `ctx.authentication()` to make per-message decisions if desired).
  *
+ * **One field decides authentication.** [authentication] holds the single
+ * [AuthenticationScheme] used by this block, mirroring the HTTP block exactly. Companion
+ * libraries contribute ready-made schemes via their own factory functions, e.g.
+ * `ws.authentication = jwt { }`.
+ *
  * **Two ways to grant access**, checked in this order by the guard, mirroring the HTTP block:
  * 1. If the matched WS endpoint declares [io.javalin.security.RouteRole]s
- *    (`config.routes.ws(path, handler, Role.ADMIN)`), [roleMapper] resolves the caller's roles and
- *    the guard grants access when they intersect (or when the endpoint declares
- *    [io.github.mzlnk.javalin.security.Anyone]).
+ *    (`config.routes.ws(path, handler, Role.ADMIN)`), the guard grants access when they intersect
+ *    the resolved [io.github.mzlnk.javalin.security.authentication.Authentication.roles] (a plain
+ *    set-membership check relying on [io.javalin.security.RouteRole] equality), or when the
+ *    endpoint declares [io.github.mzlnk.javalin.security.Anyone].
  * 2. Otherwise, the [rules] pattern table decides.
  *
  * **Deny-by-default:** upgrade requests resolved by neither mechanism are denied (anonymous → 401,
@@ -34,45 +35,23 @@ import java.util.function.Consumer
  * **CSWSH protection:** WebSocket handshakes are not subject to the browser same-origin policy
  * or CORS. If you authenticate via cookies, configure [allowedOrigins] to restrict which origins
  * may upgrade. When set, upgrades with a missing or unlisted `Origin` header are rejected via the
- * configured [forbiddenHandler] (403 by default) before authentication runs.
+ * configured scheme's `forbiddenHandler` (403 by default) before authentication runs.
  *
- * The authentication managers configured here are independent from the HTTP security block.
- * If no manager is set, all callers are treated as anonymous and authorization decides access.
+ * The authentication scheme configured here is independent from the HTTP security block. If
+ * unset, all callers are treated as anonymous and authorization decides access.
  */
 class WsSecurityConfig internal constructor() {
 
-    /** Registers a blocking [Authenticator] for WebSocket upgrade authentication. Mutually exclusive with [asyncAuthenticator]. */
-    var authenticator: Authenticator? = null
-
     /**
-     * Registers an opt-in async [AsyncAuthenticator] for I/O-bound WebSocket authentication.
+     * The single [AuthenticationScheme] used to authenticate WebSocket upgrade requests on this block.
      *
-     * **Blocking trade-off:** Unlike the HTTP async path (which releases the request thread via
-     * `ctx.future`), the WebSocket handshake is synchronous — `ctx.future` deferral is not a
-     * supported Javalin pattern for WS upgrades. The returned [java.util.concurrent.CompletableFuture]
-     * is therefore resolved via a blocking `join()` on the upgrade thread. This is safe and correct,
-     * but it pins an upgrade thread for the duration of the I/O call.
-     *
-     * Recommendations to avoid Jetty thread-pool pressure under load:
-     * - Enable `config.concurrency.useVirtualThreads = true`, or
-     * - Use a pre-fetched token cache so lookups are in-memory rather than remote.
-     *
-     * Mutually exclusive with [authenticator] — validated when the plugin starts.
+     * Unset (`null`, the default) means every upgrade is treated as anonymous and the [rules]
+     * pattern table alone decides access. Assign a scheme built by a companion library
+     * (`ws.authentication = jwt { }`) or implement [AuthenticationScheme.Sync] /
+     * [AuthenticationScheme.Async] directly for a custom mechanism.
      */
-    var asyncAuthenticator: AsyncAuthenticator? = null
-
-    /**
-     * Maps the resolved authentication to the [io.javalin.security.RouteRole]s the caller holds,
-     * for WS endpoints that declare roles directly. Unset means endpoints with declared roles
-     * always fall through to the [rules] pattern table instead.
-     */
-    var roleMapper: RoleMapper? = null
-
-    /** Overrides how failed/absent WebSocket authentication is rendered (HTTP 401 by default). */
-    var unauthorizedHandler: UnauthorizedHandler = UnauthorizedHandler.DEFAULT
-
-    /** Overrides how WebSocket access-denied for an authenticated caller is rendered (HTTP 403 by default). */
-    var forbiddenHandler: ForbiddenHandler = ForbiddenHandler.DEFAULT
+    @JvmField
+    var authentication: AuthenticationScheme? = null
 
     /**
      * Restricts WebSocket upgrades to requests whose `Origin` header matches one of the given
@@ -82,6 +61,7 @@ class WsSecurityConfig internal constructor() {
      * rejected when the plugin starts, to avoid silently denying all upgrades. When unset (the
      * default), no Origin check is performed.
      */
+    @JvmField
     var allowedOrigins: Collection<String>? = null
 
     /** The pattern-based rule table, used for WS endpoints with no declared [io.javalin.security.RouteRole]s. */
@@ -94,13 +74,6 @@ class WsSecurityConfig internal constructor() {
 
     /** Validates cross-field invariants. Called once, when the plugin starts. */
     internal fun validate() {
-        if (authenticator != null && asyncAuthenticator != null) {
-            throw SecurityConfigurationException(
-                "Both a blocking authenticator and an asyncAuthenticator were configured for the WS " +
-                    "block, but they are mutually exclusive: choose one authentication path (blocking " +
-                    "or async) per security configuration.",
-            )
-        }
         val origins = allowedOrigins
         if (origins != null) {
             if (origins.isEmpty()) {

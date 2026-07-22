@@ -1,8 +1,11 @@
 package io.github.mzlnk.javalin.security;
 
+import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticator;
 import io.github.mzlnk.javalin.security.authentication.Authentication;
 import io.github.mzlnk.javalin.security.authentication.Authenticator;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult;
+import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme;
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler;
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler;
 import io.github.mzlnk.javalin.security.authorization.Rule;
 import io.github.mzlnk.javalin.security.authorization.Rules;
@@ -11,7 +14,10 @@ import io.javalin.security.RouteRole;
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import static io.javalin.http.HandlerType.*;
 import static org.assertj.core.api.Assertions.*;
@@ -25,20 +31,54 @@ import static org.assertj.core.api.Assertions.*;
  */
 class JavaInteropIT {
 
-    private enum Role implements RouteRole { ADMIN }
+    private enum Role implements RouteRole { ADMIN, READ, WRITE }
 
     private final Authenticator headerAuthenticator = ctx -> {
         String user = ctx.header("X-User");
         if (user == null) return AuthenticationResult.NotAuthenticated.INSTANCE;
         if ("invalid".equals(user)) return new AuthenticationResult.Failure("bad credentials", null);
-        String authoritiesHeader = ctx.header("X-Authorities");
-        java.util.Set<String> authorities = authoritiesHeader == null
-                ? java.util.Set.of()
-                : java.util.Set.of(authoritiesHeader.split(","));
+        String rolesHeader = ctx.header("X-Roles");
+        Set<RouteRole> roles = rolesHeader == null
+                ? Set.of()
+                : Arrays.stream(rolesHeader.split(","))
+                        .map(name -> (RouteRole) Role.valueOf(name))
+                        .collect(Collectors.toSet());
         return new AuthenticationResult.Success(
-                Authentication.authenticated(new TestPrincipal(user), authorities)
+                Authentication.authenticated(new TestPrincipal(user), roles)
         );
     };
+
+    /**
+     * Builds an {@link AuthenticationScheme.Sync} directly from Java — the way a custom
+     * authentication mechanism (not provided by a companion library's {@code jwt { }} /
+     * {@code basicAuth { }} factory) is wired up.
+     */
+    private static AuthenticationScheme.Sync scheme(Authenticator authenticator) {
+        return scheme(authenticator, UnauthorizedHandler.getDEFAULT(), ForbiddenHandler.getDEFAULT());
+    }
+
+    private static AuthenticationScheme.Sync scheme(
+            Authenticator authenticator,
+            UnauthorizedHandler unauthorizedHandler,
+            ForbiddenHandler forbiddenHandler
+    ) {
+        return new AuthenticationScheme.Sync() {
+            @Override
+            public Authenticator authenticator() {
+                return authenticator;
+            }
+
+            @Override
+            public UnauthorizedHandler getUnauthorizedHandler() {
+                return unauthorizedHandler;
+            }
+
+            @Override
+            public ForbiddenHandler getForbiddenHandler() {
+                return forbiddenHandler;
+            }
+        };
+    }
 
     // ── plugin registration produces no Unit.INSTANCE / INSTANCE.getX() ───────
 
@@ -47,11 +87,11 @@ class JavaInteropIT {
         // No Unit.INSTANCE, no .INSTANCE.getX() — compiles cleanly from Java
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.setAuthenticator(headerAuthenticator);
+                http.authentication = scheme(headerAuthenticator);
                 http.rules(rules -> {
                     rules.add("/api/*", GET, Rules.allow());
-                    rules.add("/admin/*", POST, Rules.hasAuthority("ADMIN"));
-                    rules.setFallback(Rules.deny());
+                    rules.add("/admin/*", POST, Rules.hasRole(Role.ADMIN));
+                    rules.fallback = Rules.deny();
                 });
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
@@ -67,8 +107,8 @@ class JavaInteropIT {
         assertThat(Rules.allow()).isNotNull();
         assertThat(Rules.deny()).isNotNull();
         assertThat(Rules.authenticated()).isNotNull();
-        assertThat(Rules.hasAuthority("READ")).isNotNull();
-        assertThat(Rules.hasAnyAuthority("READ", "WRITE")).isNotNull();
+        assertThat(Rules.hasRole(Role.READ)).isNotNull();
+        assertThat(Rules.hasAnyRole(Role.READ, Role.WRITE)).isNotNull();
     }
 
     // ── custom Rule as lambda ──────────────────────────────────────────────────
@@ -80,7 +120,7 @@ class JavaInteropIT {
 
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                        http.rules(rules -> rules.setFallback(customRule))))));
+                        http.rules(rules -> rules.fallback = customRule)))));
 
         assertThat(app).isNotNull();
     }
@@ -95,8 +135,8 @@ class JavaInteropIT {
 
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                    http.rules(rules -> rules.setFallback(Rules.authenticated()));
-                    http.setAuthenticator(alwaysBob);
+                    http.rules(rules -> rules.fallback = Rules.authenticated());
+                    http.authentication = scheme(alwaysBob);
                 }))));
 
         assertThat(app).isNotNull();
@@ -108,31 +148,48 @@ class JavaInteropIT {
     void custom_unauthorized_and_forbidden_handlers() {
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                    http.rules(rules -> rules.setFallback(Rules.hasAuthority("ADMIN")));
-                    http.setAuthenticator(headerAuthenticator);
-                    http.setUnauthorizedHandler((ctx, failure) -> ctx.status(401).result("custom-401"));
-                    http.setForbiddenHandler((ctx, auth) -> ctx.status(403).result("custom-403"));
+                    http.rules(rules -> rules.fallback = Rules.hasRole(Role.ADMIN));
+                    http.authentication = scheme(
+                            headerAuthenticator,
+                            (ctx, failure) -> ctx.status(401).result("custom-401"),
+                            (ctx, auth) -> ctx.status(403).result("custom-403")
+                    );
                 }))));
 
         assertThat(app).isNotNull();
     }
 
-    // ── mutual exclusion: sync + async authenticators rejected ────────────────
+    // ── sync/async are mutually exclusive by construction ─────────────────────
 
     @Test
-    void plugin_rejects_both_sync_and_async_authenticator() {
-        // JavalinSecurityPlugin.onStart runs during Javalin.create(...) itself (plugins are
-        // started once the whole create block has been applied, before create() returns), so the
-        // validation failure surfaces there rather than at a later app.start() call.
-        assertThatThrownBy(() -> Javalin.create(config ->
+    void async_scheme_can_be_built_directly_from_java() {
+        // AuthenticationScheme.Async has a single abstract method — a Java lambda cannot
+        // implement it directly (the interface also declares defaulted properties that are
+        // abstract at the JVM level), so a small anonymous class is used, mirroring `scheme(...)`.
+        AuthenticationScheme.Async async = new AuthenticationScheme.Async() {
+            @Override
+            public AsyncAuthenticator asyncAuthenticator() {
+                return ctx -> CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated.INSTANCE);
+            }
+
+            @Override
+            public UnauthorizedHandler getUnauthorizedHandler() {
+                return UnauthorizedHandler.getDEFAULT();
+            }
+
+            @Override
+            public ForbiddenHandler getForbiddenHandler() {
+                return ForbiddenHandler.getDEFAULT();
+            }
+        };
+
+        Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                    http.rules(rules -> rules.setFallback(Rules.allow()));
-                    http.setAuthenticator(ctx -> AuthenticationResult.NotAuthenticated.INSTANCE);
-                    http.setAsyncAuthenticator(ctx -> CompletableFuture.completedFuture(
-                            AuthenticationResult.NotAuthenticated.INSTANCE));
-                })))))
-                .isInstanceOf(SecurityConfigurationException.class)
-                .hasMessageContaining("mutually exclusive");
+                    http.rules(rules -> rules.fallback = Rules.allow());
+                    http.authentication = async;
+                }))));
+
+        assertThat(app).isNotNull();
     }
 
     // ── full integration ──────────────────────────────────────────────────────
@@ -144,9 +201,9 @@ class JavaInteropIT {
                 http.rules(rules -> {
                     rules.add("/api/*", GET, Rules.allow());
                     rules.add("/api/*", POST, Rules.authenticated());
-                    rules.setFallback(Rules.deny());
+                    rules.fallback = Rules.deny();
                 });
-                http.setAuthenticator(headerAuthenticator);
+                http.authentication = scheme(headerAuthenticator);
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
             config.routes.post("/api/resource", ctx -> ctx.result("created"));
@@ -172,9 +229,8 @@ class JavaInteropIT {
 
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/*", GET, Rules.hasAuthority("ADMIN")));
-                http.setAuthenticator(headerAuthenticator);
-                http.setForbiddenHandler(denied);
+                http.rules(rules -> rules.add("/api/*", GET, Rules.hasRole(Role.ADMIN)));
+                http.authentication = scheme(headerAuthenticator, UnauthorizedHandler.getDEFAULT(), denied);
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
         });
@@ -192,8 +248,8 @@ class JavaInteropIT {
     void context_extension_exposes_authentication_from_java() {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.setFallback(Rules.authenticated()));
-                http.setAuthenticator(headerAuthenticator);
+                http.rules(rules -> rules.fallback = Rules.authenticated());
+                http.authentication = scheme(headerAuthenticator);
             })));
             config.routes.get("/api/me", ctx -> {
                 Authentication authentication = ctx.with(JavalinSecurityPlugin.class).authentication();
@@ -211,17 +267,11 @@ class JavaInteropIT {
     // ── RouteRole-first authorization from Java ───────────────────────────────
 
     @Test
-    void route_declared_roles_are_resolved_via_roleMapper_from_java() {
+    void route_declared_roles_are_granted_directly_from_authentication_roles_from_java() {
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.setAuthenticator(headerAuthenticator);
-                http.setRoleMapper((authentication, ctx) -> {
-                    if (authentication.getAuthorities().contains("ADMIN")) {
-                        return java.util.Set.of(Role.ADMIN);
-                    }
-                    return java.util.Set.of();
-                });
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
+                    http.authentication = scheme(headerAuthenticator)
+            )));
             config.routes.get("/admin", ctx -> ctx.result("admin-ok"), Role.ADMIN);
         });
 
@@ -230,7 +280,7 @@ class JavaInteropIT {
 
             var response = client.get("/admin", req -> {
                 req.header("X-User", "alice");
-                req.header("X-Authorities", "ADMIN");
+                req.header("X-Roles", "ADMIN");
             });
             assertThat(response.code()).isEqualTo(200);
             assertThat(response.body().string()).isEqualTo("admin-ok");

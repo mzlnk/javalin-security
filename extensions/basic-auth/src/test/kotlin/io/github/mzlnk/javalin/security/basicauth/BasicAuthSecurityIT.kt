@@ -6,6 +6,7 @@ import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
 import io.javalin.http.HandlerType.GET
 import io.javalin.http.HandlerType.POST
+import io.javalin.security.RouteRole
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -13,14 +14,16 @@ import org.junit.jupiter.api.Test
 import java.util.Base64
 
 /**
- * Integration tests for the `basicAuth { }` extension wired through `config.security { it.http { } }`.
+ * Integration tests for the `basicAuth { }` scheme factory assigned via `http.authentication = basicAuth { }`.
  */
 class BasicAuthSecurityIT {
 
+    private enum class Role : RouteRole { USER, ADMIN }
+
     private val testUserLookup = UserLookup { username ->
         when (username) {
-            "alice" -> BasicUser(username = "alice", password = "alice-pw", authorities = setOf("USER"))
-            "admin" -> BasicUser(username = "admin", password = "admin-pw", authorities = setOf("ADMIN"))
+            "alice" -> BasicUser(username = "alice", password = "alice-pw", roles = setOf(Role.USER))
+            "admin" -> BasicUser(username = "admin", password = "admin-pw", roles = setOf(Role.ADMIN))
             else -> null
         }
     }
@@ -31,7 +34,7 @@ class BasicAuthSecurityIT {
     private fun app(basicChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
             security.http { http ->
-                http.basicAuth { basic ->
+                http.authentication = basicAuth { basic ->
                     basic.userLookup = testUserLookup
                     basic.basicChallenge = basicChallenge
                     basic.realm = "TestAPI"
@@ -39,7 +42,7 @@ class BasicAuthSecurityIT {
                 http.rules { r ->
                     r.add("/public/*", GET, r.allow)
                     r.add("/protected/*", POST, r.authenticated)
-                    r.add("/admin/*", GET, r.hasAuthority("ADMIN"))
+                    r.add("/admin/*", GET, r.hasRole(Role.ADMIN))
                     r.fallback = r.deny
                 }
             }
@@ -94,17 +97,17 @@ class BasicAuthSecurityIT {
         assertThat(response.code).isEqualTo(401)
     }
 
-    // ── Authority-based access ────────────────────────────────────────────────
+    // ── Role-based access ──────────────────────────────────────────────────────
 
     @Test
-    fun `should return 403 when authenticated caller lacks required authority`() = JavalinTest.test(app()) { _, client ->
+    fun `should return 403 when authenticated caller lacks required role`() = JavalinTest.test(app()) { _, client ->
         // "alice" has USER, not ADMIN
         val response = client.get("/admin/dashboard") { it.header("Authorization", basicHeader("alice", "alice-pw")) }
         assertThat(response.code).isEqualTo(403)
     }
 
     @Test
-    fun `should allow access when caller holds required authority`() = JavalinTest.test(app()) { _, client ->
+    fun `should allow access when caller holds required role`() = JavalinTest.test(app()) { _, client ->
         val response = client.get("/admin/dashboard") { it.header("Authorization", basicHeader("admin", "admin-pw")) }
         assertThat(response.code).isEqualTo(200)
     }
@@ -116,7 +119,7 @@ class BasicAuthSecurityIT {
         val accessibleApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.basicAuth { basic -> basic.userLookup = testUserLookup }
+                    http.authentication = basicAuth { basic -> basic.userLookup = testUserLookup }
                     http.rules { r -> r.fallback = r.authenticated }
                 }
             }
@@ -169,7 +172,7 @@ class BasicAuthSecurityIT {
         val customApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.basicAuth { basic ->
+                    http.authentication = basicAuth { basic ->
                         basic.userLookup = testUserLookup
                         basic.credentialsResolver = BasicCredentialsResolver.basicHeader("X-Custom-Auth")
                     }
@@ -196,7 +199,7 @@ class BasicAuthSecurityIT {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http { http ->
-                        http.basicAuth { basic ->
+                        http.authentication = basicAuth { basic ->
                             // userLookup not set — should fail
                         }
                         http.rules { r -> r.fallback = r.allow }

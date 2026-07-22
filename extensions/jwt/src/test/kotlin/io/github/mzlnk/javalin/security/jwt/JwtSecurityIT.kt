@@ -7,16 +7,21 @@ import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
 import io.javalin.http.HandlerType.GET
 import io.javalin.http.HandlerType.POST
+import io.javalin.security.RouteRole
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for the `jwt { }` extension wired through `config.security { it.http { } }`.
+ * Integration tests for the `jwt { }` scheme factory assigned via `http.authentication = jwt { }`.
  * The decoder is a test double that reads the raw token string directly as the subject.
  */
 class JwtSecurityIT {
+
+    private enum class Role : RouteRole { ADMIN, USER }
+
+    private val roleOf: (String) -> RouteRole? = { name -> Role.entries.find { it.name == name } }
 
     private val testDecoder = JwtDecoder { token, _ ->
         if (token == "INVALID") throw IllegalArgumentException("bad token")
@@ -29,17 +34,17 @@ class JwtSecurityIT {
     private fun app(bearerChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
             security.http { http ->
-                http.jwt { jwt ->
+                http.authentication = jwt { jwt ->
                     jwt.decoder = testDecoder
                     jwt.keySource = JwtKeySource.secret("test-secret-not-actually-used-by-test-double")
-                    jwt.authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
+                    jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
                     jwt.bearerChallenge = bearerChallenge
                     jwt.realm = "TestAPI"
                 }
                 http.rules { r ->
                     r.add("/public/*", GET, r.allow)
                     r.add("/protected/*", POST, r.authenticated)
-                    r.add("/admin/*", GET, r.hasAuthority("ADMIN"))
+                    r.add("/admin/*", GET, r.hasRole(Role.ADMIN))
                     r.fallback = r.deny
                 }
             }
@@ -82,29 +87,29 @@ class JwtSecurityIT {
         assertThat(response.code).isEqualTo(401)
     }
 
-    // ── Authority-based access ────────────────────────────────────────────────
+    // ── Role-based access ──────────────────────────────────────────────────────
 
     @Test
-    fun `should return 403 when authenticated caller lacks required authority`() = JavalinTest.test(app()) { _, client ->
+    fun `should return 403 when authenticated caller lacks required role`() = JavalinTest.test(app()) { _, client ->
         // token "bob" decodes to roles=["USER"], not "ADMIN"
         val response = client.get("/admin/dashboard") { it.header("Authorization", "Bearer bob") }
         assertThat(response.code).isEqualTo(403)
     }
 
     @Test
-    fun `should allow access when caller holds required authority`() {
+    fun `should allow access when caller holds required role`() {
         val adminDecoder = JwtDecoder { token, _ ->
             SimpleDecodedJwt(subject = token, claims = mapOf("roles" to listOf("ADMIN")))
         }
         val adminApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.jwt { jwt ->
+                    http.authentication = jwt { jwt ->
                         jwt.decoder = adminDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
-                        jwt.authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
+                        jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
                     }
-                    http.rules { r -> r.add("/admin/*", GET, r.hasAuthority("ADMIN")) }
+                    http.rules { r -> r.add("/admin/*", GET, r.hasRole(Role.ADMIN)) }
                 }
             }
             cfg.routes.get("/admin/dashboard") { it.result("ok") }
@@ -122,7 +127,7 @@ class JwtSecurityIT {
         val accessibleApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.jwt { jwt ->
+                    http.authentication = jwt { jwt ->
                         jwt.decoder = testDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                     }
@@ -178,7 +183,7 @@ class JwtSecurityIT {
         val cookieApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.jwt { jwt ->
+                    http.authentication = jwt { jwt ->
                         jwt.decoder = testDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                         jwt.tokenResolver = TokenResolver.cookie("access_token")
@@ -203,7 +208,7 @@ class JwtSecurityIT {
         val cookieApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.jwt { jwt ->
+                    http.authentication = jwt { jwt ->
                         jwt.decoder = testDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                         jwt.tokenResolver = TokenResolver.cookie("access_token")
@@ -228,7 +233,7 @@ class JwtSecurityIT {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http { http ->
-                        http.jwt { jwt ->
+                        http.authentication = jwt { jwt ->
                             jwt.keySource = JwtKeySource.secret("test-secret")
                             // decoder not set — should fail
                         }
@@ -246,7 +251,7 @@ class JwtSecurityIT {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http { http ->
-                        http.jwt { jwt ->
+                        http.authentication = jwt { jwt ->
                             jwt.decoder = testDecoder
                             // keySource not set — should fail
                         }

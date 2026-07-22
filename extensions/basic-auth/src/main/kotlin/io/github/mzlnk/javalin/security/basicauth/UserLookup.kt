@@ -5,7 +5,7 @@ package io.github.mzlnk.javalin.security.basicauth
  *
  * Implementations decide *where* users come from — an in-memory map, a database, an external
  * identity store, etc. — and return the stored [BasicUser] (with its *encoded* password and
- * granted authorities), or `null` when the username is unknown.
+ * granted [io.javalin.security.RouteRole]s), or `null` when the username is unknown.
  *
  * This is deliberately separate from password comparison: [BasicAuthenticator] takes
  * the [BasicUser.password] returned here and compares it against the caller-supplied raw password
@@ -16,7 +16,7 @@ package io.github.mzlnk.javalin.security.basicauth
  * Register via the `basicAuth { }` block, supplying a lambda if desired:
  *
  * ```kotlin
- * http.basicAuth { basic ->
+ * http.authentication = basicAuth { basic ->
  *     basic.userLookup = UserLookup { username -> repository.findByUsername(username) }
  * }
  * ```

@@ -45,6 +45,7 @@ class WsSecurityRules internal constructor() : RuleFactory by DefaultRules {
      * Last write wins. Unset (`null`, the default) denies unmatched requests — the deny-by-default
      * guarantee.
      */
+    @JvmField
     var fallback: Rule? = null
 
 }

@@ -3,12 +3,17 @@ package io.github.mzlnk.javalin.security.jwt
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.javalin.http.Context
+import io.javalin.security.RouteRole
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class JwtAuthenticatorTest {
+
+    private enum class Role : RouteRole { ADMIN, USER }
+
+    private val roleOf: (String) -> RouteRole? = { name -> Role.entries.find { it.name == name } }
 
     private val validToken = "valid.jwt.token"
     private val decodedJwt = SimpleDecodedJwt(subject = "alice", claims = mapOf("sub" to "alice"))
@@ -55,27 +60,23 @@ class JwtAuthenticatorTest {
     }
 
     @Test
-    fun `should populate authorities from mapper`() {
-        val manager = JwtAuthenticator.builder(successDecoder, verification)
-            .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
-            .build()
-
+    fun `should populate roles from mapper`() {
         val rolesJwt = SimpleDecodedJwt(subject = "bob", claims = mapOf("roles" to listOf("ADMIN", "USER")))
         val decoderWithRoles = JwtDecoder { _, _ -> rolesJwt }
 
         val managerWithRoles = JwtAuthenticator.builder(decoderWithRoles, verification)
-            .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
+            .rolesMapper(JwtRolesMapper.fromClaim("roles", roleOf))
             .build()
 
         val result = managerWithRoles.authenticate(ctx("Bearer $validToken")) as AuthenticationResult.Success
-        assertThat(result.authentication.authorities).containsExactlyInAnyOrder("ADMIN", "USER")
+        assertThat(result.authentication.roles).containsExactlyInAnyOrder(Role.ADMIN, Role.USER)
     }
 
     @Test
-    fun `should return empty authorities when no mapper is configured`() {
+    fun `should return empty roles when no mapper is configured`() {
         val manager = JwtAuthenticator.of(successDecoder, verification)
         val result = manager.authenticate(ctx("Bearer $validToken")) as AuthenticationResult.Success
-        assertThat(result.authentication.authorities).isEmpty()
+        assertThat(result.authentication.roles).isEmpty()
     }
 
     // ── Failure ───────────────────────────────────────────────────────────────
@@ -110,7 +111,7 @@ class JwtAuthenticatorTest {
     @Test
     fun `builder produces a functional manager`() {
         val manager = JwtAuthenticator.builder(successDecoder, verification)
-            .authoritiesMapper(JwtAuthoritiesMapper.fromScope())
+            .rolesMapper(JwtRolesMapper.fromScope(roleOf))
             .build()
 
         val result = manager.authenticate(ctx("Bearer $validToken"))

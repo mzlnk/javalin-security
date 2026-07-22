@@ -14,23 +14,25 @@ import org.junit.jupiter.api.Test
 
 class JavalinSecurityIT {
 
+    private enum class Role : RouteRole { ADMIN, USER }
+
     /**
-     * Test authenticator: authenticates when an `X-User` header is present, granting the
-     * authorities listed (comma separated) in `X-Authorities`. A user named "invalid" simulates a
-     * bad credential.
+     * Test authenticator: authenticates when an `X-User` header is present, granting the roles
+     * listed (comma separated) in `X-Roles`. A user named "invalid" simulates a bad credential.
      */
     private val headerAuthenticator = Authenticator { context ->
         when (val user = context.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             "invalid" -> AuthenticationResult.Failure(message = "bad credentials")
             else -> {
-                val authorities = context.header("X-Authorities")
+                val roles = context.header("X-Roles")
                     ?.split(",")
                     ?.map { it.trim() }
                     ?.filter { it.isNotEmpty() }
+                    ?.mapNotNull { name -> Role.entries.find { it.name == name } }
                     ?.toSet()
                     ?: emptySet()
-                AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user), authorities))
+                AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user), roles))
             }
         }
     }
@@ -42,9 +44,9 @@ class JavalinSecurityIT {
                     http.rules { r ->
                         r.add("/api/v1/*", GET, r.allow)
                         r.add("/api/v1/*", POST, r.authenticated)
-                        r.add("/api/v1/*", DELETE, r.hasAuthority("ADMIN"))
+                        r.add("/api/v1/*", DELETE, r.hasRole(Role.ADMIN))
                     }
-                    authenticator?.let { http.authenticator = it }
+                    authenticator?.let { http.authentication = syncScheme(it) }
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -95,7 +97,7 @@ class JavalinSecurityIT {
         // when
         val response = client.delete("/api/v1/resource", null) {
             it.header("X-User", "bob")
-            it.header("X-Authorities", "USER")
+            it.header("X-Roles", "USER")
         }
 
         // then
@@ -107,7 +109,7 @@ class JavalinSecurityIT {
         // when
         val response = client.delete("/api/v1/resource", null) {
             it.header("X-User", "admin")
-            it.header("X-Authorities", "ADMIN")
+            it.header("X-Roles", "ADMIN")
         }
 
         // then
@@ -140,7 +142,7 @@ class JavalinSecurityIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.allow) }
-                    http.authenticator = headerAuthenticator
+                    http.authentication = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.get("/internal") { it.result("secret") }
@@ -190,8 +192,6 @@ class JavalinSecurityIT {
 
     // ── RouteRole-first authorization ───────────────────────────────────────────
 
-    private enum class Role : RouteRole { ADMIN, USER }
-
     @Test
     fun `Anyone role grants access even to anonymous callers, bypassing the rule table`() = JavalinTest.test(
         Javalin.create { cfg ->
@@ -205,48 +205,42 @@ class JavalinSecurityIT {
     }
 
     @Test
-    fun `a route with declared roles is granted when roleMapper maps a matching role`() = JavalinTest.test(
+    fun `a route with declared roles is granted when the caller holds a matching role`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticator = headerAuthenticator
-                    http.roleMapper = RoleMapper { authentication, _ ->
-                        authentication.authorities.mapNotNull { authority ->
-                            runCatching { Role.valueOf(authority) }.getOrNull()
-                        }.toSet()
-                    }
+                    http.authentication = syncScheme(headerAuthenticator)
                     http.rules { r -> r.fallback = r.deny } // rule table must NOT be consulted
                 }
             }
             cfg.routes.get("/admin", { it.result("admin-ok") }, Role.ADMIN)
         },
     ) { _, client ->
-        // anonymous → 401, roleMapper has nothing to map
+        // anonymous → 401, no roles to match
         assertThat(client.get("/admin").code).isEqualTo(401)
 
         // authenticated without the role → 403
         val forbidden = client.get("/admin") {
             it.header("X-User", "bob")
-            it.header("X-Authorities", "USER")
+            it.header("X-Roles", "USER")
         }
         assertThat(forbidden.code).isEqualTo(403)
 
-        // authenticated with the role → 200, granted by role mapping, not the (deny) rule table
+        // authenticated with the role → 200, granted directly from authentication.roles, not the (deny) rule table
         val granted = client.get("/admin") {
             it.header("X-User", "alice")
-            it.header("X-Authorities", "ADMIN")
+            it.header("X-Roles", "ADMIN")
         }
         assertThat(granted.code).isEqualTo(200)
         assertThat(granted.body.string()).isEqualTo("admin-ok")
     }
 
     @Test
-    fun `a route with declared roles is denied when no roleMapper is configured`() = JavalinTest.test(
+    fun `a route with declared roles is denied when the caller holds no matching role`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticator = headerAuthenticator
-                    // no roleMapper configured
+                    http.authentication = syncScheme(headerAuthenticator)
                     http.rules { r -> r.fallback = r.allow } // even a permissive fallback must not apply
                 }
             }
@@ -255,7 +249,7 @@ class JavalinSecurityIT {
     ) { _, client ->
         val response = client.get("/admin") {
             it.header("X-User", "alice")
-            it.header("X-Authorities", "ADMIN")
+            it.header("X-Roles", "USER") // authenticated, but not ADMIN
         }
         assertThat(response.code).isEqualTo(403)
     }
@@ -265,14 +259,18 @@ class JavalinSecurityIT {
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.roleMapper = RoleMapper { _, _ -> setOf(Role.ADMIN) } // would grant any role-based route
+                    http.authentication = syncScheme(
+                        Authenticator {
+                            AuthenticationResult.Success(Authentication.authenticated(TestPrincipal("alice"), Role.ADMIN))
+                        },
+                    )
                     http.rules { r -> r.add("/plain", GET, r.deny) }
                 }
             }
             cfg.routes.get("/plain") { it.result("ok") } // no roles declared
         },
     ) { _, client ->
-        // roleMapper is irrelevant here since the route declares no roles — the rule table decides
-        assertThat(client.get("/plain").code).isEqualTo(401)
+        // the caller's ADMIN role is irrelevant here since the route declares no roles — the rule table decides
+        assertThat(client.get("/plain").code).isEqualTo(403)
     }
 }

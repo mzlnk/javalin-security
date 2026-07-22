@@ -45,7 +45,7 @@ import javax.crypto.spec.SecretKeySpec
  * Register it as the decoder:
  *
  * ```kotlin
- * http.jwt { jwt ->
+ * http.authentication = jwt { jwt ->
  *     jwt.decoder = NimbusJwtDecoder
  *     jwt.keySource = JwtKeySource.publicKey(rsaPublicKey)
  * }

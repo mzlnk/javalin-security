@@ -163,7 +163,7 @@ class JavalinSecurityWsHardeningIT {
                 cfg.security { security ->
                     security.ws { ws ->
                         ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                        ws.authenticator = headerAuthenticator
+                        ws.authentication = syncScheme(headerAuthenticator)
                     }
                 }
                 cfg.routes.ws("/ws/chat") { }
@@ -275,7 +275,7 @@ class JavalinSecurityWsHardeningIT {
                     security.ws { ws ->
                         ws.rules { r -> r.fallback = r.authenticated }
                         ws.allowedOrigins = listOf("https://allowed.example.com")
-                        ws.authenticator = headerAuthenticator
+                        ws.authentication = syncScheme(headerAuthenticator)
                     }
                 }
                 cfg.routes.ws("/ws/chat") { }
@@ -336,9 +336,11 @@ class JavalinSecurityWsHardeningIT {
                     security.ws { ws ->
                         ws.rules { r -> r.fallback = r.allow }
                         ws.allowedOrigins = listOf("https://allowed.example.com")
-                        ws.forbiddenHandler = { ctx, _ ->
-                            ctx.status(403).result("custom-origin-denied")
-                        }
+                        ws.authentication = syncScheme(
+                            forbiddenHandler = { ctx, _ ->
+                                ctx.status(403).result("custom-origin-denied")
+                            },
+                        )
                     }
                 }
                 cfg.routes.ws("/ws/chat") { }

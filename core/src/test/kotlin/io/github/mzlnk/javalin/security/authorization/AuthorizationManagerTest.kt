@@ -6,16 +6,19 @@ import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
 import io.github.mzlnk.javalin.security.mockContext
 import io.javalin.config.RouterConfig
 import io.javalin.http.HandlerType
+import io.javalin.security.RouteRole
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class AuthorizationManagerTest {
 
+    private enum class Role : RouteRole { ADMIN, USER }
+
     private val anonymous = Authentication.unauthenticated()
     private val defaultRouter = RouterConfig()
 
-    private fun authenticated(vararg authorities: String): Authentication =
-        Authentication.authenticated(TestPrincipal("bob"), *authorities)
+    private fun authenticated(vararg roles: RouteRole): Authentication =
+        Authentication.authenticated(TestPrincipal("bob"), *roles)
 
     private fun entry(pattern: String, method: HandlerType?, rule: Rule, router: RouterConfig = defaultRouter) =
         AuthorizationManager.Entry(pattern, method, rule, router)
@@ -108,13 +111,13 @@ class AuthorizationManagerTest {
     fun `should deny when the matching rule is not satisfied`() {
         // given
         val manager = AuthorizationManager(
-            entries = listOf(entry("/api/*", HandlerType.GET, Rules.hasAuthority("ADMIN"))),
+            entries = listOf(entry("/api/*", HandlerType.GET, Rules.hasRole(Role.ADMIN))),
             fallback = null,
             allowCorsPreflight = false,
         )
 
         // when
-        val granted = manager.isGranted(HandlerType.GET, "/api/x", authenticated("USER"), mockContext())
+        val granted = manager.isGranted(HandlerType.GET, "/api/x", authenticated(Role.USER), mockContext())
 
         // then
         assertThat(granted).isFalse()
@@ -124,13 +127,13 @@ class AuthorizationManagerTest {
     fun `should grant access when the matching rule is satisfied`() {
         // given
         val manager = AuthorizationManager(
-            entries = listOf(entry("/api/*", HandlerType.DELETE, Rules.hasAuthority("ADMIN"))),
+            entries = listOf(entry("/api/*", HandlerType.DELETE, Rules.hasRole(Role.ADMIN))),
             fallback = null,
             allowCorsPreflight = false,
         )
 
         // when
-        val granted = manager.isGranted(HandlerType.DELETE, "/api/x", authenticated("ADMIN"), mockContext())
+        val granted = manager.isGranted(HandlerType.DELETE, "/api/x", authenticated(Role.ADMIN), mockContext())
 
         // then
         assertThat(granted).isTrue()

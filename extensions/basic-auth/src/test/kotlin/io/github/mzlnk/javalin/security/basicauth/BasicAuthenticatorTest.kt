@@ -2,6 +2,7 @@ package io.github.mzlnk.javalin.security.basicauth
 
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.http.Context
+import io.javalin.security.RouteRole
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
@@ -10,7 +11,9 @@ import java.util.Base64
 
 class BasicAuthenticatorTest {
 
-    private val alice = BasicUser(username = "alice", password = "correct-password", authorities = setOf("USER", "ADMIN"))
+    private enum class Role : RouteRole { USER, ADMIN }
+
+    private val alice = BasicUser(username = "alice", password = "correct-password", roles = setOf(Role.USER, Role.ADMIN))
     private val userLookup = UserLookup { username -> if (username == "alice") alice else null }
 
     private fun basicHeader(username: String, password: String): String =
@@ -90,20 +93,20 @@ class BasicAuthenticatorTest {
     }
 
     @Test
-    fun `should populate authorities from the looked-up user`() {
+    fun `should populate roles from the looked-up user`() {
         val manager = BasicAuthenticator.of(userLookup)
         val result = manager.authenticate(ctx(basicHeader("alice", "correct-password"))) as AuthenticationResult.Success
 
-        assertThat(result.authentication.authorities).containsExactlyInAnyOrder("USER", "ADMIN")
+        assertThat(result.authentication.roles).containsExactlyInAnyOrder(Role.USER, Role.ADMIN)
     }
 
     @Test
-    fun `should return empty authorities when the looked-up user has none`() {
-        val noAuthoritiesLookup = UserLookup { username -> BasicUser(username = username, password = "pw") }
-        val manager = BasicAuthenticator.of(noAuthoritiesLookup)
+    fun `should return empty roles when the looked-up user has none`() {
+        val noRolesLookup = UserLookup { username -> BasicUser(username = username, password = "pw") }
+        val manager = BasicAuthenticator.of(noRolesLookup)
         val result = manager.authenticate(ctx(basicHeader("bob", "pw"))) as AuthenticationResult.Success
 
-        assertThat(result.authentication.authorities).isEmpty()
+        assertThat(result.authentication.roles).isEmpty()
     }
 
     // ── Builder ───────────────────────────────────────────────────────────────

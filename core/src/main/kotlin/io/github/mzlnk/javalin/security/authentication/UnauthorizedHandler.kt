@@ -27,6 +27,7 @@ fun interface UnauthorizedHandler {
     companion object {
 
         /** The default handler: a bare `401 Unauthorized` with no credential details leaked, mirroring Javalin's own [UnauthorizedResponse]. */
+        @JvmStatic
         val DEFAULT: UnauthorizedHandler = UnauthorizedHandler { _, _ -> throw UnauthorizedResponse() }
 
     }

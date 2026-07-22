@@ -4,7 +4,6 @@ import io.github.mzlnk.javalin.security.Anyone
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin
 import io.github.mzlnk.javalin.security.LogSanitizer
 import io.github.mzlnk.javalin.security.PathNormalizer
-import io.github.mzlnk.javalin.security.RoleMapper
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticator
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.Authenticator
@@ -28,7 +27,7 @@ import java.util.concurrent.CompletionException
  * 2. **Authenticate** — authenticate the upgrade request (sync, or async resolved by a blocking
  *    join, see below).
  * 3. **Authorize** — if the matched WS endpoint declares [RouteRole]s, grant access when they
- *    include [Anyone] or intersect what [roleMapper] resolves for the caller; otherwise evaluate
+ *    include [Anyone] or intersect the caller's own [Authentication.roles]; otherwise evaluate
  *    the configured WS rule table. On grant, the guard returns and the upgrade proceeds to
  *    [onConnect][io.javalin.websocket.WsConnectContext]. On deny, the configured
  *    [UnauthorizedHandler] (401) or [ForbiddenHandler] (403) is invoked and the upgrade is halted
@@ -49,12 +48,17 @@ import java.util.concurrent.CompletionException
  * If the async future completes exceptionally, or [asyncAuthenticator] throws synchronously, the
  * error is caught and converted to [AuthenticationResult.Failure] so the pipeline remains
  * fail-closed and no internal detail is leaked to the caller.
+ *
+ * [authenticator] and [asyncAuthenticator] are resolved by [io.github.mzlnk.javalin.security.JavalinSecurityPlugin]
+ * from the single [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme] assigned
+ * to `ws.authentication`; the two are mutually exclusive by construction (a scheme is either
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Sync] or
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Async], never both).
  */
 internal class WsSecurityGuard(
     private val authenticator: Authenticator?,
     private val asyncAuthenticator: AsyncAuthenticator?,
     private val authorizationManager: WsAuthorizationManager,
-    private val roleMapper: RoleMapper?,
     private val pathNormalizer: PathNormalizer,
     private val unauthorizedHandler: UnauthorizedHandler,
     private val forbiddenHandler: ForbiddenHandler,
@@ -126,7 +130,7 @@ internal class WsSecurityGuard(
         val routeRoles = context.routeRoles()
 
         val granted = if (routeRoles.isNotEmpty()) {
-            grantedByRole(routeRoles, authentication, context)
+            grantedByRole(routeRoles, authentication)
         } else {
             authorizationManager.isGranted(path, authentication, context)
         }
@@ -151,26 +155,11 @@ internal class WsSecurityGuard(
 
     /**
      * Grants access when the matched WS endpoint's declared [RouteRole]s include [Anyone], or
-     * when [roleMapper] resolves the caller to at least one of the declared roles. An endpoint
-     * with declared roles and no configured [roleMapper] is denied (logged) rather than silently
-     * falling through to the WS rule table.
+     * when they intersect the caller's own [Authentication.roles]. A plain set-membership check,
+     * relying on [RouteRole] equality.
      */
-    private fun grantedByRole(routeRoles: Set<RouteRole>, authentication: Authentication, context: Context): Boolean {
-        if (Anyone in routeRoles) return true
-
-        val mapper = roleMapper
-        if (mapper == null) {
-            log.warn(
-                "WS endpoint declares roles {} but no roleMapper is configured on the WS security " +
-                    "block; denying. Set 'ws.roleMapper = { authentication, ctx -> ... }'.",
-                routeRoles,
-            )
-            return false
-        }
-
-        val callerRoles = mapper.map(authentication, context)
-        return routeRoles.any { it in callerRoles }
-    }
+    private fun grantedByRole(routeRoles: Set<RouteRole>, authentication: Authentication): Boolean =
+        Anyone in routeRoles || routeRoles.any { it in authentication.roles }
 
     // ── helpers ───────────────────────────────────────────────────────────────
 

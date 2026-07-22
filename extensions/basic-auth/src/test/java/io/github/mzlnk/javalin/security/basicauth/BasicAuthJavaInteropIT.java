@@ -1,8 +1,13 @@
 package io.github.mzlnk.javalin.security.basicauth;
 
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
+import io.github.mzlnk.javalin.security.authentication.Authenticator;
+import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme;
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler;
+import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler;
 import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.javalin.Javalin;
+import io.javalin.security.RouteRole;
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
 
@@ -24,11 +29,41 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class BasicAuthJavaInteropIT {
 
+    private enum Role implements RouteRole { USER, ADMIN }
+
     private final UserLookup testUserLookup = username ->
-            "alice".equals(username) ? new BasicUser("alice", "alice-pw", Set.of("USER")) : null;
+            "alice".equals(username) ? new BasicUser("alice", "alice-pw", Set.of(Role.USER)) : null;
 
     private static String basicHeader(String username, String password) {
         return "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
+    }
+
+    /** Wraps a plain {@link Authenticator} (e.g. a built {@link BasicAuthenticator}) in a minimal {@link AuthenticationScheme.Sync}. */
+    private static AuthenticationScheme.Sync scheme(Authenticator authenticator) {
+        return scheme(authenticator, UnauthorizedHandler.getDEFAULT(), ForbiddenHandler.getDEFAULT());
+    }
+
+    private static AuthenticationScheme.Sync scheme(
+            Authenticator authenticator,
+            UnauthorizedHandler unauthorizedHandler,
+            ForbiddenHandler forbiddenHandler
+    ) {
+        return new AuthenticationScheme.Sync() {
+            @Override
+            public Authenticator authenticator() {
+                return authenticator;
+            }
+
+            @Override
+            public UnauthorizedHandler getUnauthorizedHandler() {
+                return unauthorizedHandler;
+            }
+
+            @Override
+            public ForbiddenHandler getForbiddenHandler() {
+                return forbiddenHandler;
+            }
+        };
     }
 
     // ── BasicAuthenticator builder ─────────────────────────────────────────────
@@ -67,10 +102,10 @@ class BasicAuthJavaInteropIT {
 
     @Test
     void user_lookup_can_be_expressed_as_java_lambda() {
-        UserLookup lookup = username -> new BasicUser(username, "pw", Set.of("ROLE_USER"));
+        UserLookup lookup = username -> new BasicUser(username, "pw", Set.of(Role.USER));
         BasicUser user = lookup.lookup("bob");
         assertThat(user.getUsername()).isEqualTo("bob");
-        assertThat(user.getAuthorities()).containsExactly("ROLE_USER");
+        assertThat(user.getRoles()).containsExactly(Role.USER);
     }
 
     // ── BasicCredentialsResolver factories ─────────────────────────────────────
@@ -103,11 +138,11 @@ class BasicAuthJavaInteropIT {
 
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.setAuthenticator(authenticator);
+                http.authentication = scheme(authenticator);
                 http.rules(rules -> {
                     rules.add("/api/*", GET, Rules.allow());
                     rules.add("/api/*", POST, Rules.authenticated());
-                    rules.setFallback(Rules.deny());
+                    rules.fallback = Rules.deny();
                 });
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
@@ -138,16 +173,16 @@ class BasicAuthJavaInteropIT {
     @Test
     void one_stop_basic_auth_config_is_callable_from_java_via_static_method() {
         // The same Consumer-based `basicAuth { }` block Kotlin uses — surfaced to Java as a
-        // static method — including the basicChallenge side-effect that a standalone
-        // authenticator factory could not wire.
+        // static factory method returning an AuthenticationScheme.Sync — including the
+        // basicChallenge side-effect that a standalone authenticator alone could not wire.
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                BasicAuthSecurity.basicAuth(http, basic -> {
-                    basic.setUserLookup(testUserLookup);
-                    basic.setBasicChallenge(true);
-                    basic.setRealm("JavaTest");
+                http.authentication = BasicAuthSecurity.basicAuth(basic -> {
+                    basic.userLookup = testUserLookup;
+                    basic.basicChallenge = true;
+                    basic.realm = "JavaTest";
                 });
-                http.rules(rules -> rules.setFallback(Rules.authenticated()));
+                http.rules(rules -> rules.fallback = Rules.authenticated());
             })));
             config.routes.get("/secured", ctx -> ctx.result("ok"));
         });
@@ -175,9 +210,8 @@ class BasicAuthJavaInteropIT {
 
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.setAuthenticator(authenticator);
-                http.setUnauthorizedHandler(challenge);
-                http.rules(rules -> rules.setFallback(Rules.authenticated()));
+                http.authentication = scheme(authenticator, challenge, ForbiddenHandler.getDEFAULT());
+                http.rules(rules -> rules.fallback = Rules.authenticated());
             })));
             config.routes.get("/secured", ctx -> ctx.result("ok"));
         });

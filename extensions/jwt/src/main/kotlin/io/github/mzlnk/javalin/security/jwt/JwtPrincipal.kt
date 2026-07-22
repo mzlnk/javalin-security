@@ -15,7 +15,7 @@ import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
  *
  * [name] is the `sub` (subject) claim; it is used for logging and as the human-readable identity.
  * When no `sub` claim was present in the token, [name] is an empty string — callers that require a
- * non-empty subject should validate it in their [JwtAuthoritiesMapper] or a custom authorization rule.
+ * non-empty subject should validate it in their [JwtRolesMapper] or a custom authorization rule.
  */
 class JwtPrincipal(val token: DecodedJwt) : AuthenticatedPrincipal {
 

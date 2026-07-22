@@ -1,9 +1,14 @@
 package io.github.mzlnk.javalin.security.jwt;
 
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
+import io.github.mzlnk.javalin.security.authentication.Authenticator;
+import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme;
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler;
+import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler;
 import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.github.mzlnk.javalin.security.jwt.nimbus.NimbusJwtDecoder;
 import io.javalin.Javalin;
+import io.javalin.security.RouteRole;
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Verifies that the JWT addon provides a clean Java API:
  * - {@link JwtAuthenticator} built via its {@link JwtAuthenticator.Builder},
  * - {@link JwtKeySource} and {@link JwtVerification} factory methods/builders callable from Java,
- * - {@link JwtAuthoritiesMapper} factory methods callable as static methods,
+ * - {@link JwtRolesMapper} factory methods callable as static methods,
  * - {@link BearerChallengeUnauthorizedHandler} instantiable without generics or {@code Unit.INSTANCE},
  * - the {@code NimbusJwtDecoder} Kotlin object usable from Java as {@code NimbusJwtDecoder.INSTANCE}.
  *
@@ -27,6 +32,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class JwtJavaInteropIT {
 
+    private enum Role implements RouteRole { ADMIN, USER }
+
+    private static RouteRole roleOf(String name) {
+        for (Role role : Role.values()) {
+            if (role.name().equals(name)) return role;
+        }
+        return null;
+    }
+
     private final JwtDecoder testDecoder = (token, verification) -> {
         if ("INVALID".equals(token)) throw new IllegalArgumentException("bad token");
         return new SimpleDecodedJwt(token, Map.of("sub", token, "roles", List.of("USER")));
@@ -34,12 +48,40 @@ class JwtJavaInteropIT {
 
     private final JwtVerification testVerification = JwtVerification.of(JwtKeySource.secret("test-secret"));
 
+    /** Wraps a plain {@link Authenticator} (e.g. a built {@link JwtAuthenticator}) in a minimal {@link AuthenticationScheme.Sync}. */
+    private static AuthenticationScheme.Sync scheme(Authenticator authenticator) {
+        return scheme(authenticator, UnauthorizedHandler.getDEFAULT(), ForbiddenHandler.getDEFAULT());
+    }
+
+    private static AuthenticationScheme.Sync scheme(
+            Authenticator authenticator,
+            UnauthorizedHandler unauthorizedHandler,
+            ForbiddenHandler forbiddenHandler
+    ) {
+        return new AuthenticationScheme.Sync() {
+            @Override
+            public Authenticator authenticator() {
+                return authenticator;
+            }
+
+            @Override
+            public UnauthorizedHandler getUnauthorizedHandler() {
+                return unauthorizedHandler;
+            }
+
+            @Override
+            public ForbiddenHandler getForbiddenHandler() {
+                return forbiddenHandler;
+            }
+        };
+    }
+
     // ── JwtAuthenticator builder ──────────────────────────────────────────────
 
     @Test
     void authenticator_builder_is_fluent_from_java() {
         JwtAuthenticator authenticator = JwtAuthenticator.builder(testDecoder, testVerification)
-                .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
+                .rolesMapper(JwtRolesMapper.fromClaim("roles", JwtJavaInteropIT::roleOf))
                 .build();
 
         assertThat(authenticator).isNotNull();
@@ -79,13 +121,13 @@ class JwtJavaInteropIT {
         assertThat(decoder).isNotNull();
     }
 
-    // ── JwtAuthoritiesMapper static factories ─────────────────────────────────
+    // ── JwtRolesMapper static factories ───────────────────────────────────────
 
     @Test
     void all_mapper_factories_are_accessible_as_static_methods() {
-        assertThat(JwtAuthoritiesMapper.noAuthorities()).isNotNull();
-        assertThat(JwtAuthoritiesMapper.fromClaim("roles")).isNotNull();
-        assertThat(JwtAuthoritiesMapper.fromScope()).isNotNull();
+        assertThat(JwtRolesMapper.noRoles()).isNotNull();
+        assertThat(JwtRolesMapper.fromClaim("roles", JwtJavaInteropIT::roleOf)).isNotNull();
+        assertThat(JwtRolesMapper.fromScope(JwtJavaInteropIT::roleOf)).isNotNull();
     }
 
     // ── BearerChallengeUnauthorizedHandler ────────────────────────────────────
@@ -107,12 +149,12 @@ class JwtJavaInteropIT {
         assertThat(decoder).isNotNull();
     }
 
-    // ── JwtAuthoritiesMapper as Java lambda ───────────────────────────────────
+    // ── JwtRolesMapper as Java lambda ─────────────────────────────────────────
 
     @Test
-    void authorities_mapper_can_be_expressed_as_java_lambda() {
-        JwtAuthoritiesMapper mapper = token -> java.util.Set.of("ROLE_USER");
-        assertThat(mapper.map(new SimpleDecodedJwt("sub", Map.of()))).containsExactly("ROLE_USER");
+    void roles_mapper_can_be_expressed_as_java_lambda() {
+        JwtRolesMapper mapper = token -> java.util.Set.of(Role.USER);
+        assertThat(mapper.map(new SimpleDecodedJwt("sub", Map.of()))).containsExactly(Role.USER);
     }
 
     // ── Full integration: JavalinSecurityPlugin + JwtAuthenticator ─────────────
@@ -120,16 +162,16 @@ class JwtJavaInteropIT {
     @Test
     void full_integration_via_plugin_works_from_java() {
         JwtAuthenticator authenticator = JwtAuthenticator.builder(testDecoder, testVerification)
-                .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
+                .rolesMapper(JwtRolesMapper.fromClaim("roles", JwtJavaInteropIT::roleOf))
                 .build();
 
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.setAuthenticator(authenticator);
+                http.authentication = scheme(authenticator);
                 http.rules(rules -> {
                     rules.add("/api/*", GET, Rules.allow());
                     rules.add("/api/*", POST, Rules.authenticated());
-                    rules.setFallback(Rules.deny());
+                    rules.fallback = Rules.deny();
                 });
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
@@ -160,18 +202,18 @@ class JwtJavaInteropIT {
     @Test
     void one_stop_jwt_config_is_callable_from_java_via_static_method() {
         // The same Consumer-based `jwt { }` block Kotlin uses — surfaced to Java as a static
-        // method — including the bearerChallenge side-effect that a standalone authenticator
-        // factory could not wire.
+        // factory method returning an AuthenticationScheme.Sync — including the bearerChallenge
+        // side-effect that a standalone authenticator alone could not wire.
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                JwtSecurity.jwt(http, jwt -> {
-                    jwt.setDecoder(testDecoder);
-                    jwt.setKeySource(JwtKeySource.secret("test-secret"));
-                    jwt.setAuthoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"));
-                    jwt.setBearerChallenge(true);
-                    jwt.setRealm("JavaTest");
+                http.authentication = JwtSecurity.jwt(jwt -> {
+                    jwt.decoder = testDecoder;
+                    jwt.keySource = JwtKeySource.secret("test-secret");
+                    jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", JwtJavaInteropIT::roleOf);
+                    jwt.bearerChallenge = true;
+                    jwt.realm = "JavaTest";
                 });
-                http.rules(rules -> rules.setFallback(Rules.authenticated()));
+                http.rules(rules -> rules.fallback = Rules.authenticated());
             })));
             config.routes.get("/secured", ctx -> ctx.result("ok"));
         });
@@ -199,9 +241,8 @@ class JwtJavaInteropIT {
 
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.setAuthenticator(authenticator);
-                http.setUnauthorizedHandler(challenge);
-                http.rules(rules -> rules.setFallback(Rules.authenticated()));
+                http.authentication = scheme(authenticator, challenge, ForbiddenHandler.getDEFAULT());
+                http.rules(rules -> rules.fallback = Rules.authenticated());
             })));
             config.routes.get("/secured", ctx -> ctx.result("ok"));
         });

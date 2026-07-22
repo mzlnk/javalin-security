@@ -32,23 +32,24 @@ class JavalinSecurityWsIT {
 
     // ── test helpers ──────────────────────────────────────────────────────────
 
+    private enum class Role : RouteRole { ADMIN }
+
     private val headerAuthenticator = Authenticator { ctx ->
         when (val user = ctx.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             "invalid" -> AuthenticationResult.Failure(message = "super secret internal reason")
             else -> {
-                val authorities = ctx.header("X-Authorities")
+                val roles = ctx.header("X-Roles")
                     ?.split(",")
                     ?.map { it.trim() }
                     ?.filter { it.isNotEmpty() }
+                    ?.mapNotNull { name -> Role.entries.find { it.name == name } }
                     ?.toSet()
                     ?: emptySet()
-                AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user), authorities))
+                AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user), roles))
             }
         }
     }
-
-    private enum class Role : RouteRole { ADMIN }
 
     /**
      * Attempts a WebSocket upgrade and returns (connected, statusCodeOnFailure).
@@ -132,7 +133,7 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.authenticator = headerAuthenticator
+                    ws.authentication = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -152,7 +153,7 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     // empty rule set — everything denied by default
-                    ws.authenticator = headerAuthenticator
+                    ws.authentication = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -170,7 +171,7 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/other/*", r.authenticated) } // rule for a different path
-                    ws.authenticator = headerAuthenticator
+                    ws.authentication = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -206,7 +207,7 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.authenticator = headerAuthenticator
+                    ws.authentication = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -218,16 +219,18 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `authenticated caller with required authority is allowed`() = JavalinTest.test(
+    fun `authenticated caller with required role is allowed`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.hasAuthority("ADMIN")) }
-                    ws.authenticator = Authenticator {
-                        AuthenticationResult.Success(
-                            Authentication.authenticated(TestPrincipal("alice"), "ADMIN"),
-                        )
-                    }
+                    ws.rules { r -> r.add("/ws/*", r.hasRole(Role.ADMIN)) }
+                    ws.authentication = syncScheme(
+                        Authenticator {
+                            AuthenticationResult.Success(
+                                Authentication.authenticated(TestPrincipal("alice"), Role.ADMIN),
+                            )
+                        },
+                    )
                 }
             }
             cfg.routes.ws("/ws/admin") { }
@@ -238,15 +241,15 @@ class JavalinSecurityWsIT {
         assertThat(connected).isTrue()
     }
 
-    // ── forbidden: authenticated but missing authority ────────────────────────
+    // ── forbidden: authenticated but missing role ─────────────────────────────
 
     @Test
-    fun `authenticated caller without required authority is denied with 403`() = JavalinTest.test(
+    fun `authenticated caller without required role is denied with 403`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.hasAuthority("ADMIN")) }
-                    ws.authenticator = headerAuthenticator
+                    ws.rules { r -> r.add("/ws/*", r.hasRole(Role.ADMIN)) }
+                    ws.authentication = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.ws("/ws/admin") { }
@@ -290,7 +293,7 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authenticator = headerAuthenticator
+                    ws.authentication = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -308,7 +311,7 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authenticator = headerAuthenticator
+                    ws.authentication = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -327,9 +330,11 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.unauthorizedHandler = { ctx, _ ->
-                        ctx.status(401).result("custom-ws-401")
-                    }
+                    ws.authentication = syncScheme(
+                        unauthorizedHandler = { ctx, _ ->
+                            ctx.status(401).result("custom-ws-401")
+                        },
+                    )
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -346,11 +351,13 @@ class JavalinSecurityWsIT {
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.hasAuthority("ADMIN")) }
-                    ws.authenticator = headerAuthenticator
-                    ws.forbiddenHandler = { ctx, _ ->
-                        ctx.status(403).result("custom-ws-403")
-                    }
+                    ws.rules { r -> r.add("/ws/*", r.hasRole(Role.ADMIN)) }
+                    ws.authentication = syncScheme(
+                        authenticator = headerAuthenticator,
+                        forbiddenHandler = { ctx, _ ->
+                            ctx.status(403).result("custom-ws-403")
+                        },
+                    )
                 }
             }
             cfg.routes.ws("/ws/admin") { }
@@ -397,16 +404,18 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.asyncAuthenticator = { ctx ->
-                        CompletableFuture.supplyAsync {
-                            val user = ctx.header("X-User")
-                            if (user != null) {
-                                AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user)))
-                            } else {
-                                AuthenticationResult.NotAuthenticated
+                    ws.authentication = asyncScheme(
+                        { ctx ->
+                            CompletableFuture.supplyAsync {
+                                val user = ctx.header("X-User")
+                                if (user != null) {
+                                    AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user)))
+                                } else {
+                                    AuthenticationResult.NotAuthenticated
+                                }
                             }
-                        }
-                    }
+                        },
+                    )
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -428,11 +437,13 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.asyncAuthenticator = { _ ->
-                        CompletableFuture.completedFuture(
-                            AuthenticationResult.Failure("async credential failure"),
-                        )
-                    }
+                    ws.authentication = asyncScheme(
+                        { _ ->
+                            CompletableFuture.completedFuture(
+                                AuthenticationResult.Failure("async credential failure"),
+                            )
+                        },
+                    )
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -450,11 +461,13 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.asyncAuthenticator = { _ ->
-                        CompletableFuture.completedFuture(
-                            AuthenticationResult.Failure("async credential failure"),
-                        )
-                    }
+                    ws.authentication = asyncScheme(
+                        { _ ->
+                            CompletableFuture.completedFuture(
+                                AuthenticationResult.Failure("async credential failure"),
+                            )
+                        },
+                    )
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -471,9 +484,9 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.asyncAuthenticator = { _ ->
-                        CompletableFuture.failedFuture(RuntimeException("internal IdP crash"))
-                    }
+                    ws.authentication = asyncScheme(
+                        { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP crash")) },
+                    )
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -491,9 +504,9 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.asyncAuthenticator = { _ ->
-                        CompletableFuture.failedFuture(RuntimeException("internal IdP crash"))
-                    }
+                    ws.authentication = asyncScheme(
+                        { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP crash")) },
+                    )
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -510,9 +523,9 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.asyncAuthenticator = { _ ->
-                        throw IllegalStateException("sync crash in async ws authenticator")
-                    }
+                    ws.authentication = asyncScheme(
+                        { _ -> throw IllegalStateException("sync crash in async ws authenticator") },
+                    )
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -530,9 +543,9 @@ class JavalinSecurityWsIT {
             cfg.security { security ->
                 security.ws { ws ->
                     ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.asyncAuthenticator = { _ ->
-                        throw IllegalStateException("sync crash in async ws authenticator")
-                    }
+                    ws.authentication = asyncScheme(
+                        { _ -> throw IllegalStateException("sync crash in async ws authenticator") },
+                    )
                 }
             }
             cfg.routes.ws("/ws/chat") { }
@@ -555,7 +568,7 @@ class JavalinSecurityWsIT {
                 cfg.security { security ->
                     security.ws { ws ->
                         ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                        ws.authenticator = headerAuthenticator
+                        ws.authentication = syncScheme(headerAuthenticator)
                     }
                 }
                 cfg.routes.ws("/ws/chat") { ws ->
@@ -588,16 +601,11 @@ class JavalinSecurityWsIT {
     }
 
     @Test
-    fun `a WS endpoint with declared roles is granted when roleMapper maps a matching role`() = JavalinTest.test(
+    fun `a WS endpoint with declared roles is granted when the caller holds a matching role`() = JavalinTest.test(
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.ws { ws ->
-                    ws.authenticator = headerAuthenticator
-                    ws.roleMapper = RoleMapper { authentication, _ ->
-                        authentication.authorities.mapNotNull { authority ->
-                            runCatching { Role.valueOf(authority) }.getOrNull()
-                        }.toSet()
-                    }
+                    ws.authentication = syncScheme(headerAuthenticator)
                     ws.rules { r -> r.fallback = r.deny } // rule table must NOT be consulted
                 }
             }
@@ -612,8 +620,8 @@ class JavalinSecurityWsIT {
         val (_, forbiddenCode) = tryConnect(client.origin, "/ws/admin", "X-User" to "bob")
         assertThat(forbiddenCode).isEqualTo(403)
 
-        // authenticated with the role, granted by role mapping (not the deny rule table)
-        val (granted, _) = tryConnect(client.origin, "/ws/admin", "X-User" to "alice", "X-Authorities" to "ADMIN")
+        // authenticated with the role, granted directly from authentication.roles (not the deny rule table)
+        val (granted, _) = tryConnect(client.origin, "/ws/admin", "X-User" to "alice", "X-Roles" to "ADMIN")
         assertThat(granted).isTrue()
     }
 }

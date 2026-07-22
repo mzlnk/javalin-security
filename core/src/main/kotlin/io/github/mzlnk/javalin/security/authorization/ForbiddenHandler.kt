@@ -22,6 +22,7 @@ fun interface ForbiddenHandler {
     companion object {
 
         /** The default handler: a bare `403 Forbidden`. */
+        @JvmStatic
         val DEFAULT: ForbiddenHandler = ForbiddenHandler { _, _ -> throw ForbiddenResponse() }
 
     }

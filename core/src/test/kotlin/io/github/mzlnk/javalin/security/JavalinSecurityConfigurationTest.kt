@@ -1,12 +1,12 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.Rules
 import io.javalin.config.JavalinState
 import io.javalin.http.HandlerType.GET
 import org.assertj.core.api.Assertions.assertThatCode
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CompletableFuture
 
@@ -14,9 +14,13 @@ import java.util.concurrent.CompletableFuture
  * Startup validation and last-write-wins semantics of [SecurityConfig] and its sub-configs.
  *
  * All fields are plain `var`s with no set-once guards: assigning a field more than once simply
- * keeps the last value, matching Javalin's own subconfigs. Only genuine cross-field invariants
- * (mutually-exclusive authenticators, non-empty [io.github.mzlnk.javalin.security.ws.WsSecurityConfig.allowedOrigins])
- * are validated - and only once the plugin starts, since [SecurityConfig] itself performs no
+ * keeps the last value, matching Javalin's own subconfigs. Sync-vs-async authentication is
+ * mutually exclusive by construction — an [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme]
+ * is either [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Sync] or
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Async], never both — so
+ * there is no such runtime check left to perform. Only genuine cross-field invariants
+ * (non-empty [io.github.mzlnk.javalin.security.ws.WsSecurityConfig.allowedOrigins]) are still
+ * validated, and only once the plugin starts, since [SecurityConfig] itself performs no
  * validation while being mutated.
  */
 class JavalinSecurityConfigurationTest {
@@ -26,51 +30,27 @@ class JavalinSecurityConfigurationTest {
         JavalinSecurityPlugin { configure(it) }.onStart(JavalinState())
     }
 
-    // ── sync/async mutual exclusion ────────────────────────────────────────────
+    // ── sync/async mutual exclusion is now a type-level guarantee ─────────────
 
     @Test
-    fun `should fail fast when both a sync and async authenticator are configured for http`() {
-        assertThatThrownBy {
-            start { security ->
-                security.http { http ->
-                    http.authenticator = { AuthenticationResult.NotAuthenticated }
-                    http.asyncAuthenticator = { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) }
-                }
-            }
-        }
-            .isInstanceOf(SecurityConfigurationException::class.java)
-            .hasMessageContaining("mutually exclusive")
-    }
-
-    @Test
-    fun `should fail fast when both a sync and async authenticator are configured for ws`() {
-        assertThatThrownBy {
-            start { security ->
-                security.ws { ws ->
-                    ws.authenticator = { AuthenticationResult.NotAuthenticated }
-                    ws.asyncAuthenticator = { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) }
-                }
-            }
-        }
-            .isInstanceOf(SecurityConfigurationException::class.java)
-            .hasMessageContaining("mutually exclusive")
-    }
-
-    @Test
-    fun `should allow a sync authenticator on its own`() {
+    fun `should allow a sync scheme on its own`() {
         assertThatCode {
             start { security ->
-                security.http { http -> http.authenticator = { AuthenticationResult.NotAuthenticated } }
+                security.http { http ->
+                    http.authentication = syncScheme(Authenticator { AuthenticationResult.NotAuthenticated })
+                }
             }
         }.doesNotThrowAnyException()
     }
 
     @Test
-    fun `should allow an async authenticator on its own`() {
+    fun `should allow an async scheme on its own`() {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.asyncAuthenticator = { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) }
+                    http.authentication = asyncScheme(
+                        { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) },
+                    )
                 }
             }
         }.doesNotThrowAnyException()
@@ -79,13 +59,23 @@ class JavalinSecurityConfigurationTest {
     // ── last-write-wins: no set-once guards ────────────────────────────────────
 
     @Test
-    fun `should keep only the last assigned authenticator, with no exception`() {
+    fun `should keep only the last assigned authentication scheme, with no exception`() {
         var lastAuthenticatorInvoked: String? = null
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.authenticator = { lastAuthenticatorInvoked = "first"; AuthenticationResult.NotAuthenticated }
-                    http.authenticator = { lastAuthenticatorInvoked = "second"; AuthenticationResult.NotAuthenticated }
+                    http.authentication = syncScheme(
+                        Authenticator {
+                            lastAuthenticatorInvoked = "first"
+                            AuthenticationResult.NotAuthenticated
+                        },
+                    )
+                    http.authentication = syncScheme(
+                        Authenticator {
+                            lastAuthenticatorInvoked = "second"
+                            AuthenticationResult.NotAuthenticated
+                        },
+                    )
                 }
             }
         }.doesNotThrowAnyException()
@@ -98,8 +88,8 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.unauthorizedHandler = first
-                    http.unauthorizedHandler = second
+                    http.authentication = syncScheme(unauthorizedHandler = first)
+                    http.authentication = syncScheme(unauthorizedHandler = second)
                 }
             }
         }.doesNotThrowAnyException()

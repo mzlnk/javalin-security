@@ -9,6 +9,7 @@ import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.github.mzlnk.javalin.security.jwt.nimbus.NimbusJwtDecoder
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
+import io.javalin.security.RouteRole
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -25,13 +26,17 @@ import java.util.concurrent.atomic.AtomicReference
 import java.net.http.HttpClient as JdkHttpClient
 
 /**
- * Integration tests for the `jwt { }` extension wired through `config.security { it.ws { jwt { } } }`.
+ * Integration tests for the `jwt { }` scheme factory assigned via `ws.authentication = jwt { }`.
  *
  * Mirrors [JwtSecurityIT] (HTTP) and reuses the WS upgrade-attempt harness pattern from
  * `JavalinSecurityWsIT` in `javalin-security-core` — the decoder here is the real
  * [NimbusJwtDecoder], with tokens signed in-test against a locally generated RSA key pair.
  */
 class JwtWsSecurityIT {
+
+    private enum class Role : RouteRole { ADMIN, USER }
+
+    private val roleOf: (String) -> RouteRole? = { name -> Role.entries.find { it.name == name } }
 
     private val keyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.genKeyPair()
 
@@ -50,14 +55,14 @@ class JwtWsSecurityIT {
     private fun bearerApp(): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
             security.ws { ws ->
-                ws.jwt { jwt ->
+                ws.authentication = jwt { jwt ->
                     jwt.decoder = NimbusJwtDecoder
                     jwt.keySource = JwtKeySource.publicKey(keyPair.public)
-                    jwt.authoritiesMapper = JwtAuthoritiesMapper.fromClaim("roles")
+                    jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
                 }
                 ws.rules { r ->
                     r.add("/ws/chat", r.authenticated)
-                    r.add("/ws/admin", r.hasAuthority("ADMIN"))
+                    r.add("/ws/admin", r.hasRole(Role.ADMIN))
                 }
             }
         }
@@ -68,7 +73,7 @@ class JwtWsSecurityIT {
     private fun cookieApp(): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
             security.ws { ws ->
-                ws.jwt { jwt ->
+                ws.authentication = jwt { jwt ->
                     jwt.decoder = NimbusJwtDecoder
                     jwt.keySource = JwtKeySource.publicKey(keyPair.public)
                     jwt.tokenResolver = TokenResolver.cookie("access_token")
@@ -130,7 +135,7 @@ class JwtWsSecurityIT {
     }
 
     @Test
-    fun `should allow upgrade when caller holds the required authority`() = JavalinTest.test(bearerApp()) { _, client ->
+    fun `should allow upgrade when caller holds the required role`() = JavalinTest.test(bearerApp()) { _, client ->
         val (connected, _) = tryConnect(
             client.origin,
             "/ws/admin",
@@ -141,7 +146,7 @@ class JwtWsSecurityIT {
     }
 
     @Test
-    fun `should reject upgrade with 403 when authenticated caller lacks required authority`() =
+    fun `should reject upgrade with 403 when authenticated caller lacks required role`() =
         JavalinTest.test(bearerApp()) { _, client ->
             val (connected, code) = tryConnect(
                 client.origin,

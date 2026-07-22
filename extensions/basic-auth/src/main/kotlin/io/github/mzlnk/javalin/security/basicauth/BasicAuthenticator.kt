@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory
  *    with a wrong password.
  * 3. Compare the supplied raw password against the stored [BasicUser.password] via
  *    [PasswordEncoder]. A mismatch -> [AuthenticationResult.Failure].
- * 4. Return [AuthenticationResult.Success] with a [BasicAuthPrincipal] and the user's authorities.
+ * 4. Return [AuthenticationResult.Success] with a [BasicAuthPrincipal] and the user's roles.
  *
  * Construct via the `basicAuth { }` block (which assigns it to `http.authenticator`) or use
  * [Builder] to obtain an instance directly.
@@ -54,7 +54,7 @@ class BasicAuthenticator private constructor(
         }
 
         val principal = BasicAuthPrincipal(user.username)
-        return AuthenticationResult.Success(Authentication.authenticated(principal, user.authorities))
+        return AuthenticationResult.Success(Authentication.authenticated(principal, user.roles))
     }
 
     /**

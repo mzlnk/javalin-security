@@ -8,11 +8,11 @@ import io.javalin.http.Context
  * An [UnauthorizedHandler] that includes a `WWW-Authenticate: Bearer` challenge in the 401 response.
  *
  * This is opt-in behavior. To activate it, set `bearerChallenge = true` inside the `jwt { }`
- * block, or assign an instance directly to `http.unauthorizedHandler` / `ws.unauthorizedHandler`:
+ * block:
  *
  * ```kotlin
  * http { http ->
- *     http.jwt { jwt ->
+ *     http.authentication = jwt { jwt ->
  *         jwt.decoder = myDecoder
  *         jwt.bearerChallenge = true    // emits WWW-Authenticate header
  *         jwt.realm = "My API"          // optional, defaults to "API"

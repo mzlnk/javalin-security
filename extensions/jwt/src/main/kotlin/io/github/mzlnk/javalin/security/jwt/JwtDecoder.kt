@@ -13,7 +13,7 @@ package io.github.mzlnk.javalin.security.jwt
  * The implementation is deliberately thin: it does only verification and decoding for the given
  * [JwtVerification] spec — it does not decide *which* key source or claim checks to use (that is
  * the addon's job, configured via the `jwt { }` DSL). It does not decide how extracted claims map
- * to authorities (see [JwtAuthoritiesMapper]) and does not interact with the request context.
+ * to roles (see [JwtRolesMapper]) and does not interact with the request context.
  *
  * Library-specific adapters (e.g. `NimbusJwtDecoder`) are expected to be stateless Kotlin
  * `object`s — analogous to how Javalin's `JavalinJackson` implements `JsonMapper` — since all

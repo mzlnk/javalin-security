@@ -9,7 +9,7 @@ import io.javalin.http.HandlerType
  * The HTTP pattern-based rule table, configured via `http.rules { }`.
  *
  * Implements [RuleFactory] via delegation so the built-in rules ([allow], [deny], [authenticated],
- * [hasAuthority], etc.) are available as unqualified names inside the block, e.g.
+ * [hasRole], etc.) are available as unqualified names inside the block, e.g.
  * `add("/api/...", GET, allow)`.
  *
  * This table is the fallback mechanism for authorization: a request whose matched route declares
@@ -54,6 +54,7 @@ class SecurityRules internal constructor() : RuleFactory by DefaultRules {
      * guarantee. Set to `allow` to open every otherwise-uncovered path, or `authenticated` to
      * require login by default.
      */
+    @JvmField
     var fallback: Rule? = null
 
     /**
@@ -69,6 +70,7 @@ class SecurityRules internal constructor() : RuleFactory by DefaultRules {
      * response headers; this flag only controls whether the security guard passes the preflight
      * request through.
      */
+    @JvmField
     var allowCorsPreflight: Boolean = false
 
 }

@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory
  *    No token -> [AuthenticationResult.NotAuthenticated] (anonymous; authorization rules decide access).
  * 2. Call [JwtDecoder.decode] with the configured [JwtVerification]. Any thrown exception ->
  *    [AuthenticationResult.Failure] (logged; 401).
- * 3. Map the [DecodedJwt] to a [JwtPrincipal] and resolve authorities via [JwtAuthoritiesMapper].
+ * 3. Map the [DecodedJwt] to a [JwtPrincipal] and resolve roles via [JwtRolesMapper].
  * 4. Return [AuthenticationResult.Success] with the populated [Authentication].
  *
  * Construct via the `jwt { }` block (which assigns it to `http.authenticator` or
@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory
 class JwtAuthenticator private constructor(
     private val decoder: JwtDecoder,
     private val verification: JwtVerification,
-    private val authoritiesMapper: JwtAuthoritiesMapper,
+    private val rolesMapper: JwtRolesMapper,
     private val tokenResolver: TokenResolver,
 ) : Authenticator {
 
@@ -40,8 +40,8 @@ class JwtAuthenticator private constructor(
         }
 
         val principal = JwtPrincipal(decoded)
-        val authorities = authoritiesMapper.map(decoded)
-        return AuthenticationResult.Success(Authentication.authenticated(principal, authorities))
+        val roles = rolesMapper.map(decoded)
+        return AuthenticationResult.Success(Authentication.authenticated(principal, roles))
     }
 
     /**
@@ -52,7 +52,7 @@ class JwtAuthenticator private constructor(
      * ```java
      * JwtVerification verification = JwtVerification.builder(JwtKeySource.publicKey(rsaKey)).build();
      * JwtAuthenticator authenticator = JwtAuthenticator.builder(NimbusJwtDecoder.INSTANCE, verification)
-     *     .authoritiesMapper(JwtAuthoritiesMapper.fromClaim("roles"))
+     *     .rolesMapper(JwtRolesMapper.fromClaim("roles", name -> Role.valueOf(name)))
      *     .build();
      * ```
      */
@@ -61,11 +61,11 @@ class JwtAuthenticator private constructor(
         private val verification: JwtVerification,
     ) {
 
-        private var authoritiesMapper: JwtAuthoritiesMapper = JwtAuthoritiesMapper.noAuthorities()
+        private var rolesMapper: JwtRolesMapper = JwtRolesMapper.noRoles()
         private var tokenResolver: TokenResolver = TokenResolver.DEFAULT
 
-        fun authoritiesMapper(mapper: JwtAuthoritiesMapper): Builder {
-            this.authoritiesMapper = mapper
+        fun rolesMapper(mapper: JwtRolesMapper): Builder {
+            this.rolesMapper = mapper
             return this
         }
 
@@ -81,7 +81,7 @@ class JwtAuthenticator private constructor(
         fun build(): JwtAuthenticator = JwtAuthenticator(
             decoder = decoder,
             verification = verification,
-            authoritiesMapper = authoritiesMapper,
+            rolesMapper = rolesMapper,
             tokenResolver = tokenResolver,
         )
 

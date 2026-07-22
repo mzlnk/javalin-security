@@ -3,16 +3,17 @@
 package io.github.mzlnk.javalin.security.jwt
 
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
+import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme
+import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
+import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
-import io.github.mzlnk.javalin.security.http.HttpSecurityConfig
-import io.github.mzlnk.javalin.security.ws.WsSecurityConfig
 import java.util.function.Consumer
 
 /**
- * Configuration object for the `jwt { }` block inside `http { }` / `ws { }`.
+ * Configuration object for the [jwt] scheme factory.
  *
- * Configures JWT bearer-token authentication and wires it into the security pipeline.
- * [decoder] and [keySource] are the only required fields; all other settings have defaults.
+ * Configures JWT bearer-token authentication. [decoder] and [keySource] are the only required
+ * fields; all other settings have defaults.
  *
  * The addon (this config) owns the decision of *where the verification key comes from* and *which
  * claims are checked* — [keySource], [issuer], [audiences], [clockSkewSeconds] — as well as
@@ -20,16 +21,17 @@ import java.util.function.Consumer
  * stateless adapter (e.g. `NimbusJwtDecoder`) that only performs the actual signature
  * verification and claim checks for the [JwtVerification] built from these fields.
  *
- * What this block does explicitly:
- * - Builds a [JwtVerification] from [keySource], [issuer], [audiences] and [clockSkewSeconds].
- * - Sets `authenticator` on the receiving [HttpSecurityConfig]/[WsSecurityConfig] to a
- *   [JwtAuthenticator] built from [decoder], that [JwtVerification], and [authoritiesMapper].
- * - When [bearerChallenge] is `true`, also sets `unauthorizedHandler` to a
- *   [BearerChallengeUnauthorizedHandler]. This is the only additional side-effect and is opt-in.
+ * What [jwt] builds from this config:
+ * - A [JwtVerification] from [keySource], [issuer], [audiences] and [clockSkewSeconds].
+ * - A [JwtAuthenticator] from [decoder], that [JwtVerification], and [rolesMapper] — the
+ *   [AuthenticationScheme.Sync.authenticator] of the returned scheme. The roles resolved by
+ *   [rolesMapper] land directly on [io.github.mzlnk.javalin.security.authentication.Authentication.roles].
+ * - The scheme's [AuthenticationScheme.forbiddenHandler] directly from [forbiddenHandler].
+ * - The scheme's [AuthenticationScheme.unauthorizedHandler]: a [BearerChallengeUnauthorizedHandler]
+ *   when [bearerChallenge] is `true`, otherwise [UnauthorizedHandler.DEFAULT].
  *
- * What this block does NOT do:
- * - It does not configure the rule table — use `http.rules { }` / `ws.rules { }` alongside `jwt { }`.
- * - It does not override `forbiddenHandler` — configure it separately if needed.
+ * This config does not configure the rule table — use `http.rules { }` / `ws.rules { }` alongside
+ * `http.authentication = jwt { }`.
  */
 class JwtConfig internal constructor() {
 
@@ -39,8 +41,9 @@ class JwtConfig internal constructor() {
      * Expected to be a stateless implementation (e.g. the `NimbusJwtDecoder` object) that performs
      * verification purely from the [JwtVerification] built from this block's other fields.
      *
-     * Throws [SecurityConfigurationException] if `null` when the authenticator is built.
+     * Throws [SecurityConfigurationException] if `null` when the scheme is built.
      */
+    @JvmField
     var decoder: JwtDecoder? = null
 
     /**
@@ -49,8 +52,9 @@ class JwtConfig internal constructor() {
      *
      * See [JwtKeySource]'s factory methods (`publicKey`, `pem`, `pemFile`, `secret`, `jwks`, ...).
      *
-     * Throws [SecurityConfigurationException] if `null` when the authenticator is built.
+     * Throws [SecurityConfigurationException] if `null` when the scheme is built.
      */
+    @JvmField
     var keySource: JwtKeySource? = null
 
     /**
@@ -59,6 +63,7 @@ class JwtConfig internal constructor() {
      * Defaults to `null` (issuer not checked). Tokens with a different or absent issuer are
      * rejected when set.
      */
+    @JvmField
     var issuer: String? = null
 
     /**
@@ -66,6 +71,7 @@ class JwtConfig internal constructor() {
      *
      * Defaults to an empty set (audience not checked).
      */
+    @JvmField
     var audiences: Set<String> = emptySet()
 
     /**
@@ -73,15 +79,28 @@ class JwtConfig internal constructor() {
      *
      * Defaults to `60` seconds. Set to `0` to disable clock skew tolerance.
      */
+    @JvmField
     var clockSkewSeconds: Int = 60
 
     /**
-     * Maps a verified [DecodedJwt] to the caller's granted authorities.
+     * Maps a verified [DecodedJwt] to the caller's granted [io.javalin.security.RouteRole]s.
      *
-     * Defaults to [JwtAuthoritiesMapper.noAuthorities] (empty set). Authorization rules that rely
-     * on specific authorities (e.g. `hasAuthority("ADMIN")`) require a non-default mapper.
+     * Defaults to [JwtRolesMapper.noRoles] (empty set). Routes/endpoints that declare
+     * [io.javalin.security.RouteRole]s directly, and authorization rules that rely on specific
+     * roles (e.g. `hasRole(Role.ADMIN)`), require a non-default mapper — see
+     * [JwtRolesMapper.fromClaim] / [JwtRolesMapper.fromScope].
      */
-    var authoritiesMapper: JwtAuthoritiesMapper = JwtAuthoritiesMapper.noAuthorities()
+    @JvmField
+    var rolesMapper: JwtRolesMapper = JwtRolesMapper.noRoles()
+
+    /**
+     * The scheme's [AuthenticationScheme.forbiddenHandler].
+     *
+     * Overrides how access-denied for an authenticated caller is rendered. Defaults to a bare
+     * HTTP 403.
+     */
+    @JvmField
+    var forbiddenHandler: ForbiddenHandler = ForbiddenHandler.DEFAULT
 
     /**
      * When `true`, failed or absent authentication responds with a
@@ -90,6 +109,7 @@ class JwtConfig internal constructor() {
      * Defaults to `false`. Enable when clients need the challenge to discover the authentication
      * scheme (e.g. OAuth 2.0 resource servers per RFC 6750).
      */
+    @JvmField
     var bearerChallenge: Boolean = false
 
     /**
@@ -97,6 +117,7 @@ class JwtConfig internal constructor() {
      *
      * Defaults to `"API"`.
      */
+    @JvmField
     var realm: String = "API"
 
     /**
@@ -106,12 +127,13 @@ class JwtConfig internal constructor() {
      * in [TokenResolver.cookie] for browser/SPA flows that store the JWT in a cookie instead:
      *
      * ```kotlin
-     * http.jwt { jwt ->
+     * http.authentication = jwt { jwt ->
      *     jwt.decoder = myDecoder
      *     jwt.tokenResolver = TokenResolver.cookie("access_token")
      * }
      * ```
      */
+    @JvmField
     var tokenResolver: TokenResolver = TokenResolver.DEFAULT
 
     internal fun buildAuthenticator(): JwtAuthenticator {
@@ -130,57 +152,38 @@ class JwtConfig internal constructor() {
             .clockSkew(clockSkewSeconds)
             .build()
         return JwtAuthenticator.builder(d, verification)
-            .authoritiesMapper(authoritiesMapper)
+            .rolesMapper(rolesMapper)
             .tokenResolver(tokenResolver)
             .build()
     }
 
-    internal fun buildChallenge(): BearerChallengeUnauthorizedHandler =
-        BearerChallengeUnauthorizedHandler(realm)
+    internal fun buildUnauthorizedHandler(): UnauthorizedHandler =
+        if (bearerChallenge) BearerChallengeUnauthorizedHandler(realm) else UnauthorizedHandler.DEFAULT
 
 }
 
 /**
- * Configures JWT bearer-token authentication inside an `http { }` block.
+ * Builds an [AuthenticationScheme.Sync] configured for JWT bearer-token authentication.
  *
  * The same one-stop configuration works from both languages — the [JwtConfig] arrives as an
- * explicit `Consumer` parameter, just like every other configuration block in this library:
+ * explicit `Consumer` parameter, just like every other configuration block in this library, and
+ * the returned scheme is assigned directly to `http.authentication` / `ws.authentication`:
  *
  * ```kotlin
- * http.jwt { jwt ->
+ * http.authentication = jwt { jwt ->
  *     jwt.decoder = NimbusJwtDecoder
  *     jwt.keySource = JwtKeySource.pemFile(path)
  * }
  * ```
  *
  * ```java
- * JwtSecurity.jwt(http, jwt -> {
- *     jwt.setDecoder(NimbusJwtDecoder.INSTANCE);
- *     jwt.setKeySource(JwtKeySource.pemFile(path));
+ * http.authentication = JwtSecurity.jwt(jwt -> {
+ *     jwt.decoder = NimbusJwtDecoder.INSTANCE;
+ *     jwt.keySource = JwtKeySource.pemFile(path);
  * });
  * ```
  *
- * Users who want the authenticator object itself (e.g. to share it between blocks) can build one
- * via [JwtAuthenticator.builder] and assign it to `http.authenticator` directly.
- *
- * The [JwtConfig.decoder] and [JwtConfig.keySource] fields are the only required settings.
- */
-fun HttpSecurityConfig.jwt(configure: Consumer<JwtConfig>) {
-    val config = JwtConfig().also(configure::accept)
-    authenticator = config.buildAuthenticator()
-    if (config.bearerChallenge) {
-        unauthorizedHandler = config.buildChallenge()
-    }
-}
-
-/**
- * Configures JWT bearer-token authentication inside a `ws { }` block.
- *
- * Mirrors the `http { }` extension exactly — it builds the same [JwtAuthenticator] from
- * [JwtConfig.decoder]/[JwtConfig.keySource]/[JwtConfig.authoritiesMapper] and assigns it to
- * `ws.authenticator`. When [JwtConfig.bearerChallenge] is `true`, it also sets
- * `ws.unauthorizedHandler` to a [BearerChallengeUnauthorizedHandler].
- *
+ * The same scheme works for both `http.authentication` and `ws.authentication`.
  * **Browser clients cannot set an `Authorization` header on a WebSocket handshake.** For
  * browser/SPA flows, set `tokenResolver = TokenResolver.cookie("...")` and pair it with
  * `ws.allowedOrigins` on the surrounding `ws { }` block — WebSocket handshakes are not
@@ -189,7 +192,7 @@ fun HttpSecurityConfig.jwt(configure: Consumer<JwtConfig>) {
  *
  * ```kotlin
  * ws { ws ->
- *     ws.jwt { jwt ->
+ *     ws.authentication = jwt { jwt ->
  *         jwt.decoder = NimbusJwtDecoder
  *         jwt.keySource = JwtKeySource.publicKey(rsaPublicKey)
  *         jwt.tokenResolver = TokenResolver.cookie("access_token")
@@ -199,12 +202,20 @@ fun HttpSecurityConfig.jwt(configure: Consumer<JwtConfig>) {
  * }
  * ```
  *
+ * Users who want the [JwtAuthenticator] object itself (e.g. to share it between blocks) can build
+ * one via [JwtAuthenticator.builder] and wrap it in a custom [AuthenticationScheme.Sync]
+ * implementation.
+ *
  * The [JwtConfig.decoder] and [JwtConfig.keySource] fields are the only required settings.
  */
-fun WsSecurityConfig.jwt(configure: Consumer<JwtConfig>) {
+fun jwt(configure: Consumer<JwtConfig>): AuthenticationScheme.Sync {
     val config = JwtConfig().also(configure::accept)
-    authenticator = config.buildAuthenticator()
-    if (config.bearerChallenge) {
-        unauthorizedHandler = config.buildChallenge()
+    val authenticator = config.buildAuthenticator()
+    val unauthorizedHandlerValue = config.buildUnauthorizedHandler()
+    val forbiddenHandlerValue = config.forbiddenHandler
+    return object : AuthenticationScheme.Sync {
+        override val unauthorizedHandler: UnauthorizedHandler get() = unauthorizedHandlerValue
+        override val forbiddenHandler: ForbiddenHandler get() = forbiddenHandlerValue
+        override fun authenticator() = authenticator
     }
 }

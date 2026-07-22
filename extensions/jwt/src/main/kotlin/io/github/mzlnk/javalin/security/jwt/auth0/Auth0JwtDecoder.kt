@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Register it as the decoder:
  *
  * ```kotlin
- * http.jwt { jwt ->
+ * http.authentication = jwt { jwt ->
  *     jwt.decoder = Auth0JwtDecoder
  *     jwt.keySource = JwtKeySource.publicKey(rsaPublicKey)
  * }

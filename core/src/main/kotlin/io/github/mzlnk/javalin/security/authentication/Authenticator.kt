@@ -13,8 +13,9 @@ import io.javalin.http.Context
  *
  * Implementations must not throw for the "no credentials present" case.
  *
- * Register via `http.authenticator = { ctx -> ... }`, or the fluent Java assignment
- * `http.authenticator = ctx -> ...`.
+ * Register by implementing [AuthenticationScheme.Sync] and returning this from
+ * [AuthenticationScheme.Sync.authenticator] — either directly, or via a companion library's
+ * scheme factory (e.g. `http.authentication = jwt { }`).
  */
 fun interface Authenticator {
 

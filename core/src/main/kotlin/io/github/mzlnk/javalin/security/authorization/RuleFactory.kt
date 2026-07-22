@@ -1,5 +1,7 @@
 package io.github.mzlnk.javalin.security.authorization
 
+import io.javalin.security.RouteRole
+
 /**
  * The set of built-in [Rule] factories, exposed as unqualified members inside a rule-declaration
  * block (e.g. `rules { add("/x", GET, allow) }`) via Kotlin interface delegation.
@@ -18,11 +20,11 @@ interface RuleFactory {
     /** Grants access to any authenticated caller. */
     val authenticated: Rule
 
-    /** Grants access when the caller holds the given [authority]. */
-    fun hasAuthority(authority: String): Rule
+    /** Grants access when the caller holds the given [role]. */
+    fun hasRole(role: RouteRole): Rule
 
-    /** Grants access when the caller holds at least one of the given [authorities]. */
-    fun hasAnyAuthority(vararg authorities: String): Rule
+    /** Grants access when the caller holds at least one of the given [roles]. */
+    fun hasAnyRole(vararg roles: RouteRole): Rule
 
 }
 
@@ -38,8 +40,8 @@ internal object DefaultRules : RuleFactory {
 
     override val authenticated: Rule get() = Rules.authenticated()
 
-    override fun hasAuthority(authority: String): Rule = Rules.hasAuthority(authority)
+    override fun hasRole(role: RouteRole): Rule = Rules.hasRole(role)
 
-    override fun hasAnyAuthority(vararg authorities: String): Rule = Rules.hasAnyAuthority(*authorities)
+    override fun hasAnyRole(vararg roles: RouteRole): Rule = Rules.hasAnyRole(*roles)
 
 }

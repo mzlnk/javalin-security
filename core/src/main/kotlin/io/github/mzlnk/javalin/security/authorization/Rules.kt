@@ -1,10 +1,12 @@
 package io.github.mzlnk.javalin.security.authorization
 
+import io.javalin.security.RouteRole
+
 /**
  * The single source of truth for built-in [Rule] logic.
  *
  * Java users call these `@JvmStatic` methods directly — e.g. `Rules.allow()`,
- * `Rules.hasAuthority("ADMIN")` — with no extra indirection.
+ * `Rules.hasRole(Role.ADMIN)` — with no extra indirection.
  *
  * Kotlin users access the same rules as unqualified DSL members inside a rule-declaration block
  * (e.g. `rules { }`) via [RuleFactory] delegation to [DefaultRules], which delegates here.
@@ -23,16 +25,23 @@ object Rules {
     @JvmStatic
     fun authenticated(): Rule = Rule { authentication, _ -> authentication.isAuthenticated }
 
-    /** Grants access when the caller holds the given [authority]. */
+    /**
+     * Grants access when the caller holds the given [role].
+     *
+     * Matching is a plain `role in authentication.roles` set-membership check, so it relies on
+     * [RouteRole] equality — enum constants and data classes compare correctly out of the box.
+     */
     @JvmStatic
-    fun hasAuthority(authority: String): Rule =
-        Rule { authentication, _ -> authentication.isAuthenticated && authority in authentication.authorities }
+    fun hasRole(role: RouteRole): Rule =
+        Rule { authentication, _ -> authentication.isAuthenticated && role in authentication.roles }
 
-    /** Grants access when the caller holds at least one of the given [authorities]. */
+    /**
+     * Grants access when the caller holds at least one of the given [roles].
+     *
+     * Matching is a plain set-membership check per [RouteRole] equality (see [hasRole]).
+     */
     @JvmStatic
-    fun hasAnyAuthority(vararg authorities: String): Rule =
-        Rule { authentication, _ ->
-            authentication.isAuthenticated && authorities.any { it in authentication.authorities }
-        }
+    fun hasAnyRole(vararg roles: RouteRole): Rule =
+        Rule { authentication, _ -> authentication.isAuthenticated && roles.any { it in authentication.roles } }
 
 }
