@@ -1,12 +1,6 @@
 package io.github.mzlnk.javalin.security.jwt
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
-import com.nimbusds.jose.crypto.RSASSASigner
-import com.nimbusds.jwt.JWTClaimsSet
-import com.nimbusds.jwt.SignedJWT
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
-import io.github.mzlnk.javalin.security.jwt.nimbus.NimbusJwtDecoder
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
 import io.javalin.security.RouteRole
@@ -16,9 +10,6 @@ import org.junit.jupiter.api.Test
 import java.net.URI
 import java.net.http.WebSocket
 import java.net.http.WebSocketHandshakeException
-import java.security.KeyPairGenerator
-import java.security.interfaces.RSAPrivateKey
-import java.util.Date
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -30,7 +21,16 @@ class JwtWsSecurityTest {
 
     private val roleOf: (String) -> RouteRole? = { name -> Role.entries.find { it.name == name } }
 
-    private val keyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.genKeyPair()
+    private val testDecoder = JwtDecoder { token, _ ->
+        if (!token.startsWith("valid|")) throw IllegalArgumentException("bad token")
+        val parts = token.split("|", limit = 3)
+        val subject = parts.getOrElse(1) { "" }
+        val roles = parts.getOrElse(2) { "" }.split(",").filter { it.isNotEmpty() }
+        SimpleDecodedJwt(
+            subject = subject,
+            claims = mapOf("sub" to subject, "roles" to roles),
+        )
+    }
 
     @Test
     fun `should reject an anonymous upgrade when the WS route requires authentication`() {
@@ -142,24 +142,15 @@ class JwtWsSecurityTest {
         }
     }
 
-    private fun token(subject: String, roles: List<String> = emptyList()): String {
-        val claims = JWTClaimsSet.Builder()
-            .subject(subject)
-            .claim("roles", roles)
-            .issueTime(Date())
-            .expirationTime(Date(System.currentTimeMillis() + 60_000))
-            .build()
-        val jwt = SignedJWT(JWSHeader(JWSAlgorithm.RS256), claims)
-        jwt.sign(RSASSASigner(keyPair.private as RSAPrivateKey))
-        return jwt.serialize()
-    }
+    private fun token(subject: String, roles: List<String> = emptyList()): String =
+        "valid|$subject|${roles.joinToString(",")}"
 
     private fun bearerApp(): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
             security.ws { ws ->
                 ws.authentication = jwt { jwt ->
-                    jwt.decoder = NimbusJwtDecoder
-                    jwt.keySource = JwtKeySource.publicKey(keyPair.public)
+                    jwt.decoder = testDecoder
+                    jwt.keySource = JwtKeySource.secret("test-secret")
                     jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
                 }
                 ws.rules { r ->
@@ -176,8 +167,8 @@ class JwtWsSecurityTest {
         cfg.security { security ->
             security.ws { ws ->
                 ws.authentication = jwt { jwt ->
-                    jwt.decoder = NimbusJwtDecoder
-                    jwt.keySource = JwtKeySource.publicKey(keyPair.public)
+                    jwt.decoder = testDecoder
+                    jwt.keySource = JwtKeySource.secret("test-secret")
                     jwt.tokenResolver = TokenResolver.cookie("access_token")
                 }
                 ws.rules { r -> r.add("/ws/chat", r.authenticated) }

@@ -1,33 +1,34 @@
 package io.github.mzlnk.javalin.security.jwt;
 
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.RSASSASigner;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
 import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.github.mzlnk.javalin.security.common.token.TokenResolver;
-import io.github.mzlnk.javalin.security.jwt.nimbus.NimbusJwtDecoder;
 import io.javalin.Javalin;
 import io.javalin.security.RouteRole;
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
 
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
-import java.security.interfaces.RSAPrivateKey;
-import java.util.Date;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtWsSecurityJavaTest {
     private enum Role implements RouteRole { ADMIN, USER }
 
-    private final KeyPair keyPair = generateRsaKeyPair();
+    private final JwtDecoder testDecoder = (token, verification) -> {
+        if (!token.startsWith("valid|")) {
+            throw new IllegalArgumentException("bad token");
+        }
+        String[] parts = token.split("\\|", 3);
+        String subject = parts.length > 1 ? parts[1] : "";
+        List<String> roles = parts.length > 2 && !parts[2].isEmpty()
+                ? Arrays.stream(parts[2].split(",")).filter(s -> !s.isEmpty()).collect(Collectors.toList())
+                : List.of();
+        return new SimpleDecodedJwt(subject, Map.of("sub", subject, "roles", roles));
+    };
 
     @Test
     void should_reject_an_anonymous_upgrade_when_the_ws_route_requires_authentication() {
@@ -144,30 +145,8 @@ class JwtWsSecurityJavaTest {
         return null;
     }
 
-    private static KeyPair generateRsaKeyPair() {
-        try {
-            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-            generator.initialize(2048);
-            return generator.genKeyPair();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     private String token(String subject, List<String> roles) {
-        try {
-            JWTClaimsSet claims = new JWTClaimsSet.Builder()
-                    .subject(subject)
-                    .claim("roles", roles)
-                    .issueTime(new Date())
-                    .expirationTime(new Date(System.currentTimeMillis() + 60_000))
-                    .build();
-            SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claims);
-            jwt.sign(new RSASSASigner((RSAPrivateKey) keyPair.getPrivate()));
-            return jwt.serialize();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return "valid|" + subject + "|" + String.join(",", roles);
     }
 
     private String token(String subject) {
@@ -178,8 +157,8 @@ class JwtWsSecurityJavaTest {
         return Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
                 ws.authentication = JwtSecurity.jwt(jwt -> {
-                    jwt.decoder = NimbusJwtDecoder.INSTANCE;
-                    jwt.keySource = JwtKeySource.publicKey(keyPair.getPublic());
+                    jwt.decoder = testDecoder;
+                    jwt.keySource = JwtKeySource.secret("test-secret");
                     jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", JwtWsSecurityJavaTest::roleOf);
                 });
                 ws.rules(rules -> {
@@ -196,8 +175,8 @@ class JwtWsSecurityJavaTest {
         return Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
                 ws.authentication = JwtSecurity.jwt(jwt -> {
-                    jwt.decoder = NimbusJwtDecoder.INSTANCE;
-                    jwt.keySource = JwtKeySource.publicKey(keyPair.getPublic());
+                    jwt.decoder = testDecoder;
+                    jwt.keySource = JwtKeySource.secret("test-secret");
                     jwt.tokenResolver = TokenResolver.cookie("access_token");
                 });
                 ws.rules(rules -> rules.add("/ws/chat", Rules.authenticated()));

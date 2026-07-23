@@ -1,6 +1,5 @@
 package io.github.mzlnk.javalin.security.jwt;
 
-import io.github.mzlnk.javalin.security.jwt.nimbus.NimbusJwtDecoder;
 import io.javalin.security.RouteRole;
 import org.junit.jupiter.api.Test;
 
@@ -48,12 +47,6 @@ class JwtJavaInteropTest {
                 .build();
 
         assertThat(verification).isNotNull();
-    }
-
-    @Test
-    void nimbus_decoder_object_is_usable_from_java() {
-        JwtDecoder decoder = NimbusJwtDecoder.INSTANCE;
-        assertThat(decoder).isNotNull();
     }
 
     @Test

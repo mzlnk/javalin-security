@@ -1,17 +1,11 @@
 dependencies {
     api(project(":javalin-security"))
     api(project(":javalin-security-extensions-common"))
-    compileOnly(libs.nimbus.jose.jwt)
-    compileOnly(libs.auth0.java.jwt)
-    compileOnly(libs.auth0.jwks.rsa)
     compileOnly(libs.javalin)
     compileOnly(libs.slf4j.api)
 
     testImplementation(libs.javalin)
     testImplementation(libs.javalin.testtools)
-    testImplementation(libs.nimbus.jose.jwt)
-    testImplementation(libs.auth0.java.jwt)
-    testImplementation(libs.auth0.jwks.rsa)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)
@@ -20,9 +14,6 @@ dependencies {
 
     e2eTestImplementation(libs.javalin)
     e2eTestImplementation(libs.javalin.testtools)
-    e2eTestImplementation(libs.nimbus.jose.jwt)
-    e2eTestImplementation(libs.auth0.java.jwt)
-    e2eTestImplementation(libs.auth0.jwks.rsa)
     e2eTestImplementation(platform(libs.junit.bom))
     e2eTestImplementation(libs.junit.jupiter)
     e2eTestImplementation(libs.assertj.core)
