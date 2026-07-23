@@ -10,20 +10,11 @@ import org.junit.jupiter.api.Test
 import java.util.Base64
 
 class BasicAuthenticatorTest {
-
     private enum class Role : RouteRole { USER, ADMIN }
 
     private val alice = BasicUser(username = "alice", password = "correct-password", roles = setOf(Role.USER, Role.ADMIN))
+
     private val userLookup = UserLookup { username -> if (username == "alice") alice else null }
-
-    private fun basicHeader(username: String, password: String): String =
-        "Basic " + Base64.getEncoder().encodeToString("$username:$password".toByteArray())
-
-    private fun ctx(authHeader: String?): Context = mockk {
-        every { header("Authorization") } returns authHeader
-    }
-
-    // ── NotAuthenticated ──────────────────────────────────────────────────────
 
     @Test
     fun `should return NotAuthenticated when Authorization header is absent`() {
@@ -38,8 +29,6 @@ class BasicAuthenticatorTest {
         val result = manager.authenticate(ctx("Bearer some.jwt.token"))
         assertThat(result).isEqualTo(AuthenticationResult.NotAuthenticated)
     }
-
-    // ── Failure: malformed credentials ────────────────────────────────────────
 
     @Test
     fun `should return Failure when Basic credentials are not valid Base64`() {
@@ -58,8 +47,6 @@ class BasicAuthenticatorTest {
         assertThat(result).isInstanceOf(AuthenticationResult.Failure::class.java)
     }
 
-    // ── Failure: unknown user / wrong password ────────────────────────────────
-
     @Test
     fun `should return Failure when username is unknown`() {
         val manager = BasicAuthenticator.of(userLookup)
@@ -75,8 +62,6 @@ class BasicAuthenticatorTest {
 
         assertThat(result).isInstanceOf(AuthenticationResult.Failure::class.java)
     }
-
-    // ── Success ───────────────────────────────────────────────────────────────
 
     @Test
     fun `should return Success with BasicAuthPrincipal when credentials are valid`() {
@@ -109,8 +94,6 @@ class BasicAuthenticatorTest {
         assertThat(result.authentication.roles).isEmpty()
     }
 
-    // ── Builder ───────────────────────────────────────────────────────────────
-
     @Test
     fun `builder produces a functional manager`() {
         val manager = BasicAuthenticator.builder(userLookup)
@@ -120,8 +103,6 @@ class BasicAuthenticatorTest {
         val result = manager.authenticate(ctx(basicHeader("alice", "correct-password")))
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
     }
-
-    // ── custom passwordEncoder ────────────────────────────────────────────────
 
     @Test
     fun `should use the configured passwordEncoder for comparison`() {
@@ -133,8 +114,6 @@ class BasicAuthenticatorTest {
         val result = manager.authenticate(ctx(basicHeader("alice", "literally-anything")))
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
     }
-
-    // ── custom credentialsResolver ────────────────────────────────────────────
 
     @Test
     fun `should authenticate from a custom header when a custom credentialsResolver is configured`() {
@@ -164,12 +143,16 @@ class BasicAuthenticatorTest {
         assertThat(result).isEqualTo(AuthenticationResult.NotAuthenticated)
     }
 
-    // ── BasicAuthPrincipal ────────────────────────────────────────────────────
-
     @Test
     fun `BasicAuthPrincipal name is the username`() {
         val principal = BasicAuthPrincipal("carol")
         assertThat(principal.name).isEqualTo("carol")
     }
 
+    private fun basicHeader(username: String, password: String): String =
+        "Basic " + Base64.getEncoder().encodeToString("$username:$password".toByteArray())
+
+    private fun ctx(authHeader: String?): Context = mockk {
+        every { header("Authorization") } returns authHeader
+    }
 }

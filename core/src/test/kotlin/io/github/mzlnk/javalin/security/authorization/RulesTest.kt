@@ -8,14 +8,11 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class RulesTest {
-
     private enum class Role : RouteRole { READ, WRITE, ADMIN, USER }
 
     private val context = mockContext()
-    private val anonymous = Authentication.unauthenticated()
 
-    private fun authenticated(vararg roles: RouteRole): Authentication =
-        Authentication.authenticated(TestPrincipal("bob"), *roles)
+    private val anonymous = Authentication.unauthenticated()
 
     @Test
     fun `should grant when rule is allow even for anonymous caller`() {
@@ -81,8 +78,6 @@ class RulesTest {
         assertThat(granted).isTrue()
     }
 
-    // ── DSL delegation (RuleFactory / DefaultRules) ────────────────────────────
-
     @Test
     fun `DefaultRules should expose the same rule logic as Rules for delegation`() {
         assertThat(DefaultRules.allow.isGranted(anonymous, context)).isTrue()
@@ -91,4 +86,7 @@ class RulesTest {
         assertThat(DefaultRules.hasRole(Role.ADMIN).isGranted(authenticated(Role.ADMIN), context)).isTrue()
         assertThat(DefaultRules.hasAnyRole(Role.ADMIN, Role.USER).isGranted(authenticated(Role.USER), context)).isTrue()
     }
+
+    private fun authenticated(vararg roles: RouteRole): Authentication =
+        Authentication.authenticated(TestPrincipal("bob"), *roles)
 }

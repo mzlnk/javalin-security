@@ -25,20 +25,122 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import java.net.http.HttpClient as JdkHttpClient
 
-/**
- * Integration tests for the `jwt { }` scheme factory assigned via `ws.authentication = jwt { }`.
- *
- * Mirrors [JwtSecurityIT] (HTTP) and reuses the WS upgrade-attempt harness pattern from
- * `JavalinSecurityWsIT` in `javalin-security-core` — the decoder here is the real
- * [NimbusJwtDecoder], with tokens signed in-test against a locally generated RSA key pair.
- */
-class JwtWsSecurityIT {
-
+class JwtWsSecurityTest {
     private enum class Role : RouteRole { ADMIN, USER }
 
     private val roleOf: (String) -> RouteRole? = { name -> Role.entries.find { it.name == name } }
 
     private val keyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.genKeyPair()
+
+    @Test
+    fun `should reject an anonymous upgrade when the WS route requires authentication`() {
+        // given
+        val app = bearerApp()
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val (connected, code) = tryConnect(client.origin, "/ws/chat")
+
+            // then
+            assertThat(connected).isFalse()
+            assertThat(code).isEqualTo(401)
+        }
+    }
+
+    @Test
+    fun `should allow the upgrade when a valid bearer token is provided`() {
+        // given
+        val app = bearerApp()
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val (connected, _) = tryConnect(client.origin, "/ws/chat", "Authorization" to "Bearer ${token("alice")}")
+
+            // then
+            assertThat(connected).isTrue()
+        }
+    }
+
+    @Test
+    fun `should allow the upgrade when the caller holds the required role`() {
+        // given
+        val app = bearerApp()
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val (connected, _) = tryConnect(
+                client.origin,
+                "/ws/admin",
+                "Authorization" to "Bearer ${token("admin", roles = listOf("ADMIN"))}",
+            )
+
+            // then
+            assertThat(connected).isTrue()
+        }
+    }
+
+    @Test
+    fun `should reject the upgrade with 403 when the authenticated caller lacks the required role`() {
+        // given
+        val app = bearerApp()
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val (connected, code) = tryConnect(
+                client.origin,
+                "/ws/admin",
+                "Authorization" to "Bearer ${token("bob", roles = listOf("USER"))}",
+            )
+
+            // then
+            assertThat(connected).isFalse()
+            assertThat(code).isEqualTo(403)
+        }
+    }
+
+    @Test
+    fun `should reject the upgrade with 401 when the bearer token is malformed`() {
+        // given
+        val app = bearerApp()
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val (connected, code) = tryConnect(client.origin, "/ws/chat", "Authorization" to "Bearer not-a-jwt")
+
+            // then
+            assertThat(connected).isFalse()
+            assertThat(code).isEqualTo(401)
+        }
+    }
+
+    @Test
+    fun `should allow the upgrade when a valid token is carried in a cookie`() {
+        // given
+        val app = cookieApp()
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val (connected, _) = tryConnect(client.origin, "/ws/chat", "Cookie" to "access_token=${token("alice")}")
+
+            // then
+            assertThat(connected).isTrue()
+        }
+    }
+
+    @Test
+    fun `should reject the upgrade with 401 when the cookie is absent`() {
+        // given
+        val app = cookieApp()
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val (connected, code) = tryConnect(client.origin, "/ws/chat", "Authorization" to "Bearer ${token("alice")}")
+
+            // then
+            assertThat(connected).isFalse()
+            assertThat(code).isEqualTo(401)
+        }
+    }
 
     private fun token(subject: String, roles: List<String> = emptyList()): String {
         val claims = JWTClaimsSet.Builder()
@@ -116,72 +218,4 @@ class JwtWsSecurityIT {
         latch.await(timeoutMs, TimeUnit.MILLISECONDS)
         return connected.get() to statusCode.get()
     }
-
-    // ── bearer header transport ─────────────────────────────────────────────
-
-    @Test
-    fun `should reject anonymous upgrade to an authenticated WS route`() = JavalinTest.test(bearerApp()) { _, client ->
-        val (connected, code) = tryConnect(client.origin, "/ws/chat")
-
-        assertThat(connected).isFalse()
-        assertThat(code).isEqualTo(401)
-    }
-
-    @Test
-    fun `should allow upgrade with a valid bearer token`() = JavalinTest.test(bearerApp()) { _, client ->
-        val (connected, _) = tryConnect(client.origin, "/ws/chat", "Authorization" to "Bearer ${token("alice")}")
-
-        assertThat(connected).isTrue()
-    }
-
-    @Test
-    fun `should allow upgrade when caller holds the required role`() = JavalinTest.test(bearerApp()) { _, client ->
-        val (connected, _) = tryConnect(
-            client.origin,
-            "/ws/admin",
-            "Authorization" to "Bearer ${token("admin", roles = listOf("ADMIN"))}",
-        )
-
-        assertThat(connected).isTrue()
-    }
-
-    @Test
-    fun `should reject upgrade with 403 when authenticated caller lacks required role`() =
-        JavalinTest.test(bearerApp()) { _, client ->
-            val (connected, code) = tryConnect(
-                client.origin,
-                "/ws/admin",
-                "Authorization" to "Bearer ${token("bob", roles = listOf("USER"))}",
-            )
-
-            assertThat(connected).isFalse()
-            assertThat(code).isEqualTo(403)
-        }
-
-    @Test
-    fun `should reject upgrade with 401 when the bearer token is malformed`() = JavalinTest.test(bearerApp()) { _, client ->
-        val (connected, code) = tryConnect(client.origin, "/ws/chat", "Authorization" to "Bearer not-a-jwt")
-
-        assertThat(connected).isFalse()
-        assertThat(code).isEqualTo(401)
-    }
-
-    // ── cookie transport (browser/SPA flows) ────────────────────────────────
-
-    @Test
-    fun `should allow upgrade with a valid token carried in a cookie`() = JavalinTest.test(cookieApp()) { _, client ->
-        val (connected, _) = tryConnect(client.origin, "/ws/chat", "Cookie" to "access_token=${token("alice")}")
-
-        assertThat(connected).isTrue()
-    }
-
-    @Test
-    fun `should reject upgrade with 401 when the cookie is absent`() = JavalinTest.test(cookieApp()) { _, client ->
-        // An Authorization header is present, but the cookie-based resolver only looks at the cookie.
-        val (connected, code) = tryConnect(client.origin, "/ws/chat", "Authorization" to "Bearer ${token("alice")}")
-
-        assertThat(connected).isFalse()
-        assertThat(code).isEqualTo(401)
-    }
-
 }

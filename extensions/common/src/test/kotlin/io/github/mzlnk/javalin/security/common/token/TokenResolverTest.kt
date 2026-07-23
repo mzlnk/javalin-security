@@ -7,13 +7,6 @@ import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 
 class TokenResolverTest {
-
-    // ── bearerHeader() ────────────────────────────────────────────────────────
-
-    private fun ctxWithHeader(authHeader: String?): Context = mockk {
-        every { header("Authorization") } returns authHeader
-    }
-
     @Test
     fun `bearerHeader should return token when Authorization header is present with Bearer scheme`() {
         val token = TokenResolver.bearerHeader().resolve(ctxWithHeader("Bearer my.jwt.token"))
@@ -63,12 +56,6 @@ class TokenResolverTest {
         Assertions.assertThat(token).isEqualTo("my.jwt.token")
     }
 
-    // ── cookie(name) ──────────────────────────────────────────────────────────
-
-    private fun ctxWithCookie(name: String, value: String?): Context = mockk {
-        every { cookie(name) } returns value
-    }
-
     @Test
     fun `cookie should return the trimmed cookie value when present`() {
         val token = TokenResolver.cookie("access_token").resolve(ctxWithCookie("access_token", "  my.jwt.token  "))
@@ -97,12 +84,17 @@ class TokenResolverTest {
         Assertions.assertThat(token).isNull()
     }
 
-    // ── DEFAULT ───────────────────────────────────────────────────────────────
-
     @Test
     fun `DEFAULT should behave like bearerHeader`() {
         val token = TokenResolver.DEFAULT.resolve(ctxWithHeader("Bearer my.jwt.token"))
         Assertions.assertThat(token).isEqualTo("my.jwt.token")
     }
 
+    private fun ctxWithHeader(authHeader: String?): Context = mockk {
+        every { header("Authorization") } returns authHeader
+    }
+
+    private fun ctxWithCookie(name: String, value: String?): Context = mockk {
+        every { cookie(name) } returns value
+    }
 }

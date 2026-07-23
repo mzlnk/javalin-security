@@ -4,12 +4,6 @@ import io.github.mzlnk.javalin.security.PathNormalizer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
-/**
- * [PathNormalizer] now only strips the router's context path and fixes up the leading slash;
- * trailing-slash/duplicate-slash/case-insensitivity handling all live inside Javalin's own
- * [io.javalin.router.matcher.PathParser], driven by [io.javalin.config.RouterConfig] — see
- * [PathPatternsTest] for coverage of that behaviour.
- */
 class PathNormalizerTest {
 
     @Test

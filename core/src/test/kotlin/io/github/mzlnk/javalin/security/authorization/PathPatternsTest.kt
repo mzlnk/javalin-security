@@ -6,18 +6,13 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 
-/**
- * Tests [compilePattern], the shared bridge from a security rule pattern to Javalin's own
- * [io.javalin.router.matcher.PathParser] - the same primitive Javalin's router uses for its own
- * routes.
- */
 class PathPatternsTest {
 
     private val router = RouterConfig()
 
     @Test
     fun `should match nested segments with a single star, since Javalin wildcards cross path segments`() {
-        // given: unlike the legacy Ant-style matcher, a single "*" already crosses "/" boundaries
+        // given
         val parser = compilePattern("/api/v1/*", router)
 
         // when / then
@@ -72,7 +67,7 @@ class PathPatternsTest {
 
     @Test
     fun `should honor ignoreTrailingSlashes when configured on the router`() {
-        // given: default RouterConfig has ignoreTrailingSlashes = true
+        // given
         val parser = compilePattern("/api/admin", router)
 
         // when / then

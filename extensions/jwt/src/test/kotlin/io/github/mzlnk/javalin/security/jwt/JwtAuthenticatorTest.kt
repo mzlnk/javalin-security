@@ -10,23 +10,19 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class JwtAuthenticatorTest {
-
     private enum class Role : RouteRole { ADMIN, USER }
 
     private val roleOf: (String) -> RouteRole? = { name -> Role.entries.find { it.name == name } }
 
     private val validToken = "valid.jwt.token"
+
     private val decodedJwt = SimpleDecodedJwt(subject = "alice", claims = mapOf("sub" to "alice"))
+
     private val verification = JwtVerification.of(JwtKeySource.secret("test-secret"))
 
     private val successDecoder = JwtDecoder { _, _ -> decodedJwt }
+
     private val failingDecoder = JwtDecoder { _, _ -> throw IllegalArgumentException("expired token") }
-
-    private fun ctx(authHeader: String?): Context = mockk {
-        every { header("Authorization") } returns authHeader
-    }
-
-    // ── NotAuthenticated ──────────────────────────────────────────────────────
 
     @Test
     fun `should return NotAuthenticated when Authorization header is absent`() {
@@ -41,8 +37,6 @@ class JwtAuthenticatorTest {
         val result = manager.authenticate(ctx("Basic dXNlcjpwYXNz"))
         assertThat(result).isEqualTo(AuthenticationResult.NotAuthenticated)
     }
-
-    // ── Success ───────────────────────────────────────────────────────────────
 
     @Test
     fun `should return Success with JwtPrincipal when decoder succeeds`() {
@@ -79,8 +73,6 @@ class JwtAuthenticatorTest {
         assertThat(result.authentication.roles).isEmpty()
     }
 
-    // ── Failure ───────────────────────────────────────────────────────────────
-
     @Test
     fun `should return Failure when decoder throws`() {
         val manager = JwtAuthenticator.of(failingDecoder, verification)
@@ -91,8 +83,6 @@ class JwtAuthenticatorTest {
         assertThat(failure.message).isEqualTo("expired token")
         assertThat(failure.cause).isInstanceOf(IllegalArgumentException::class.java)
     }
-
-    // ── JwtPrincipal ──────────────────────────────────────────────────────────
 
     @Test
     fun `JwtPrincipal name is the token subject`() {
@@ -106,8 +96,6 @@ class JwtAuthenticatorTest {
         assertThat(principal.name).isBlank()
     }
 
-    // ── Builder ───────────────────────────────────────────────────────────────
-
     @Test
     fun `builder produces a functional manager`() {
         val manager = JwtAuthenticator.builder(successDecoder, verification)
@@ -117,8 +105,6 @@ class JwtAuthenticatorTest {
         val result = manager.authenticate(ctx("Bearer $validToken"))
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
     }
-
-    // ── tokenResolver ─────────────────────────────────────────────────────────
 
     @Test
     fun `should authenticate from a cookie when a custom tokenResolver is configured`() {
@@ -148,4 +134,7 @@ class JwtAuthenticatorTest {
         assertThat(result).isEqualTo(AuthenticationResult.NotAuthenticated)
     }
 
+    private fun ctx(authHeader: String?): Context = mockk {
+        every { header("Authorization") } returns authHeader
+    }
 }

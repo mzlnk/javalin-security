@@ -11,21 +11,15 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class AuthorizationManagerTest {
-
     private enum class Role : RouteRole { ADMIN, USER }
 
     private val anonymous = Authentication.unauthenticated()
+
     private val defaultRouter = RouterConfig()
-
-    private fun authenticated(vararg roles: RouteRole): Authentication =
-        Authentication.authenticated(TestPrincipal("bob"), *roles)
-
-    private fun entry(pattern: String, method: HandlerType?, rule: Rule, router: RouterConfig = defaultRouter) =
-        AuthorizationManager.Entry(pattern, method, rule, router)
 
     @Test
     fun `should apply the first matching rule when several patterns match`() {
-        // given: a permissive rule declared before a restrictive one for the same path.
+        // given
         // Javalin's own "*" wildcard already crosses path segments, so no "**" is needed.
         val manager = AuthorizationManager(
             entries = listOf(
@@ -39,7 +33,7 @@ class AuthorizationManagerTest {
         // when
         val granted = manager.isGranted(HandlerType.GET, "/api/x", anonymous, mockContext())
 
-        // then: first-match-wins grants access
+        // then
         assertThat(granted).isTrue()
     }
 
@@ -68,7 +62,7 @@ class AuthorizationManagerTest {
             allowCorsPreflight = false,
         )
 
-        // when: a GET does not match the POST rule
+        // when
         val granted = manager.isGranted(HandlerType.GET, "/api/x", anonymous, mockContext())
 
         // then
@@ -141,7 +135,7 @@ class AuthorizationManagerTest {
 
     @Test
     fun `should match a path parameter segment against the concrete request path`() {
-        // given: unlike the legacy Ant-style matcher, {id} is a real path parameter, not a
+        // given
         // literal string, so it matches concrete path segments directly.
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/users/{id}", HandlerType.GET, Rules.allow())),
@@ -158,7 +152,7 @@ class AuthorizationManagerTest {
 
     @Test
     fun `should match case-insensitively when configured on the router`() {
-        // given: allow so a match yields true, distinguishing it from deny-by-default
+        // given
         val caseInsensitiveRouter = RouterConfig().apply { caseInsensitiveRoutes = true }
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/admin/*", HandlerType.GET, Rules.allow(), caseInsensitiveRouter)),
@@ -166,7 +160,7 @@ class AuthorizationManagerTest {
             allowCorsPreflight = false,
         )
 
-        // when: an upper-cased path still matches the rule
+        // when
         val granted = manager.isGranted(HandlerType.GET, "/API/ADMIN/x", anonymous, mockContext())
 
         // then
@@ -185,11 +179,9 @@ class AuthorizationManagerTest {
         // when
         val granted = manager.isGranted(HandlerType.GET, "/API/ADMIN/x", anonymous, mockContext())
 
-        // then: case-sensitive matcher does not match, so deny-by-default applies
+        // then
         assertThat(granted).isFalse()
     }
-
-    // ── fallback ────────────────────────────────────────────────────────────────
 
     @Test
     fun `should apply the fallback rule when no entry matches`() {
@@ -219,8 +211,6 @@ class AuthorizationManagerTest {
         assertThat(granted).isFalse()
     }
 
-    // ── CORS preflight ────────────────────────────────────────────────────────
-
     @Test
     fun `should grant a CORS preflight OPTIONS request when allowCorsPreflight is enabled`() {
         // given
@@ -236,7 +226,7 @@ class AuthorizationManagerTest {
 
     @Test
     fun `should not grant a plain OPTIONS request even when allowCorsPreflight is enabled`() {
-        // given: no Access-Control-Request-Method header, so this doesn't look like a preflight
+        // given
         val manager = AuthorizationManager(entries = emptyList(), fallback = null, allowCorsPreflight = true)
         val context = mockContext(method = HandlerType.OPTIONS)
 
@@ -259,4 +249,10 @@ class AuthorizationManagerTest {
         // then
         assertThat(granted).isFalse()
     }
+
+    private fun authenticated(vararg roles: RouteRole): Authentication =
+        Authentication.authenticated(TestPrincipal("bob"), *roles)
+
+    private fun entry(pattern: String, method: HandlerType?, rule: Rule, router: RouterConfig = defaultRouter) =
+        AuthorizationManager.Entry(pattern, method, rule, router)
 }

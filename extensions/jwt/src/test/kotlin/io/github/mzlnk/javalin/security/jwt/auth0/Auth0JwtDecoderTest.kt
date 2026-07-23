@@ -23,13 +23,12 @@ import java.util.Date
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Auth0JwtDecoderTest {
-
-    // ── RSA key pair used across RSA + JWKS tests ─────────────────────────────
-
     private lateinit var rsaJwk: RSAKey
+
     private lateinit var ecJwk: ECKey
 
     private var jwksServer: Javalin? = null
+
     private var jwksPort: Int = 0
 
     @BeforeAll
@@ -58,47 +57,6 @@ class Auth0JwtDecoderTest {
     fun tearDown() {
         jwksServer?.stop()
     }
-
-    // ── Helper token builders ─────────────────────────────────────────────────
-
-    private fun rsaToken(
-        subject: String = "alice",
-        issuer: String? = null,
-        audience: List<String>? = null,
-        expiresAt: Date = Date(System.currentTimeMillis() + 60_000),
-        keyId: String? = "rsa-test-key",
-        privateKey: RSAPrivateKey = rsaJwk.toRSAPrivateKey(),
-        publicKey: RSAPublicKey = rsaJwk.toRSAPublicKey(),
-    ): String {
-        val builder = JWT.create()
-            .withSubject(subject)
-            .apply { issuer?.let { withIssuer(it) } }
-            .apply { audience?.let { withAudience(*it.toTypedArray()) } }
-            .withExpiresAt(expiresAt)
-            .apply { keyId?.let { withKeyId(it) } }
-        return builder.sign(Algorithm.RSA256(publicKey, privateKey))
-    }
-
-    private fun ecToken(
-        subject: String = "alice",
-        expiresAt: Date = Date(System.currentTimeMillis() + 60_000),
-    ): String =
-        JWT.create()
-            .withSubject(subject)
-            .withExpiresAt(expiresAt)
-            .withKeyId("ec-test-key")
-            .sign(Algorithm.ECDSA256(ecJwk.toECPublicKey(), ecJwk.toECPrivateKey()))
-
-    private fun hmacToken(
-        subject: String = "alice",
-        secret: String = "super-secret-key-with-enough-length",
-    ): String =
-        JWT.create()
-            .withSubject(subject)
-            .withExpiresAt(Date(System.currentTimeMillis() + 60_000))
-            .sign(Algorithm.HMAC256(secret))
-
-    // ── publicKey (RSA) ───────────────────────────────────────────────────────
 
     @Test
     fun `publicKey(RSA) decodes a valid RS256 token`() {
@@ -133,8 +91,6 @@ class Auth0JwtDecoderTest {
         assertThatThrownBy { Auth0JwtDecoder.decode(tampered, verification) }.isInstanceOf(Exception::class.java)
     }
 
-    // ── publicKey (RSA) + issuer/audience validation ─────────────────────────
-
     @Test
     fun `publicKey(RSA) validates issuer when configured`() {
         val verification = JwtVerification.builder(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
@@ -163,8 +119,6 @@ class Auth0JwtDecoderTest {
         }.isInstanceOf(Exception::class.java)
     }
 
-    // ── publicKey (EC) ────────────────────────────────────────────────────────
-
     @Test
     fun `publicKey(EC) decodes a valid ES256 token`() {
         val verification = JwtVerification.of(JwtKeySource.publicKey(ecJwk.toECPublicKey()))
@@ -177,8 +131,6 @@ class Auth0JwtDecoderTest {
         val verification = JwtVerification.of(JwtKeySource.publicKey(ecJwk.toECPublicKey()))
         assertThatThrownBy { Auth0JwtDecoder.decode(rsaToken(), verification) }.isInstanceOf(Exception::class.java)
     }
-
-    // ── pem ────────────────────────────────────────────────────────────────────
 
     @Test
     fun `pem decodes valid RSA token from PEM public key`() {
@@ -217,8 +169,6 @@ class Auth0JwtDecoderTest {
         }.isInstanceOf(Exception::class.java)
     }
 
-    // ── secret (HMAC) ──────────────────────────────────────────────────────────
-
     @Test
     fun `secret decodes a valid HS256 token`() {
         val secret = "super-secret-key-with-enough-length"
@@ -233,8 +183,6 @@ class Auth0JwtDecoderTest {
         val token = hmacToken(secret = "wrong-secret-key-1234567890123456")
         assertThatThrownBy { Auth0JwtDecoder.decode(token, verification) }.isInstanceOf(Exception::class.java)
     }
-
-    // ── jwks ───────────────────────────────────────────────────────────────────
 
     @Test
     fun `jwks decodes a valid RSA token via remote JWKS`() {
@@ -289,8 +237,6 @@ class Auth0JwtDecoderTest {
         assertThatThrownBy { Auth0JwtDecoder.decode(noIssuerToken, verification) }.isInstanceOf(Exception::class.java)
     }
 
-    // ── publicKey (RSA) + RSASSA-PSS ──────────────────────────────────────────
-
     @Test
     fun `publicKey(RSA) decodes a valid PS256 token`() {
         val verification = JwtVerification.of(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
@@ -301,8 +247,6 @@ class Auth0JwtDecoderTest {
         val decoded = Auth0JwtDecoder.decode(psToken, verification)
         assertThat(decoded.subject).isEqualTo("alice")
     }
-
-    // ── DecodedJwt claim access ───────────────────────────────────────────────
 
     @Test
     fun `decoded token exposes all claims in the claims map`() {
@@ -335,4 +279,40 @@ class Auth0JwtDecoderTest {
         assertThat(decoded.subject).isBlank()
     }
 
+    private fun rsaToken(
+        subject: String = "alice",
+        issuer: String? = null,
+        audience: List<String>? = null,
+        expiresAt: Date = Date(System.currentTimeMillis() + 60_000),
+        keyId: String? = "rsa-test-key",
+        privateKey: RSAPrivateKey = rsaJwk.toRSAPrivateKey(),
+        publicKey: RSAPublicKey = rsaJwk.toRSAPublicKey(),
+    ): String {
+        val builder = JWT.create()
+            .withSubject(subject)
+            .apply { issuer?.let { withIssuer(it) } }
+            .apply { audience?.let { withAudience(*it.toTypedArray()) } }
+            .withExpiresAt(expiresAt)
+            .apply { keyId?.let { withKeyId(it) } }
+        return builder.sign(Algorithm.RSA256(publicKey, privateKey))
+    }
+
+    private fun ecToken(
+        subject: String = "alice",
+        expiresAt: Date = Date(System.currentTimeMillis() + 60_000),
+    ): String =
+        JWT.create()
+            .withSubject(subject)
+            .withExpiresAt(expiresAt)
+            .withKeyId("ec-test-key")
+            .sign(Algorithm.ECDSA256(ecJwk.toECPublicKey(), ecJwk.toECPrivateKey()))
+
+    private fun hmacToken(
+        subject: String = "alice",
+        secret: String = "super-secret-key-with-enough-length",
+    ): String =
+        JWT.create()
+            .withSubject(subject)
+            .withExpiresAt(Date(System.currentTimeMillis() + 60_000))
+            .sign(Algorithm.HMAC256(secret))
 }

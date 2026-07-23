@@ -30,13 +30,12 @@ import java.util.UUID
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class NimbusJwtDecoderTest {
-
-    // ── RSA key pair used across RSA + JWKS tests ─────────────────────────────
-
     private lateinit var rsaJwk: RSAKey
+
     private lateinit var ecJwk: ECKey
 
     private var jwksServer: Javalin? = null
+
     private var jwksPort: Int = 0
 
     @BeforeAll
@@ -65,53 +64,6 @@ class NimbusJwtDecoderTest {
     fun tearDown() {
         jwksServer?.stop()
     }
-
-    // ── Helper token builders ─────────────────────────────────────────────────
-
-    private fun rsaToken(
-        subject: String = "alice",
-        issuer: String? = null,
-        audience: List<String>? = null,
-        expiresAt: Date = Date(System.currentTimeMillis() + 60_000),
-        keyId: String = "rsa-test-key",
-    ): String {
-        val claims = JWTClaimsSet.Builder()
-            .subject(subject)
-            .apply { issuer?.let { issuer(it) } }
-            .apply { audience?.let { audience(it) } }
-            .expirationTime(expiresAt)
-            .build()
-        val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID(keyId).build()
-        return SignedJWT(header, claims).also { it.sign(RSASSASigner(rsaJwk)) }.serialize()
-    }
-
-    private fun ecToken(
-        subject: String = "alice",
-        expiresAt: Date = Date(System.currentTimeMillis() + 60_000),
-    ): String {
-        val claims = JWTClaimsSet.Builder()
-            .subject(subject)
-            .expirationTime(expiresAt)
-            .build()
-        val header = JWSHeader.Builder(JWSAlgorithm.ES256).keyID("ec-test-key").build()
-        return SignedJWT(header, claims).also { it.sign(ECDSASigner(ecJwk)) }.serialize()
-    }
-
-    private fun hmacToken(
-        subject: String = "alice",
-        secret: String = "super-secret-key-with-enough-length",
-        algorithm: JWSAlgorithm = JWSAlgorithm.HS256,
-    ): String {
-        val claims = JWTClaimsSet.Builder()
-            .subject(subject)
-            .expirationTime(Date(System.currentTimeMillis() + 60_000))
-            .build()
-        val header = JWSHeader(algorithm)
-        val signer = MACSigner(secret.toByteArray(Charsets.UTF_8))
-        return SignedJWT(header, claims).also { it.sign(signer) }.serialize()
-    }
-
-    // ── publicKey (RSA) ───────────────────────────────────────────────────────
 
     @Test
     fun `publicKey(RSA) decodes a valid RS256 token`() {
@@ -143,8 +95,6 @@ class NimbusJwtDecoderTest {
         assertThatThrownBy { NimbusJwtDecoder.decode(tampered, verification) }.isInstanceOf(Exception::class.java)
     }
 
-    // ── publicKey (RSA) + issuer/audience validation ─────────────────────────
-
     @Test
     fun `publicKey(RSA) validates issuer when configured`() {
         val verification = JwtVerification.builder(JwtKeySource.publicKey(rsaJwk.toRSAPublicKey()))
@@ -173,8 +123,6 @@ class NimbusJwtDecoderTest {
         }.isInstanceOf(Exception::class.java)
     }
 
-    // ── publicKey (EC) ────────────────────────────────────────────────────────
-
     @Test
     fun `publicKey(EC) decodes a valid ES256 token`() {
         val verification = JwtVerification.of(JwtKeySource.publicKey(ecJwk.toECPublicKey()))
@@ -187,8 +135,6 @@ class NimbusJwtDecoderTest {
         val verification = JwtVerification.of(JwtKeySource.publicKey(ecJwk.toECPublicKey()))
         assertThatThrownBy { NimbusJwtDecoder.decode(rsaToken(), verification) }.isInstanceOf(Exception::class.java)
     }
-
-    // ── pem ────────────────────────────────────────────────────────────────────
 
     @Test
     fun `pem decodes valid RSA token from PEM public key`() {
@@ -227,8 +173,6 @@ class NimbusJwtDecoderTest {
         }.isInstanceOf(Exception::class.java)
     }
 
-    // ── secret (HMAC) ──────────────────────────────────────────────────────────
-
     @Test
     fun `secret decodes a valid HS256 token`() {
         val secret = "super-secret-key-with-enough-length"
@@ -243,8 +187,6 @@ class NimbusJwtDecoderTest {
         val token = hmacToken(secret = "wrong-secret-key-1234567890123456")
         assertThatThrownBy { NimbusJwtDecoder.decode(token, verification) }.isInstanceOf(Exception::class.java)
     }
-
-    // ── jwks ───────────────────────────────────────────────────────────────────
 
     @Test
     fun `jwks decodes a valid RSA token via remote JWKS`() {
@@ -291,8 +233,6 @@ class NimbusJwtDecoderTest {
         assertThatThrownBy { NimbusJwtDecoder.decode(noIssuerToken, verification) }.isInstanceOf(Exception::class.java)
     }
 
-    // ── DecodedJwt claim access ───────────────────────────────────────────────
-
     @Test
     fun `decoded token exposes all claims in the claims map`() {
         val claims = JWTClaimsSet.Builder()
@@ -326,4 +266,46 @@ class NimbusJwtDecoderTest {
         assertThat(decoded.subject).isBlank()
     }
 
+    private fun rsaToken(
+        subject: String = "alice",
+        issuer: String? = null,
+        audience: List<String>? = null,
+        expiresAt: Date = Date(System.currentTimeMillis() + 60_000),
+        keyId: String = "rsa-test-key",
+    ): String {
+        val claims = JWTClaimsSet.Builder()
+            .subject(subject)
+            .apply { issuer?.let { issuer(it) } }
+            .apply { audience?.let { audience(it) } }
+            .expirationTime(expiresAt)
+            .build()
+        val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID(keyId).build()
+        return SignedJWT(header, claims).also { it.sign(RSASSASigner(rsaJwk)) }.serialize()
+    }
+
+    private fun ecToken(
+        subject: String = "alice",
+        expiresAt: Date = Date(System.currentTimeMillis() + 60_000),
+    ): String {
+        val claims = JWTClaimsSet.Builder()
+            .subject(subject)
+            .expirationTime(expiresAt)
+            .build()
+        val header = JWSHeader.Builder(JWSAlgorithm.ES256).keyID("ec-test-key").build()
+        return SignedJWT(header, claims).also { it.sign(ECDSASigner(ecJwk)) }.serialize()
+    }
+
+    private fun hmacToken(
+        subject: String = "alice",
+        secret: String = "super-secret-key-with-enough-length",
+        algorithm: JWSAlgorithm = JWSAlgorithm.HS256,
+    ): String {
+        val claims = JWTClaimsSet.Builder()
+            .subject(subject)
+            .expirationTime(Date(System.currentTimeMillis() + 60_000))
+            .build()
+        val header = JWSHeader(algorithm)
+        val signer = MACSigner(secret.toByteArray(Charsets.UTF_8))
+        return SignedJWT(header, claims).also { it.sign(signer) }.serialize()
+    }
 }

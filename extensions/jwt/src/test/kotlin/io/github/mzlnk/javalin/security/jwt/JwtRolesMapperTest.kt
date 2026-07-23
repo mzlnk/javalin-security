@@ -5,14 +5,9 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class JwtRolesMapperTest {
-
     private enum class Role : RouteRole { ADMIN, USER }
 
     private val roleOf: (String) -> RouteRole? = { name -> Role.entries.find { it.name == name } }
-
-    private fun jwt(claims: Map<String, Any?>) = SimpleDecodedJwt(subject = "user", claims = claims)
-
-    // ── noRoles ─────────────────────────────────────────────────────────────
 
     @Test
     fun `noRoles returns empty set for any token`() {
@@ -20,8 +15,6 @@ class JwtRolesMapperTest {
         assertThat(mapper.map(jwt(mapOf("roles" to listOf("ADMIN"))))).isEmpty()
         assertThat(mapper.map(jwt(emptyMap()))).isEmpty()
     }
-
-    // ── fromClaim (single string) ─────────────────────────────────────────────
 
     @Test
     fun `fromClaim returns single-element set when claim is a string`() {
@@ -59,8 +52,6 @@ class JwtRolesMapperTest {
         assertThat(mapper.map(jwt(mapOf("roles" to listOf("ADMIN", "UNKNOWN"))))).containsExactly(Role.ADMIN)
     }
 
-    // ── fromScope ─────────────────────────────────────────────────────────────
-
     @Test
     fun `fromScope splits space-delimited scope claim`() {
         val scopeRoleOf: (String) -> RouteRole? = { scope ->
@@ -92,4 +83,6 @@ class JwtRolesMapperTest {
         val mapper = JwtRolesMapper.fromScope { scope -> if (scope == "admin") Role.ADMIN else null }
         assertThat(mapper.map(jwt(mapOf("scope" to "admin")))).containsExactly(Role.ADMIN)
     }
+
+    private fun jwt(claims: Map<String, Any?>) = SimpleDecodedJwt(subject = "user", claims = claims)
 }
