@@ -1,6 +1,6 @@
 package io.github.mzlnk.javalin.security
 
-import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.javalin.http.Context
 
@@ -27,6 +27,21 @@ class SecurityContext internal constructor(private val context: Context) {
 
     /** Convenience accessor for the principal of the current request. `null` when the request is unauthenticated. */
     @Suppress("UNCHECKED_CAST")
-    fun <T : AuthenticatedPrincipal> principal(): T? = authentication().principal as T?
+    fun <T : Identity> principal(): T? = authentication().identity as T?
+
+    /**
+     * Java-friendly accessor for the principal of the current request, cast to [type]. `null`
+     * when the request is unauthenticated.
+     *
+     * Java has no reified generics, so calling the type-parameterless [principal] overload above
+     * from Java yields an unchecked cast that only fails, confusingly, at some later use site.
+     * Passing [type] explicitly gives Java callers a natural call site and an immediate,
+     * descriptive `ClassCastException` if the principal is of a different type:
+     *
+     * ```java
+     * MyPrincipal principal = ctx.with(JavalinSecurityPlugin.class).principal(MyPrincipal.class);
+     * ```
+     */
+    fun <T : Identity> principal(type: Class<T>): T? = type.cast(authentication().identity)
 
 }

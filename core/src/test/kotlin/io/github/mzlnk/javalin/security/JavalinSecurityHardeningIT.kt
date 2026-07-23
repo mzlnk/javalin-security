@@ -114,7 +114,7 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authentication = syncScheme(alwaysBob)
+                    http.authenticationStrategy = syncScheme(alwaysBob)
                 }
             }
             cfg.routes.get("/api/v1/me") { it.result(it.principal<TestPrincipal>()!!.name) }
@@ -134,7 +134,7 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authentication = syncScheme(
+                    http.authenticationStrategy = syncScheme(
                         unauthorizedHandler = { ctx, _ ->
                             ctx.header("WWW-Authenticate", "Bearer")
                             throw UnauthorizedResponse()
@@ -159,7 +159,7 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.hasRole(Role.ADMIN)) }
-                    http.authentication = syncScheme(
+                    http.authenticationStrategy = syncScheme(
                         authenticator = headerAuthenticator,
                         forbiddenHandler = { _, _ ->
                             throw io.javalin.http.ForbiddenResponse("custom denied")
@@ -184,7 +184,7 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.allow) }
-                    http.authentication = syncScheme(headerAuthenticator)
+                    http.authenticationStrategy = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -205,7 +205,7 @@ class JavalinSecurityHardeningIT {
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
                     // A natural but unsafe implementation: render a 401 and return without throwing.
-                    http.authentication = syncScheme(
+                    http.authenticationStrategy = syncScheme(
                         unauthorizedHandler = { ctx, _ -> ctx.status(401).result("denied-without-throwing") },
                     )
                 }
@@ -230,7 +230,7 @@ class JavalinSecurityHardeningIT {
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.hasRole(Role.ADMIN)) }
                     // Render a 403 and return without throwing.
-                    http.authentication = syncScheme(
+                    http.authenticationStrategy = syncScheme(
                         authenticator = headerAuthenticator,
                         forbiddenHandler = { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") },
                     )
@@ -273,12 +273,12 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authentication = syncScheme(headerAuthenticator)
+                    http.authenticationStrategy = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.get("/api/v1/resource") { ctx ->
                 // Route handler: only reachable when security guard grants access
-                ctx.result((ctx.authentication().principal as TestPrincipal).name)
+                ctx.result((ctx.authentication().identity as TestPrincipal).name)
             }
         },
     ) { _, client ->
@@ -356,7 +356,7 @@ class JavalinSecurityHardeningIT {
                     // Unlike the legacy Ant-style matcher, {id} is a real path parameter here and
                     // matches the concrete request path directly.
                     http.rules { r -> r.add("/api/v1/users/{id}", GET, r.deny) }
-                    http.authentication = syncScheme(headerAuthenticator)
+                    http.authenticationStrategy = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.get("/api/v1/users/{id}") { it.result("user-${it.pathParam("id")}") }
@@ -378,7 +378,7 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.authenticated) }
-                    http.authentication = asyncScheme(
+                    http.authenticationStrategy = asyncScheme(
                         { ctx ->
                             // Simulate I/O without blocking the request thread
                             CompletableFuture.supplyAsync {
@@ -409,7 +409,7 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.allow) }
-                    http.authentication = asyncScheme(
+                    http.authenticationStrategy = asyncScheme(
                         { _ ->
                             CompletableFuture.completedFuture(
                                 AuthenticationResult.Failure("async credential failure"),
@@ -435,7 +435,7 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.authenticated) }
-                    http.authentication = asyncScheme(
+                    http.authenticationStrategy = asyncScheme(
                         { _ -> CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) },
                     )
                 }
@@ -457,7 +457,7 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.allow) }
-                    http.authentication = asyncScheme(
+                    http.authenticationStrategy = asyncScheme(
                         { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP error")) },
                     )
                 }
@@ -481,7 +481,7 @@ class JavalinSecurityHardeningIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.allow) }
-                    http.authentication = asyncScheme(
+                    http.authenticationStrategy = asyncScheme(
                         { _ -> throw IllegalStateException("sync crash in authenticator") },
                     )
                 }

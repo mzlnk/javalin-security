@@ -34,7 +34,7 @@ class JwtSecurityIT {
     private fun app(bearerChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
             security.http { http ->
-                http.authentication = jwt { jwt ->
+                http.authenticationStrategy = jwt { jwt ->
                     jwt.decoder = testDecoder
                     jwt.keySource = JwtKeySource.secret("test-secret-not-actually-used-by-test-double")
                     jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
@@ -104,7 +104,7 @@ class JwtSecurityIT {
         val adminApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authentication = jwt { jwt ->
+                    http.authenticationStrategy = jwt { jwt ->
                         jwt.decoder = adminDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                         jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
@@ -127,7 +127,7 @@ class JwtSecurityIT {
         val accessibleApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authentication = jwt { jwt ->
+                    http.authenticationStrategy = jwt { jwt ->
                         jwt.decoder = testDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                     }
@@ -183,7 +183,7 @@ class JwtSecurityIT {
         val cookieApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authentication = jwt { jwt ->
+                    http.authenticationStrategy = jwt { jwt ->
                         jwt.decoder = testDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                         jwt.tokenResolver = TokenResolver.cookie("access_token")
@@ -208,7 +208,7 @@ class JwtSecurityIT {
         val cookieApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authentication = jwt { jwt ->
+                    http.authenticationStrategy = jwt { jwt ->
                         jwt.decoder = testDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                         jwt.tokenResolver = TokenResolver.cookie("access_token")
@@ -233,7 +233,7 @@ class JwtSecurityIT {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http { http ->
-                        http.authentication = jwt { jwt ->
+                        http.authenticationStrategy = jwt { jwt ->
                             jwt.keySource = JwtKeySource.secret("test-secret")
                             // decoder not set — should fail
                         }
@@ -251,7 +251,7 @@ class JwtSecurityIT {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http { http ->
-                        http.authentication = jwt { jwt ->
+                        http.authenticationStrategy = jwt { jwt ->
                             jwt.decoder = testDecoder
                             // keySource not set — should fail
                         }

@@ -1,9 +1,9 @@
 package io.github.mzlnk.javalin.security.basicauth
 
-import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
+import io.github.mzlnk.javalin.security.authentication.Identity
 
 /**
- * The [AuthenticatedPrincipal] produced by HTTP Basic authentication.
+ * The [Identity] produced by HTTP Basic authentication.
  *
  * [name] is the username supplied in the request's `Basic` credentials, as resolved by
  * [BasicCredentialsResolver] and validated against a [UserLookup]:
@@ -13,4 +13,4 @@ import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
  * val username: String = principal.name
  * ```
  */
-class BasicAuthPrincipal(override val name: String) : AuthenticatedPrincipal
+class BasicAuthPrincipal(override val name: String) : Identity

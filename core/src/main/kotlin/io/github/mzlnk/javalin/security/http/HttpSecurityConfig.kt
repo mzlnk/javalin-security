@@ -1,20 +1,20 @@
 package io.github.mzlnk.javalin.security.http
 
-import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme
+import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy
 import java.util.function.Consumer
 
 /**
- * The HTTP security configuration: the authentication scheme and the pattern-based rule table.
+ * The HTTP security configuration: the authentication strategy and the pattern-based rule table.
  *
  * A single mutable, field-assignment config — the same shape as Javalin's own subconfigs
  * (`config.http`, `config.router`, ...): plain `var` assignment, last write wins, no builder.
  *
- * **One field decides authentication.** [authentication] holds the single
- * [AuthenticationScheme] used by this block — how the caller is authenticated, how failures are
+ * **One field decides authentication.** [authenticationStrategy] holds the single
+ * [AuthenticationStrategy] used by this block — how the caller is authenticated, how failures are
  * rendered, and (via [io.github.mzlnk.javalin.security.authentication.Authentication.roles]) which
  * [io.javalin.security.RouteRole]s the caller holds, all in one place. Companion libraries
- * contribute ready-made schemes via their own factory functions, e.g. `http.authentication = jwt { }`.
- * Assigning [authentication] again simply replaces the previous scheme (last write wins) — there
+ * contribute ready-made strategies via their own factory functions, e.g. `http.authentication = jwt { }`.
+ * Assigning [authenticationStrategy] again simply replaces the previous strategy (last write wins) — there
  * is no separate authenticator/handler state to drift out of sync with it.
  *
  * **Two ways to grant access**, checked in this order by the guard:
@@ -27,15 +27,15 @@ import java.util.function.Consumer
 class HttpSecurityConfig internal constructor() {
 
     /**
-     * The single [AuthenticationScheme] used to authenticate requests on this block.
+     * The single [AuthenticationStrategy] used to authenticate requests on this block.
      *
      * Unset (`null`, the default) means every request is treated as anonymous and the [rules]
-     * pattern table alone decides access. Assign a scheme built by a companion library
+     * pattern table alone decides access. Assign a strategy built by a companion library
      * (`http.authentication = jwt { }`, `http.authentication = basicAuth { }`) or implement
-     * [AuthenticationScheme.Sync] / [AuthenticationScheme.Async] directly for a custom mechanism.
+     * [AuthenticationStrategy.Sync] / [AuthenticationStrategy.Async] directly for a custom mechanism.
      */
     @JvmField
-    var authentication: AuthenticationScheme? = null
+    var authenticationStrategy: AuthenticationStrategy? = null
 
     /** The pattern-based rule table, used for routes with no declared [io.javalin.security.RouteRole]s. */
     internal val rules: SecurityRules = SecurityRules()

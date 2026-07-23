@@ -17,8 +17,8 @@ import java.util.concurrent.CompletableFuture
  * exceptionally (or the implementation throws synchronously), the guard treats it as an
  * [AuthenticationResult.Failure] and returns a logged 401, preserving fail-closed semantics.
  *
- * Register by implementing [AuthenticationScheme.Async] and returning this from
- * [AuthenticationScheme.Async.asyncAuthenticator].
+ * Register by implementing [AuthenticationStrategy.Async] and returning this from
+ * [AuthenticationStrategy.Async.authenticator].
  *
  * For `config.concurrency.useVirtualThreads = true` applications the blocking [Authenticator] is
  * usually sufficient — virtual threads make blocking I/O cheap. Async is an advanced option.

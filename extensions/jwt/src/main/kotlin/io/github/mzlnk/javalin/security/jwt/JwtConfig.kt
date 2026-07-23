@@ -3,14 +3,14 @@
 package io.github.mzlnk.javalin.security.jwt
 
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
-import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme
+import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import java.util.function.Consumer
 
 /**
- * Configuration object for the [jwt] scheme factory.
+ * Configuration object for the [jwt] strategy factory.
  *
  * Configures JWT bearer-token authentication. [decoder] and [keySource] are the only required
  * fields; all other settings have defaults.
@@ -24,10 +24,10 @@ import java.util.function.Consumer
  * What [jwt] builds from this config:
  * - A [JwtVerification] from [keySource], [issuer], [audiences] and [clockSkewSeconds].
  * - A [JwtAuthenticator] from [decoder], that [JwtVerification], and [rolesMapper] — the
- *   [AuthenticationScheme.Sync.authenticator] of the returned scheme. The roles resolved by
+ *   [AuthenticationStrategy.Sync.authenticator] of the returned strategy. The roles resolved by
  *   [rolesMapper] land directly on [io.github.mzlnk.javalin.security.authentication.Authentication.roles].
- * - The scheme's [AuthenticationScheme.forbiddenHandler] directly from [forbiddenHandler].
- * - The scheme's [AuthenticationScheme.unauthorizedHandler]: a [BearerChallengeUnauthorizedHandler]
+ * - The strategy's [AuthenticationStrategy.forbiddenHandler] directly from [forbiddenHandler].
+ * - The strategy's [AuthenticationStrategy.unauthorizedHandler]: a [BearerChallengeUnauthorizedHandler]
  *   when [bearerChallenge] is `true`, otherwise [UnauthorizedHandler.DEFAULT].
  *
  * This config does not configure the rule table — use `http.rules { }` / `ws.rules { }` alongside
@@ -41,7 +41,7 @@ class JwtConfig internal constructor() {
      * Expected to be a stateless implementation (e.g. the `NimbusJwtDecoder` object) that performs
      * verification purely from the [JwtVerification] built from this block's other fields.
      *
-     * Throws [SecurityConfigurationException] if `null` when the scheme is built.
+     * Throws [SecurityConfigurationException] if `null` when the strategy is built.
      */
     @JvmField
     var decoder: JwtDecoder? = null
@@ -52,7 +52,7 @@ class JwtConfig internal constructor() {
      *
      * See [JwtKeySource]'s factory methods (`publicKey`, `pem`, `pemFile`, `secret`, `jwks`, ...).
      *
-     * Throws [SecurityConfigurationException] if `null` when the scheme is built.
+     * Throws [SecurityConfigurationException] if `null` when the strategy is built.
      */
     @JvmField
     var keySource: JwtKeySource? = null
@@ -94,7 +94,7 @@ class JwtConfig internal constructor() {
     var rolesMapper: JwtRolesMapper = JwtRolesMapper.noRoles()
 
     /**
-     * The scheme's [AuthenticationScheme.forbiddenHandler].
+     * The strategy's [AuthenticationStrategy.forbiddenHandler].
      *
      * Overrides how access-denied for an authenticated caller is rendered. Defaults to a bare
      * HTTP 403.
@@ -163,11 +163,11 @@ class JwtConfig internal constructor() {
 }
 
 /**
- * Builds an [AuthenticationScheme.Sync] configured for JWT bearer-token authentication.
+ * Builds an [AuthenticationStrategy.Sync] configured for JWT bearer-token authentication.
  *
  * The same one-stop configuration works from both languages — the [JwtConfig] arrives as an
  * explicit `Consumer` parameter, just like every other configuration block in this library, and
- * the returned scheme is assigned directly to `http.authentication` / `ws.authentication`:
+ * the returned strategy is assigned directly to `http.authentication` / `ws.authentication`:
  *
  * ```kotlin
  * http.authentication = jwt { jwt ->
@@ -183,7 +183,7 @@ class JwtConfig internal constructor() {
  * });
  * ```
  *
- * The same scheme works for both `http.authentication` and `ws.authentication`.
+ * The same strategy works for both `http.authentication` and `ws.authentication`.
  * **Browser clients cannot set an `Authorization` header on a WebSocket handshake.** For
  * browser/SPA flows, set `tokenResolver = TokenResolver.cookie("...")` and pair it with
  * `ws.allowedOrigins` on the surrounding `ws { }` block — WebSocket handshakes are not
@@ -203,17 +203,17 @@ class JwtConfig internal constructor() {
  * ```
  *
  * Users who want the [JwtAuthenticator] object itself (e.g. to share it between blocks) can build
- * one via [JwtAuthenticator.builder] and wrap it in a custom [AuthenticationScheme.Sync]
+ * one via [JwtAuthenticator.builder] and wrap it in a custom [AuthenticationStrategy.Sync]
  * implementation.
  *
  * The [JwtConfig.decoder] and [JwtConfig.keySource] fields are the only required settings.
  */
-fun jwt(configure: Consumer<JwtConfig>): AuthenticationScheme.Sync {
+fun jwt(configure: Consumer<JwtConfig>): AuthenticationStrategy.Sync {
     val config = JwtConfig().also(configure::accept)
     val authenticator = config.buildAuthenticator()
     val unauthorizedHandlerValue = config.buildUnauthorizedHandler()
     val forbiddenHandlerValue = config.forbiddenHandler
-    return object : AuthenticationScheme.Sync {
+    return object : AuthenticationStrategy.Sync {
         override val unauthorizedHandler: UnauthorizedHandler get() = unauthorizedHandlerValue
         override val forbiddenHandler: ForbiddenHandler get() = forbiddenHandlerValue
         override fun authenticator() = authenticator

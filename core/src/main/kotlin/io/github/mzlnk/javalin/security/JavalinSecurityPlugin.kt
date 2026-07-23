@@ -2,7 +2,7 @@ package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticator
 import io.github.mzlnk.javalin.security.authentication.Authenticator
-import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme
+import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
@@ -92,14 +92,14 @@ class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
                 fallback = ws.rules.fallback,
             )
 
-            val scheme = ws.authentication
+            val strategy = ws.authentication
             val wsGuard = WsSecurityGuard(
-                authenticator = scheme.resolvedAuthenticator(),
-                asyncAuthenticator = scheme.resolvedAsyncAuthenticator(),
+                authenticator = strategy.resolvedAuthenticator(),
+                asyncAuthenticator = strategy.resolvedAsyncAuthenticator(),
                 authorizationManager = wsAuthorizationManager,
                 pathNormalizer = pathNormalizer,
-                unauthorizedHandler = scheme.resolvedUnauthorizedHandler(),
-                forbiddenHandler = scheme.resolvedForbiddenHandler(),
+                unauthorizedHandler = strategy.resolvedUnauthorizedHandler(),
+                forbiddenHandler = strategy.resolvedForbiddenHandler(),
                 allowedOrigins = ws.allowedOrigins?.toSet(),
             )
 
@@ -122,14 +122,14 @@ class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
                 allowCorsPreflight = http.rules.allowCorsPreflight,
             )
 
-            val scheme = http.authentication
+            val strategy = http.authenticationStrategy
             val guard = SecurityGuard(
-                authenticator = scheme.resolvedAuthenticator(),
-                asyncAuthenticator = scheme.resolvedAsyncAuthenticator(),
+                authenticator = strategy.resolvedAuthenticator(),
+                asyncAuthenticator = strategy.resolvedAsyncAuthenticator(),
                 authorizationManager = authorizationManager,
                 pathNormalizer = pathNormalizer,
-                unauthorizedHandler = scheme.resolvedUnauthorizedHandler(),
-                forbiddenHandler = scheme.resolvedForbiddenHandler(),
+                unauthorizedHandler = strategy.resolvedUnauthorizedHandler(),
+                forbiddenHandler = strategy.resolvedForbiddenHandler(),
             )
 
             state.routes.beforeMatched(guard::handle)
@@ -145,20 +145,20 @@ class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
 
 }
 
-// ── AuthenticationScheme resolution helpers ────────────────────────────────
+// ── AuthenticationStrategy resolution helpers ──────────────────────────────
 //
-// A block with no [AuthenticationScheme] configured (`null`) treats every caller as anonymous —
-// the pattern-based rule table alone decides access — while still applying the scheme-agnostic
+// A block with no [AuthenticationStrategy] configured (`null`) treats every caller as anonymous —
+// the pattern-based rule table alone decides access — while still applying the strategy-agnostic
 // defaults for the unauthorized/forbidden handlers.
 
-private fun AuthenticationScheme?.resolvedAuthenticator(): Authenticator? =
-    (this as? AuthenticationScheme.Sync)?.authenticator()
+private fun AuthenticationStrategy?.resolvedAuthenticator(): Authenticator? =
+    (this as? AuthenticationStrategy.Sync)?.authenticator()
 
-private fun AuthenticationScheme?.resolvedAsyncAuthenticator(): AsyncAuthenticator? =
-    (this as? AuthenticationScheme.Async)?.asyncAuthenticator()
+private fun AuthenticationStrategy?.resolvedAsyncAuthenticator(): AsyncAuthenticator? =
+    (this as? AuthenticationStrategy.Async)?.authenticator()
 
-private fun AuthenticationScheme?.resolvedUnauthorizedHandler(): UnauthorizedHandler =
+private fun AuthenticationStrategy?.resolvedUnauthorizedHandler(): UnauthorizedHandler =
     this?.unauthorizedHandler ?: UnauthorizedHandler.DEFAULT
 
-private fun AuthenticationScheme?.resolvedForbiddenHandler(): ForbiddenHandler =
+private fun AuthenticationStrategy?.resolvedForbiddenHandler(): ForbiddenHandler =
     this?.forbiddenHandler ?: ForbiddenHandler.DEFAULT

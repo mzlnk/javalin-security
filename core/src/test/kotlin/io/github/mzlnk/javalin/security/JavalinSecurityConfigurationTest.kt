@@ -15,9 +15,9 @@ import java.util.concurrent.CompletableFuture
  *
  * All fields are plain `var`s with no set-once guards: assigning a field more than once simply
  * keeps the last value, matching Javalin's own subconfigs. Sync-vs-async authentication is
- * mutually exclusive by construction — an [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme]
- * is either [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Sync] or
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Async], never both — so
+ * mutually exclusive by construction — an [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy]
+ * is either [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Sync] or
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Async], never both — so
  * there is no such runtime check left to perform. Only genuine cross-field invariants
  * (non-empty [io.github.mzlnk.javalin.security.ws.WsSecurityConfig.allowedOrigins]) are still
  * validated, and only once the plugin starts, since [SecurityConfig] itself performs no
@@ -37,7 +37,7 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.authentication = syncScheme(Authenticator { AuthenticationResult.NotAuthenticated })
+                    http.authenticationStrategy = syncScheme(Authenticator { AuthenticationResult.NotAuthenticated })
                 }
             }
         }.doesNotThrowAnyException()
@@ -48,7 +48,7 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.authentication = asyncScheme(
+                    http.authenticationStrategy = asyncScheme(
                         { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) },
                     )
                 }
@@ -64,13 +64,13 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.authentication = syncScheme(
+                    http.authenticationStrategy = syncScheme(
                         Authenticator {
                             lastAuthenticatorInvoked = "first"
                             AuthenticationResult.NotAuthenticated
                         },
                     )
-                    http.authentication = syncScheme(
+                    http.authenticationStrategy = syncScheme(
                         Authenticator {
                             lastAuthenticatorInvoked = "second"
                             AuthenticationResult.NotAuthenticated
@@ -88,8 +88,8 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.authentication = syncScheme(unauthorizedHandler = first)
-                    http.authentication = syncScheme(unauthorizedHandler = second)
+                    http.authenticationStrategy = syncScheme(unauthorizedHandler = first)
+                    http.authenticationStrategy = syncScheme(unauthorizedHandler = second)
                 }
             }
         }.doesNotThrowAnyException()

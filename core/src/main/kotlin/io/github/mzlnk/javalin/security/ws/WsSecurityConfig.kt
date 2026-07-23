@@ -1,11 +1,11 @@
 package io.github.mzlnk.javalin.security.ws
 
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
-import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme
+import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy
 import java.util.function.Consumer
 
 /**
- * The WebSocket security configuration: the authentication scheme, the pattern-based rule table,
+ * The WebSocket security configuration: the authentication strategy, the pattern-based rule table,
  * and CSWSH origin protection.
  *
  * A single mutable, field-assignment config, same shape as [io.github.mzlnk.javalin.security.http.HttpSecurityConfig].
@@ -17,8 +17,8 @@ import java.util.function.Consumer
  * from `ctx.authentication()` to make per-message decisions if desired).
  *
  * **One field decides authentication.** [authentication] holds the single
- * [AuthenticationScheme] used by this block, mirroring the HTTP block exactly. Companion
- * libraries contribute ready-made schemes via their own factory functions, e.g.
+ * [AuthenticationStrategy] used by this block, mirroring the HTTP block exactly. Companion
+ * libraries contribute ready-made strategies via their own factory functions, e.g.
  * `ws.authentication = jwt { }`.
  *
  * **Two ways to grant access**, checked in this order by the guard, mirroring the HTTP block:
@@ -35,23 +35,23 @@ import java.util.function.Consumer
  * **CSWSH protection:** WebSocket handshakes are not subject to the browser same-origin policy
  * or CORS. If you authenticate via cookies, configure [allowedOrigins] to restrict which origins
  * may upgrade. When set, upgrades with a missing or unlisted `Origin` header are rejected via the
- * configured scheme's `forbiddenHandler` (403 by default) before authentication runs.
+ * configured strategy's `forbiddenHandler` (403 by default) before authentication runs.
  *
- * The authentication scheme configured here is independent from the HTTP security block. If
+ * The authentication strategy configured here is independent from the HTTP security block. If
  * unset, all callers are treated as anonymous and authorization decides access.
  */
 class WsSecurityConfig internal constructor() {
 
     /**
-     * The single [AuthenticationScheme] used to authenticate WebSocket upgrade requests on this block.
+     * The single [AuthenticationStrategy] used to authenticate WebSocket upgrade requests on this block.
      *
      * Unset (`null`, the default) means every upgrade is treated as anonymous and the [rules]
-     * pattern table alone decides access. Assign a scheme built by a companion library
-     * (`ws.authentication = jwt { }`) or implement [AuthenticationScheme.Sync] /
-     * [AuthenticationScheme.Async] directly for a custom mechanism.
+     * pattern table alone decides access. Assign a strategy built by a companion library
+     * (`ws.authentication = jwt { }`) or implement [AuthenticationStrategy.Sync] /
+     * [AuthenticationStrategy.Async] directly for a custom mechanism.
      */
     @JvmField
-    var authentication: AuthenticationScheme? = null
+    var authentication: AuthenticationStrategy? = null
 
     /**
      * Restricts WebSocket upgrades to requests whose `Origin` header matches one of the given

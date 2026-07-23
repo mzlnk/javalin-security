@@ -1,6 +1,6 @@
 package io.github.mzlnk.javalin.security
 
-import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.javalin.config.JavalinConfig
 import io.javalin.http.Context
@@ -37,8 +37,34 @@ fun JavalinConfig.security(configure: Consumer<SecurityConfig>) {
  */
 fun Context.authentication(): Authentication = with(JavalinSecurityPlugin::class).authentication()
 
-/** Convenience accessor for the principal of the current request. `null` when the request is unauthenticated. */
-fun <T : AuthenticatedPrincipal> Context.principal(): T? = with(JavalinSecurityPlugin::class).principal()
+/**
+ * Convenience accessor for the principal of the current request. `null` when the request is
+ * unauthenticated.
+ *
+ * Kotlin sugar for `ctx.with(JavalinSecurityPlugin::class).principal()`. Java has no reified
+ * generics, so this overload is not usable from Java without an explicit type witness; use the
+ * [Class]-taking overload below instead.
+ */
+fun <T : Identity> Context.principal(): T? = with(JavalinSecurityPlugin::class).principal()
+
+/**
+ * Java-friendly accessor for the principal of the current request, cast to [type]. `null` when
+ * the request is unauthenticated.
+ *
+ * Kotlin sugar for `ctx.with(JavalinSecurityPlugin::class).principal(type)`. Prefer this overload
+ * from Java, where the type-parameterless [principal] extension above requires an awkward
+ * explicit type witness. Passing [type] gives a natural call site (via a static import) and an
+ * immediate, descriptive `ClassCastException` if the principal is of a different type:
+ *
+ * ```java
+ * import static io.github.mzlnk.javalin.security.ExtensionsKt.principal;
+ * // …
+ * MyPrincipal principal = principal(ctx, MyPrincipal.class);
+ * ```
+ *
+ * Equivalent, without the static import: `ctx.with(JavalinSecurityPlugin.class).principal(type)`.
+ */
+fun <T : Identity> Context.principal(type: Class<T>): T? = with(JavalinSecurityPlugin::class).principal(type)
 
 /**
  * Returns the [Authentication] resolved for the current WebSocket session.
@@ -73,6 +99,29 @@ fun <T : AuthenticatedPrincipal> Context.principal(): T? = with(JavalinSecurityP
 fun WsContext.authentication(): Authentication =
     attribute<Authentication>(JavalinSecurityPlugin.AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()
 
-/** Convenience accessor for the principal of the current WebSocket session. `null` when the session is unauthenticated. */
+/**
+ * Convenience accessor for the principal of the current WebSocket session. `null` when the
+ * session is unauthenticated.
+ *
+ * Java has no reified generics, so this overload is not usable from Java without an explicit
+ * type witness; use the [Class]-taking overload below instead.
+ */
 @Suppress("UNCHECKED_CAST")
-fun <T : AuthenticatedPrincipal> WsContext.principal(): T? = authentication().principal as T?
+fun <T : Identity> WsContext.principal(): T? = authentication().identity as T?
+
+/**
+ * Java-friendly accessor for the principal of the current WebSocket session, cast to [type].
+ * `null` when the session is unauthenticated.
+ *
+ * Prefer this overload from Java, where the type-parameterless [principal] extension above
+ * requires an awkward explicit type witness. Passing [type] gives a natural call site (via a
+ * static import) and an immediate, descriptive `ClassCastException` if the principal is of a
+ * different type:
+ *
+ * ```java
+ * import static io.github.mzlnk.javalin.security.ExtensionsKt.principal;
+ * // …
+ * MyPrincipal principal = principal(wsCtx, MyPrincipal.class);
+ * ```
+ */
+fun <T : Identity> WsContext.principal(type: Class<T>): T? = type.cast(authentication().identity)

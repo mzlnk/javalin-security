@@ -34,7 +34,7 @@ class BasicAuthSecurityIT {
     private fun app(basicChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
             security.http { http ->
-                http.authentication = basicAuth { basic ->
+                http.authenticationStrategy = basicAuth { basic ->
                     basic.userLookup = testUserLookup
                     basic.basicChallenge = basicChallenge
                     basic.realm = "TestAPI"
@@ -119,7 +119,7 @@ class BasicAuthSecurityIT {
         val accessibleApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authentication = basicAuth { basic -> basic.userLookup = testUserLookup }
+                    http.authenticationStrategy = basicAuth { basic -> basic.userLookup = testUserLookup }
                     http.rules { r -> r.fallback = r.authenticated }
                 }
             }
@@ -172,7 +172,7 @@ class BasicAuthSecurityIT {
         val customApp = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authentication = basicAuth { basic ->
+                    http.authenticationStrategy = basicAuth { basic ->
                         basic.userLookup = testUserLookup
                         basic.credentialsResolver = BasicCredentialsResolver.basicHeader("X-Custom-Auth")
                     }
@@ -199,7 +199,7 @@ class BasicAuthSecurityIT {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http { http ->
-                        http.authentication = basicAuth { basic ->
+                        http.authenticationStrategy = basicAuth { basic ->
                             // userLookup not set — should fail
                         }
                         http.rules { r -> r.fallback = r.allow }

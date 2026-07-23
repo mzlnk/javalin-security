@@ -573,7 +573,7 @@ class JavalinSecurityWsIT {
                 }
                 cfg.routes.ws("/ws/chat") { ws ->
                     ws.onConnect { ctx ->
-                        principalName.set((ctx.authentication().principal as? TestPrincipal)?.name)
+                        principalName.set((ctx.authentication().identity as? TestPrincipal)?.name)
                         connectLatch.countDown()
                     }
                 }

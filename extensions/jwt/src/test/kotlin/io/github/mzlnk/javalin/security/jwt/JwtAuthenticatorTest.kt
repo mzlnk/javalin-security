@@ -52,9 +52,9 @@ class JwtAuthenticatorTest {
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
         val success = result as AuthenticationResult.Success
         assertThat(success.authentication.isAuthenticated).isTrue()
-        assertThat(success.authentication.principal).isInstanceOf(JwtPrincipal::class.java)
+        assertThat(success.authentication.identity).isInstanceOf(JwtPrincipal::class.java)
 
-        val principal = success.authentication.principal as JwtPrincipal
+        val principal = success.authentication.identity as JwtPrincipal
         assertThat(principal.name).isEqualTo("alice")
         assertThat(principal.token).isEqualTo(decodedJwt)
     }

@@ -4,7 +4,7 @@ import io.github.mzlnk.javalin.security.authentication.AsyncAuthenticator;
 import io.github.mzlnk.javalin.security.authentication.Authentication;
 import io.github.mzlnk.javalin.security.authentication.Authenticator;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult;
-import io.github.mzlnk.javalin.security.authentication.AuthenticationScheme;
+import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy;
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler;
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler;
 import io.github.mzlnk.javalin.security.authorization.Rule;
@@ -49,20 +49,20 @@ class JavaInteropIT {
     };
 
     /**
-     * Builds an {@link AuthenticationScheme.Sync} directly from Java — the way a custom
+     * Builds an {@link AuthenticationStrategy.Sync} directly from Java — the way a custom
      * authentication mechanism (not provided by a companion library's {@code jwt { }} /
      * {@code basicAuth { }} factory) is wired up.
      */
-    private static AuthenticationScheme.Sync scheme(Authenticator authenticator) {
+    private static AuthenticationStrategy.Sync scheme(Authenticator authenticator) {
         return scheme(authenticator, UnauthorizedHandler.getDEFAULT(), ForbiddenHandler.getDEFAULT());
     }
 
-    private static AuthenticationScheme.Sync scheme(
+    private static AuthenticationStrategy.Sync scheme(
             Authenticator authenticator,
             UnauthorizedHandler unauthorizedHandler,
             ForbiddenHandler forbiddenHandler
     ) {
-        return new AuthenticationScheme.Sync() {
+        return new AuthenticationStrategy.Sync() {
             @Override
             public Authenticator authenticator() {
                 return authenticator;
@@ -87,7 +87,7 @@ class JavaInteropIT {
         // No Unit.INSTANCE, no .INSTANCE.getX() — compiles cleanly from Java
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = scheme(headerAuthenticator);
+                http.authenticationStrategy = scheme(headerAuthenticator);
                 http.rules(rules -> {
                     rules.add("/api/*", GET, Rules.allow());
                     rules.add("/admin/*", POST, Rules.hasRole(Role.ADMIN));
@@ -136,7 +136,7 @@ class JavaInteropIT {
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                     http.rules(rules -> rules.fallback = Rules.authenticated());
-                    http.authentication = scheme(alwaysBob);
+                    http.authenticationStrategy = scheme(alwaysBob);
                 }))));
 
         assertThat(app).isNotNull();
@@ -149,7 +149,7 @@ class JavaInteropIT {
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                     http.rules(rules -> rules.fallback = Rules.hasRole(Role.ADMIN));
-                    http.authentication = scheme(
+                    http.authenticationStrategy = scheme(
                             headerAuthenticator,
                             (ctx, failure) -> ctx.status(401).result("custom-401"),
                             (ctx, auth) -> ctx.status(403).result("custom-403")
@@ -163,12 +163,12 @@ class JavaInteropIT {
 
     @Test
     void async_scheme_can_be_built_directly_from_java() {
-        // AuthenticationScheme.Async has a single abstract method — a Java lambda cannot
+        // AuthenticationStrategy.Async has a single abstract method — a Java lambda cannot
         // implement it directly (the interface also declares defaulted properties that are
         // abstract at the JVM level), so a small anonymous class is used, mirroring `scheme(...)`.
-        AuthenticationScheme.Async async = new AuthenticationScheme.Async() {
+        AuthenticationStrategy.Async async = new AuthenticationStrategy.Async() {
             @Override
-            public AsyncAuthenticator asyncAuthenticator() {
+            public AsyncAuthenticator authenticator() {
                 return ctx -> CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated.INSTANCE);
             }
 
@@ -186,7 +186,7 @@ class JavaInteropIT {
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                     http.rules(rules -> rules.fallback = Rules.allow());
-                    http.authentication = async;
+                    http.authenticationStrategy = async;
                 }))));
 
         assertThat(app).isNotNull();
@@ -203,7 +203,7 @@ class JavaInteropIT {
                     rules.add("/api/*", POST, Rules.authenticated());
                     rules.fallback = Rules.deny();
                 });
-                http.authentication = scheme(headerAuthenticator);
+                http.authenticationStrategy = scheme(headerAuthenticator);
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
             config.routes.post("/api/resource", ctx -> ctx.result("created"));
@@ -230,7 +230,7 @@ class JavaInteropIT {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.add("/api/*", GET, Rules.hasRole(Role.ADMIN)));
-                http.authentication = scheme(headerAuthenticator, UnauthorizedHandler.getDEFAULT(), denied);
+                http.authenticationStrategy = scheme(headerAuthenticator, UnauthorizedHandler.getDEFAULT(), denied);
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
         });
@@ -249,11 +249,11 @@ class JavaInteropIT {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.fallback = Rules.authenticated());
-                http.authentication = scheme(headerAuthenticator);
+                http.authenticationStrategy = scheme(headerAuthenticator);
             })));
             config.routes.get("/api/me", ctx -> {
                 Authentication authentication = ctx.with(JavalinSecurityPlugin.class).authentication();
-                ctx.result(authentication.getPrincipal().getName());
+                ctx.result(authentication.getIdentity().getName());
             });
         });
 
@@ -270,7 +270,7 @@ class JavaInteropIT {
     void route_declared_roles_are_granted_directly_from_authentication_roles_from_java() {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                    http.authentication = scheme(headerAuthenticator)
+                    http.authenticationStrategy = scheme(headerAuthenticator)
             )));
             config.routes.get("/admin", ctx -> ctx.result("admin-ok"), Role.ADMIN);
         });

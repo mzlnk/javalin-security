@@ -86,9 +86,9 @@ class BasicAuthenticatorTest {
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
         val success = result as AuthenticationResult.Success
         assertThat(success.authentication.isAuthenticated).isTrue()
-        assertThat(success.authentication.principal).isInstanceOf(BasicAuthPrincipal::class.java)
+        assertThat(success.authentication.identity).isInstanceOf(BasicAuthPrincipal::class.java)
 
-        val principal = success.authentication.principal as BasicAuthPrincipal
+        val principal = success.authentication.identity as BasicAuthPrincipal
         assertThat(principal.name).isEqualTo("alice")
     }
 

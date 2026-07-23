@@ -28,7 +28,7 @@ import java.util.concurrent.CompletionException
  * 2. Otherwise, [authorizationManager] evaluates the pattern-based rule table.
  *
  * **Sync path (default, zero overhead):** When [authenticator] is present (or no
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme] is configured, treating
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy] is configured, treating
  * all requests as anonymous), the pipeline is entirely synchronous.
  *
  * **Async path (opt-in):** When [asyncAuthenticator] is present, authentication resolves via
@@ -37,10 +37,10 @@ import java.util.concurrent.CompletionException
  * security guarantees apply across the async boundary.
  *
  * [authenticator] and [asyncAuthenticator] are resolved by [io.github.mzlnk.javalin.security.JavalinSecurityPlugin]
- * from the single [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme] assigned
- * to `http.authentication`; the two are mutually exclusive by construction (a scheme is either
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Sync] or
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Async], never both).
+ * from the single [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy] assigned
+ * to `http.authentication`; the two are mutually exclusive by construction (a strategy is either
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Sync] or
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Async], never both).
  */
 internal class SecurityGuard(
     private val authenticator: Authenticator?,
@@ -175,7 +175,7 @@ internal class SecurityGuard(
     }
 
     private fun principalName(authentication: Authentication): String =
-        LogSanitizer.sanitize(authentication.principal?.name ?: "anonymous")
+        LogSanitizer.sanitize(authentication.identity?.name ?: "anonymous")
 
     private companion object {
         val log = LoggerFactory.getLogger(SecurityGuard::class.java)

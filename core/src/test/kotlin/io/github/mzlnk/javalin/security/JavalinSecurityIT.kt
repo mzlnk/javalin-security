@@ -46,7 +46,7 @@ class JavalinSecurityIT {
                         r.add("/api/v1/*", POST, r.authenticated)
                         r.add("/api/v1/*", DELETE, r.hasRole(Role.ADMIN))
                     }
-                    authenticator?.let { http.authentication = syncScheme(it) }
+                    authenticator?.let { http.authenticationStrategy = syncScheme(it) }
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -142,7 +142,7 @@ class JavalinSecurityIT {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.allow) }
-                    http.authentication = syncScheme(headerAuthenticator)
+                    http.authenticationStrategy = syncScheme(headerAuthenticator)
                 }
             }
             cfg.routes.get("/internal") { it.result("secret") }
@@ -209,7 +209,7 @@ class JavalinSecurityIT {
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authentication = syncScheme(headerAuthenticator)
+                    http.authenticationStrategy = syncScheme(headerAuthenticator)
                     http.rules { r -> r.fallback = r.deny } // rule table must NOT be consulted
                 }
             }
@@ -240,7 +240,7 @@ class JavalinSecurityIT {
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authentication = syncScheme(headerAuthenticator)
+                    http.authenticationStrategy = syncScheme(headerAuthenticator)
                     http.rules { r -> r.fallback = r.allow } // even a permissive fallback must not apply
                 }
             }
@@ -259,7 +259,7 @@ class JavalinSecurityIT {
         Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authentication = syncScheme(
+                    http.authenticationStrategy = syncScheme(
                         Authenticator {
                             AuthenticationResult.Success(Authentication.authenticated(TestPrincipal("alice"), Role.ADMIN))
                         },

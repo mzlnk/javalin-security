@@ -50,10 +50,10 @@ import java.util.concurrent.CompletionException
  * fail-closed and no internal detail is leaked to the caller.
  *
  * [authenticator] and [asyncAuthenticator] are resolved by [io.github.mzlnk.javalin.security.JavalinSecurityPlugin]
- * from the single [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme] assigned
- * to `ws.authentication`; the two are mutually exclusive by construction (a scheme is either
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Sync] or
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationScheme.Async], never both).
+ * from the single [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy] assigned
+ * to `ws.authentication`; the two are mutually exclusive by construction (a strategy is either
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Sync] or
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Async], never both).
  */
 internal class WsSecurityGuard(
     private val authenticator: Authenticator?,
@@ -173,7 +173,7 @@ internal class WsSecurityGuard(
     }
 
     private fun principalName(authentication: Authentication): String =
-        LogSanitizer.sanitize(authentication.principal?.name ?: "anonymous")
+        LogSanitizer.sanitize(authentication.identity?.name ?: "anonymous")
 
     private companion object {
         val log = LoggerFactory.getLogger(WsSecurityGuard::class.java)

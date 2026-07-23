@@ -1,9 +1,9 @@
 package io.github.mzlnk.javalin.security.jwt
 
-import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
+import io.github.mzlnk.javalin.security.authentication.Identity
 
 /**
- * The [AuthenticatedPrincipal] produced by JWT authentication.
+ * The [Identity] produced by JWT authentication.
  *
  * Wraps the fully verified and decoded [token] so that route handlers and authorization rules can
  * read any claim without re-parsing the token:
@@ -17,7 +17,7 @@ import io.github.mzlnk.javalin.security.authentication.AuthenticatedPrincipal
  * When no `sub` claim was present in the token, [name] is an empty string — callers that require a
  * non-empty subject should validate it in their [JwtRolesMapper] or a custom authorization rule.
  */
-class JwtPrincipal(val token: DecodedJwt) : AuthenticatedPrincipal {
+class JwtPrincipal(val token: DecodedJwt) : Identity {
 
     override val name: String get() = token.subject
 
