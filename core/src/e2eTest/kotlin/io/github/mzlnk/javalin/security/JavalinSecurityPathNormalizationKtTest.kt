@@ -51,7 +51,7 @@ class JavalinSecurityPathNormalizationKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/users/{id}", GET, r.deny) }
-                    http.authenticationStrategy = authenticationStrategy(headerAuthenticator)
+                    http.authentication = authenticationStrategy(headerAuthenticator)
                 }
             }
             cfg.routes.get("/api/v1/users/{id}") { it.result("user-${it.pathParam("id")}") }

@@ -17,7 +17,7 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.authenticationStrategy = authenticationStrategy(Authenticator { AuthenticationResult.NotAuthenticated })
+                    http.authentication = authenticationStrategy(Authenticator { AuthenticationResult.NotAuthenticated })
                 }
             }
         }.doesNotThrowAnyException()
@@ -28,7 +28,7 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.authenticationStrategy = asyncAuthenticationStrategy(
+                    http.authentication = asyncAuthenticationStrategy(
                         { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) },
                     )
                 }
@@ -42,13 +42,13 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.authenticationStrategy = authenticationStrategy(
+                    http.authentication = authenticationStrategy(
                         Authenticator {
                             lastAuthenticatorInvoked = "first"
                             AuthenticationResult.NotAuthenticated
                         },
                     )
-                    http.authenticationStrategy = authenticationStrategy(
+                    http.authentication = authenticationStrategy(
                         Authenticator {
                             lastAuthenticatorInvoked = "second"
                             AuthenticationResult.NotAuthenticated
@@ -66,8 +66,8 @@ class JavalinSecurityConfigurationTest {
         assertThatCode {
             start { security ->
                 security.http { http ->
-                    http.authenticationStrategy = authenticationStrategy(unauthorizedHandler = first)
-                    http.authenticationStrategy = authenticationStrategy(unauthorizedHandler = second)
+                    http.authentication = authenticationStrategy(unauthorizedHandler = first)
+                    http.authentication = authenticationStrategy(unauthorizedHandler = second)
                 }
             }
         }.doesNotThrowAnyException()
@@ -144,7 +144,7 @@ class JavalinSecurityConfigurationTest {
     }
 
     /** Builds a fresh [JavalinSecurityPlugin] and runs its startup wiring/validation without booting a real server. */
-    private fun start(configure: (SecurityConfig) -> Unit) {
+    private fun start(configure: (JavalinSecurityPlugin.Config) -> Unit) {
         JavalinSecurityPlugin { configure(it) }.onStart(JavalinState())
     }
 }

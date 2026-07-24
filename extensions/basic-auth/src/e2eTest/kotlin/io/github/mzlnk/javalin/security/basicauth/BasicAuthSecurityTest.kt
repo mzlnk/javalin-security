@@ -145,7 +145,7 @@ class BasicAuthSecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticationStrategy = basicAuth { basic -> basic.userLookup = testUserLookup }
+                    http.authentication = basicAuth { basic -> basic.userLookup = testUserLookup }
                     http.rules { r -> r.fallback = r.authenticated }
                 }
             }
@@ -220,7 +220,7 @@ class BasicAuthSecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticationStrategy = basicAuth { basic ->
+                    http.authentication = basicAuth { basic ->
                         basic.userLookup = testUserLookup
                         basic.credentialsResolver = BasicCredentialsResolver.basicHeader("X-Custom-Auth")
                     }
@@ -249,7 +249,7 @@ class BasicAuthSecurityTest {
     private fun app(basicChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
             security.http { http ->
-                http.authenticationStrategy = basicAuth { basic ->
+                http.authentication = basicAuth { basic ->
                     basic.userLookup = testUserLookup
                     basic.basicChallenge = basicChallenge
                     basic.realm = "TestAPI"

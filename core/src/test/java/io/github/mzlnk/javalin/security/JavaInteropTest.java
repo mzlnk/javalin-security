@@ -34,7 +34,7 @@ class JavaInteropTest {
         // No Unit.INSTANCE, no .INSTANCE.getX() — compiles cleanly from Java
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = authenticationStrategy(headerAuthenticator);
+                http.authentication = authenticationStrategy(headerAuthenticator);
                 http.rules(rules -> {
                     rules.add("/api/*", GET, Rules.allow());
                     rules.add("/admin/*", POST, Rules.hasRole(Role.ADMIN));
@@ -77,7 +77,7 @@ class JavaInteropTest {
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                     http.rules(rules -> rules.fallback = Rules.authenticated());
-                    http.authenticationStrategy = authenticationStrategy(alwaysBob);
+                    http.authentication = authenticationStrategy(alwaysBob);
                 }))));
 
         assertThat(app).isNotNull();
@@ -88,7 +88,7 @@ class JavaInteropTest {
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                     http.rules(rules -> rules.fallback = Rules.hasRole(Role.ADMIN));
-                    http.authenticationStrategy = new AuthenticationStrategy.Sync() {
+                    http.authentication = new AuthenticationStrategy.Sync() {
                         @Override
                         public Authenticator authenticator() {
                             return headerAuthenticator;
@@ -134,7 +134,7 @@ class JavaInteropTest {
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                     http.rules(rules -> rules.fallback = Rules.allow());
-                    http.authenticationStrategy = async;
+                    http.authentication = async;
                 }))));
 
         assertThat(app).isNotNull();

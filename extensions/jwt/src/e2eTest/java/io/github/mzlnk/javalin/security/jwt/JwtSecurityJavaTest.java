@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static io.github.mzlnk.javalin.security.ExtensionsKt.principal;
+import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
 import static io.javalin.http.HandlerType.GET;
 import static io.javalin.http.HandlerType.POST;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -107,7 +107,7 @@ class JwtSecurityJavaTest {
         JwtDecoder adminDecoder = (token, verification) -> new SimpleDecodedJwt(token, Map.of("roles", List.of("ADMIN")));
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = JwtSecurity.jwt(jwt -> {
+                http.authentication = JwtSecurity.jwt(jwt -> {
                     jwt.decoder = adminDecoder;
                     jwt.keySource = JwtKeySource.secret("test-secret");
                     jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", JwtSecurityJavaTest::roleOf);
@@ -131,7 +131,7 @@ class JwtSecurityJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = JwtSecurity.jwt(jwt -> {
+                http.authentication = JwtSecurity.jwt(jwt -> {
                     jwt.decoder = testDecoder;
                     jwt.keySource = JwtKeySource.secret("test-secret");
                 });
@@ -204,7 +204,7 @@ class JwtSecurityJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = JwtSecurity.jwt(jwt -> {
+                http.authentication = JwtSecurity.jwt(jwt -> {
                     jwt.decoder = testDecoder;
                     jwt.keySource = JwtKeySource.secret("test-secret");
                     jwt.tokenResolver = TokenResolver.cookie("access_token");
@@ -229,7 +229,7 @@ class JwtSecurityJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = JwtSecurity.jwt(jwt -> {
+                http.authentication = JwtSecurity.jwt(jwt -> {
                     jwt.decoder = testDecoder;
                     jwt.keySource = JwtKeySource.secret("test-secret");
                     jwt.tokenResolver = TokenResolver.cookie("access_token");
@@ -258,7 +258,7 @@ class JwtSecurityJavaTest {
                 .build();
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = authenticationStrategy(authenticator);
+                http.authentication = authenticationStrategy(authenticator);
                 http.rules(rules -> {
                     rules.add("/api/*", GET, Rules.allow());
                     rules.add("/api/*", POST, Rules.authenticated());
@@ -303,7 +303,7 @@ class JwtSecurityJavaTest {
     private Javalin app(boolean bearerChallenge) {
         return Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = JwtSecurity.jwt(jwt -> {
+                http.authentication = JwtSecurity.jwt(jwt -> {
                     jwt.decoder = testDecoder;
                     jwt.keySource = JwtKeySource.secret("test-secret-not-actually-used-by-test-double");
                     jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", JwtSecurityJavaTest::roleOf);

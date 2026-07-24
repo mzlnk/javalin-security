@@ -9,12 +9,12 @@ import java.util.function.Consumer
  * A single mutable, field-assignment config — the same shape as Javalin's own subconfigs
  * (`config.http`, `config.router`, ...): plain `var` assignment, last write wins, no builder.
  *
- * **One field decides authentication.** [authenticationStrategy] holds the single
+ * **One field decides authentication.** [authentication] holds the single
  * [AuthenticationStrategy] used by this block — how the caller is authenticated, how failures are
  * rendered, and (via [io.github.mzlnk.javalin.security.authentication.Authentication.roles]) which
  * [io.javalin.security.RouteRole]s the caller holds, all in one place. Companion libraries
  * contribute ready-made strategies via their own factory functions, e.g. `http.authentication = jwt { }`.
- * Assigning [authenticationStrategy] again simply replaces the previous strategy (last write wins) — there
+ * Assigning [authentication] again simply replaces the previous strategy (last write wins) — there
  * is no separate authenticator/handler state to drift out of sync with it.
  *
  * **Two ways to grant access**, checked in this order by the guard:
@@ -35,7 +35,7 @@ class HttpSecurityConfig internal constructor() {
      * [AuthenticationStrategy.Sync] / [AuthenticationStrategy.Async] directly for a custom mechanism.
      */
     @JvmField
-    var authenticationStrategy: AuthenticationStrategy? = null
+    var authentication: AuthenticationStrategy? = null
 
     /** The pattern-based rule table, used for routes with no declared [io.javalin.security.RouteRole]s. */
     internal val rules: SecurityRules = SecurityRules()

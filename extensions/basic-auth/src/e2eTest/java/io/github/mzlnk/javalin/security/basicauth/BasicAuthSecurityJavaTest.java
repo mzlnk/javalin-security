@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Base64;
 import java.util.Set;
 
-import static io.github.mzlnk.javalin.security.ExtensionsKt.principal;
+import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
 import static io.javalin.http.HandlerType.GET;
 import static io.javalin.http.HandlerType.POST;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -154,7 +154,7 @@ class BasicAuthSecurityJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = BasicAuthSecurity.basicAuth(basic -> basic.userLookup = testUserLookup);
+                http.authentication = BasicAuthSecurity.basicAuth(basic -> basic.userLookup = testUserLookup);
                 http.rules(rules -> rules.fallback = Rules.authenticated());
             })));
             config.routes.get("/me", ctx -> ctx.result(principal(ctx, BasicAuthPrincipal.class).getName()));
@@ -224,7 +224,7 @@ class BasicAuthSecurityJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = BasicAuthSecurity.basicAuth(basic -> {
+                http.authentication = BasicAuthSecurity.basicAuth(basic -> {
                     basic.userLookup = testUserLookup;
                     basic.credentialsResolver = BasicCredentialsResolver.basicHeader("X-Custom-Auth");
                 });
@@ -252,7 +252,7 @@ class BasicAuthSecurityJavaTest {
                 .build();
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = authenticationStrategy(authenticator);
+                http.authentication = authenticationStrategy(authenticator);
                 http.rules(rules -> {
                     rules.add("/api/*", GET, Rules.allow());
                     rules.add("/api/*", POST, Rules.authenticated());
@@ -313,7 +313,7 @@ class BasicAuthSecurityJavaTest {
         BasicAuthenticator authenticator = BasicAuthenticator.builder(testUserLookup).build();
         return Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = BasicAuthSecurity.basicAuth(basic -> {
+                http.authentication = BasicAuthSecurity.basicAuth(basic -> {
                     basic.userLookup = testUserLookup;
                     basic.basicChallenge = basicChallenge;
                     basic.realm = "TestAPI";

@@ -18,7 +18,7 @@ class JavalinSecurityAsyncAuthKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.authenticated) }
-                    http.authenticationStrategy = asyncAuthenticationStrategy(
+                    http.authentication = asyncAuthenticationStrategy(
                         { ctx ->
                             // Simulate I/O without blocking the request thread
                             CompletableFuture.supplyAsync {
@@ -50,7 +50,7 @@ class JavalinSecurityAsyncAuthKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.allow) }
-                    http.authenticationStrategy = asyncAuthenticationStrategy(
+                    http.authentication = asyncAuthenticationStrategy(
                         { _ ->
                             CompletableFuture.completedFuture(
                                 AuthenticationResult.Failure("async credential failure"),
@@ -79,7 +79,7 @@ class JavalinSecurityAsyncAuthKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.authenticated) }
-                    http.authenticationStrategy = asyncAuthenticationStrategy(
+                    http.authentication = asyncAuthenticationStrategy(
                         { _ -> CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) },
                     )
                 }
@@ -104,7 +104,7 @@ class JavalinSecurityAsyncAuthKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.allow) }
-                    http.authenticationStrategy = asyncAuthenticationStrategy(
+                    http.authentication = asyncAuthenticationStrategy(
                         { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP error")) },
                     )
                 }
@@ -130,7 +130,7 @@ class JavalinSecurityAsyncAuthKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/*", GET, r.allow) }
-                    http.authenticationStrategy = asyncAuthenticationStrategy(
+                    http.authentication = asyncAuthenticationStrategy(
                         { _ -> throw IllegalStateException("sync crash in authenticator") },
                     )
                 }

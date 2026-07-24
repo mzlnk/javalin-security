@@ -11,7 +11,6 @@ import io.github.mzlnk.javalin.security.jwt.JwtDecoder
 import io.github.mzlnk.javalin.security.jwt.JwtKeySource
 import io.github.mzlnk.javalin.security.jwt.JwtVerification
 import io.github.mzlnk.javalin.security.jwt.SimpleDecodedJwt
-import java.net.URL
 import java.security.PublicKey
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
@@ -69,8 +68,8 @@ object Auth0JwtDecoder : JwtDecoder {
     )
     private val EC_ALGORITHMS: Set<String> = setOf("ES256", "ES384", "ES512")
 
-    /** Cache of remote JWKS providers, keyed by URL, so fetch/cache state survives across [decode] calls. */
-    private val jwksProviders = ConcurrentHashMap<URL, JwkProvider>()
+    /** Cache of remote JWKS providers, keyed by URL string, so fetch/cache state survives across [decode] calls. */
+    private val jwksProviders = ConcurrentHashMap<String, JwkProvider>()
 
     override fun decode(token: String, verification: JwtVerification): DecodedJwt {
         val header = JWT.decode(token)
@@ -116,7 +115,7 @@ object Auth0JwtDecoder : JwtDecoder {
     private fun jwksAlgorithm(header: DecodedJWT, keySource: JwtKeySource.JwksSource): Algorithm {
         val kid = header.keyId
             ?: throw JWTVerificationException("JWT header is missing 'kid'; required for JWKS key resolution.")
-        val provider = jwksProviders.computeIfAbsent(keySource.url) { JwkProviderBuilder(it).build() }
+        val provider = jwksProviders.computeIfAbsent(keySource.url.toString()) { JwkProviderBuilder(keySource.url).build() }
         val publicKey = provider.get(kid).publicKey
         val accepted = acceptedAlgorithmNames(emptySet(), publicKey)
         return buildAlgorithm(requireAccepted(header.algorithm, accepted), publicKey)

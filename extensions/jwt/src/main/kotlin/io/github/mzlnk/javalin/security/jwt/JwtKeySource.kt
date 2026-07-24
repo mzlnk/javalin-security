@@ -8,6 +8,7 @@ import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.InvalidKeySpecException
 import java.security.spec.X509EncodedKeySpec
+import java.net.URI
 import java.net.URL
 import java.util.Base64
 
@@ -115,7 +116,7 @@ sealed interface JwtKeySource {
          * @param url the JWKS endpoint URL string (e.g. `https://auth.example.com/.well-known/jwks.json`)
          */
         @JvmStatic
-        fun jwks(url: String): JwtKeySource = jwks(URL(url))
+        fun jwks(url: String): JwtKeySource = jwks(URI.create(url).toURL())
 
         /** Verifies tokens using a remote JWKS endpoint at [url]. */
         @JvmStatic

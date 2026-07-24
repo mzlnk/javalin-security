@@ -1,3 +1,5 @@
+@file:JvmName("SecurityExtensions")
+
 package io.github.mzlnk.javalin.security
 
 import io.github.mzlnk.javalin.security.authentication.Identity
@@ -26,7 +28,7 @@ import java.util.function.Consumer
  *
  * See [JavalinSecurityPlugin] for the full opt-in/ordering/lifecycle contract.
  */
-fun JavalinConfig.security(configure: Consumer<SecurityConfig>) {
+fun JavalinConfig.security(configure: Consumer<JavalinSecurityPlugin.Config>) {
     registerPlugin(JavalinSecurityPlugin(configure))
 }
 
@@ -57,7 +59,7 @@ fun <T : Identity> Context.principal(): T? = with(JavalinSecurityPlugin::class).
  * immediate, descriptive `ClassCastException` if the principal is of a different type:
  *
  * ```java
- * import static io.github.mzlnk.javalin.security.ExtensionsKt.principal;
+ * import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
  * // …
  * MyPrincipal principal = principal(ctx, MyPrincipal.class);
  * ```
@@ -119,7 +121,7 @@ fun <T : Identity> WsContext.principal(): T? = authentication().identity as T?
  * different type:
  *
  * ```java
- * import static io.github.mzlnk.javalin.security.ExtensionsKt.principal;
+ * import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
  * // …
  * MyPrincipal principal = principal(wsCtx, MyPrincipal.class);
  * ```

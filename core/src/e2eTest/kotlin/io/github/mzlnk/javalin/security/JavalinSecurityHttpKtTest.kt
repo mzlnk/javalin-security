@@ -165,7 +165,7 @@ class JavalinSecurityHttpKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.allow) }
-                    http.authenticationStrategy = authenticationStrategy(headerAuthenticator)
+                    http.authentication = authenticationStrategy(headerAuthenticator)
                 }
             }
             cfg.routes.get("/internal") { it.result("secret") }
@@ -253,7 +253,7 @@ class JavalinSecurityHttpKtTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticationStrategy = authenticationStrategy(headerAuthenticator)
+                    http.authentication = authenticationStrategy(headerAuthenticator)
                     http.rules { r -> r.fallback = r.deny } // rule table must NOT be consulted
                 }
             }
@@ -279,7 +279,7 @@ class JavalinSecurityHttpKtTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticationStrategy = authenticationStrategy(headerAuthenticator)
+                    http.authentication = authenticationStrategy(headerAuthenticator)
                     http.rules { r -> r.fallback = r.allow } // even a permissive fallback must not apply
                 }
             }
@@ -304,7 +304,7 @@ class JavalinSecurityHttpKtTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticationStrategy = authenticationStrategy(
+                    http.authentication = authenticationStrategy(
                         Authenticator {
                             AuthenticationResult.Success(Authentication.authenticated(TestPrincipal("alice"), Role.ADMIN))
                         },
@@ -333,7 +333,7 @@ class JavalinSecurityHttpKtTest {
                         r.add("/api/v1/*", POST, r.authenticated)
                         r.add("/api/v1/*", DELETE, r.hasRole(Role.ADMIN))
                     }
-                    authenticator?.let { http.authenticationStrategy = authenticationStrategy(it) }
+                    authenticator?.let { http.authentication = authenticationStrategy(it) }
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }

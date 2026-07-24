@@ -19,7 +19,6 @@ import io.github.mzlnk.javalin.security.jwt.JwtDecoder
 import io.github.mzlnk.javalin.security.jwt.JwtKeySource
 import io.github.mzlnk.javalin.security.jwt.JwtVerification
 import io.github.mzlnk.javalin.security.jwt.SimpleDecodedJwt
-import java.net.URL
 import java.security.Key
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
@@ -75,8 +74,8 @@ object NimbusJwtDecoder : JwtDecoder {
         JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512,
     )
 
-    /** Cache of remote JWKS sources, keyed by URL, so fetch/cache state survives across [decode] calls. */
-    private val jwksSources = ConcurrentHashMap<URL, JWKSource<SecurityContext>>()
+    /** Cache of remote JWKS sources, keyed by URL string, so fetch/cache state survives across [decode] calls. */
+    private val jwksSources = ConcurrentHashMap<String, JWKSource<SecurityContext>>()
 
     override fun decode(token: String, verification: JwtVerification): DecodedJwt {
         val processor = DefaultJWTProcessor<SecurityContext>()
@@ -121,8 +120,8 @@ object NimbusJwtDecoder : JwtDecoder {
     }
 
     private fun jwksKeySelector(keySource: JwtKeySource.JwksSource): JWSKeySelector<SecurityContext> {
-        val jwkSource = jwksSources.computeIfAbsent(keySource.url) {
-            JWKSourceBuilder.create<SecurityContext>(it).build()
+        val jwkSource = jwksSources.computeIfAbsent(keySource.url.toString()) {
+            JWKSourceBuilder.create<SecurityContext>(keySource.url).build()
         }
         return JWSKeySelector { header, secCtx ->
             val keyType = KeyType.forAlgorithm(header.algorithm) ?: return@JWSKeySelector emptyList()

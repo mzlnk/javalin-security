@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory
  *    [PasswordEncoder]. A mismatch -> [AuthenticationResult.Failure].
  * 4. Return [AuthenticationResult.Success] with a [BasicAuthPrincipal] and the user's roles.
  *
- * Construct via the `basicAuth { }` block (which assigns it to `http.authenticator`) or use
+ * Construct via the `basicAuth { }` block (which assigns it to `http.authentication`) or use
  * [Builder] to obtain an instance directly.
  */
 class BasicAuthenticator private constructor(

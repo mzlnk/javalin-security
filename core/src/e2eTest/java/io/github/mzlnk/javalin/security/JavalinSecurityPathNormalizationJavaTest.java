@@ -49,7 +49,7 @@ class JavalinSecurityPathNormalizationJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.add("/api/v1/users/{id}", GET, Rules.deny()));
-                http.authenticationStrategy = authenticationStrategy(headerAuthenticator);
+                http.authentication = authenticationStrategy(headerAuthenticator);
             })));
             config.routes.get("/api/v1/users/{id}", ctx -> ctx.result("user-" + ctx.pathParam("id")));
         });

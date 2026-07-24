@@ -14,7 +14,7 @@ class BasicAuthConfigurationTest {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http { http ->
-                        http.authenticationStrategy = basicAuth { basic ->
+                        http.authentication = basicAuth { basic ->
                             // userLookup not set — should fail
                         }
                         http.rules { r -> r.fallback = r.allow }

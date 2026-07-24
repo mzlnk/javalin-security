@@ -5,8 +5,10 @@ import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
+import io.github.mzlnk.javalin.security.http.HttpSecurityConfig
 import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
 import io.github.mzlnk.javalin.security.ws.WsAuthorizationManager
+import io.github.mzlnk.javalin.security.ws.WsSecurityConfig
 import io.github.mzlnk.javalin.security.ws.WsSecurityGuard
 import io.javalin.config.JavalinState
 import io.javalin.http.Context
@@ -45,8 +47,8 @@ import java.util.function.Consumer
  * this ordering-independence is a security property, not just ergonomics.
  *
  * **Both guards are opt-in.** A guard is registered only when the corresponding block is configured:
- * the HTTP guard requires [SecurityConfig.http] to have been called, and the WS guard requires
- * [SecurityConfig.ws]. Calling `registerPlugin(JavalinSecurityPlugin { })` with neither configured
+ * the HTTP guard requires [Config.http] to have been called, and the WS guard requires
+ * [Config.ws]. Calling `registerPlugin(JavalinSecurityPlugin { })` with neither configured
  * installs no guards at all, leaving all routes unprotected. This keeps the two protocols symmetric
  * and prevents silent over-protection of routes when only one protocol is in use.
  *
@@ -66,8 +68,8 @@ import java.util.function.Consumer
  * The plugin is not repeatable (context-extending plugins never are), so accidentally registering
  * it twice fails fast.
  */
-class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
-    ContextPlugin<SecurityConfig, SecurityContext>(userConfig, SecurityConfig()) {
+class JavalinSecurityPlugin(userConfig: Consumer<Config>) :
+    ContextPlugin<JavalinSecurityPlugin.Config, SecurityContext>(userConfig, Config()) {
 
     override fun priority(): PluginPriority = PluginPriority.EARLY
 
@@ -122,7 +124,7 @@ class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
                 allowCorsPreflight = http.rules.allowCorsPreflight,
             )
 
-            val strategy = http.authenticationStrategy
+            val strategy = http.authentication
             val guard = SecurityGuard(
                 authenticator = strategy.resolvedAuthenticator(),
                 asyncAuthenticator = strategy.resolvedAsyncAuthenticator(),
@@ -134,6 +136,48 @@ class JavalinSecurityPlugin(userConfig: Consumer<SecurityConfig>) :
 
             state.routes.beforeMatched(guard::handle)
         }
+    }
+
+    /**
+     * The mutable security configuration consumed by [JavalinSecurityPlugin].
+     *
+     * A single field-assignment config, the same shape as every other Javalin plugin config (compare
+     * `RateLimitPlugin.Config`): install with
+     * `config.registerPlugin(JavalinSecurityPlugin { security -> ... })` and configure inline.
+     *
+     * **Both guards are opt-in.** The HTTP guard is installed only when [http] was called at least
+     * once; the WS guard is installed only when [ws] was called at least once. If neither is called,
+     * no guards are installed and all routes remain unprotected. This keeps the two protocols
+     * symmetric and prevents silent over-protection of routes when only one protocol is in use.
+     */
+    class Config internal constructor() {
+
+        private var httpConfig: HttpSecurityConfig? = null
+        private var wsConfig: WsSecurityConfig? = null
+
+        internal val http: HttpSecurityConfig? get() = httpConfig
+        internal val ws: WsSecurityConfig? get() = wsConfig
+
+        /**
+         * Configures the HTTP security block. May be called more than once; later calls configure the
+         * same [HttpSecurityConfig] instance (fields are last-write-wins, [HttpSecurityConfig.rules]
+         * entries accumulate).
+         */
+        fun http(configure: Consumer<HttpSecurityConfig>) {
+            val config = httpConfig ?: HttpSecurityConfig().also { httpConfig = it }
+            configure.accept(config)
+        }
+
+        /**
+         * Configures the WebSocket security block. May be called more than once; later calls configure
+         * the same [WsSecurityConfig] instance (fields are last-write-wins, [WsSecurityConfig.rules]
+         * entries accumulate).
+         */
+        fun ws(configure: Consumer<WsSecurityConfig>) {
+            val config = wsConfig ?: WsSecurityConfig().also { wsConfig = it }
+            configure.accept(config)
+        }
+
     }
 
     companion object {

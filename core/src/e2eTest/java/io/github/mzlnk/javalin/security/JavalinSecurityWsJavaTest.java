@@ -487,7 +487,7 @@ class JavalinSecurityWsJavaTest {
                 ws.authentication = authenticationStrategy(headerAuthenticator);
             })));
             config.routes.ws("/ws/chat", ws -> ws.onConnect(ctx -> {
-                Authentication authentication = ExtensionsKt.authentication(ctx);
+                Authentication authentication = SecurityExtensions.authentication(ctx);
                 principalName.set(authentication.getIdentity() instanceof TestPrincipal p ? p.getName() : null);
                 connectLatch.countDown();
             }));

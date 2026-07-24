@@ -18,8 +18,8 @@ import org.slf4j.LoggerFactory
  * 3. Map the [DecodedJwt] to a [JwtPrincipal] and resolve roles via [JwtRolesMapper].
  * 4. Return [AuthenticationResult.Success] with the populated [Authentication].
  *
- * Construct via the `jwt { }` block (which assigns it to `http.authenticator` or
- * `ws.authenticator`) or use [Builder] to obtain an instance directly.
+ * Construct via the `jwt { }` block (which assigns it to `http.authentication` or
+ * `ws.authentication`) or use [Builder] to obtain an instance directly.
  */
 class JwtAuthenticator private constructor(
     private val decoder: JwtDecoder,

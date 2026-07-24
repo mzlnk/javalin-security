@@ -21,7 +21,7 @@ class JavalinSecurityAsyncAuthJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.add("/api/*", GET, Rules.authenticated()));
-                http.authenticationStrategy = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx -> CompletableFuture.supplyAsync(() -> {
+                http.authentication = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx -> CompletableFuture.supplyAsync(() -> {
                     String user = ctx.header("X-User");
                     return user != null
                             ? new AuthenticationResult.Success(Authentication.authenticated(new TestPrincipal(user)))
@@ -44,7 +44,7 @@ class JavalinSecurityAsyncAuthJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.add("/api/*", GET, Rules.allow()));
-                http.authenticationStrategy = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx ->
+                http.authentication = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx ->
                         CompletableFuture.completedFuture(new AuthenticationResult.Failure("async credential failure", null)));
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
@@ -66,7 +66,7 @@ class JavalinSecurityAsyncAuthJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.add("/api/*", GET, Rules.authenticated()));
-                http.authenticationStrategy = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx ->
+                http.authentication = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx ->
                         CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated.INSTANCE));
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("protected-content"));
@@ -88,7 +88,7 @@ class JavalinSecurityAsyncAuthJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.add("/api/*", GET, Rules.allow()));
-                http.authenticationStrategy = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx ->
+                http.authentication = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx ->
                         CompletableFuture.failedFuture(new RuntimeException("internal IdP error")));
             })));
             config.routes.get("/api/resource", ctx -> ctx.result("protected-content"));
@@ -111,7 +111,7 @@ class JavalinSecurityAsyncAuthJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.add("/api/*", GET, Rules.allow()));
-                http.authenticationStrategy = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx -> {
+                http.authentication = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx -> {
                     throw new IllegalStateException("sync crash in authenticator");
                 });
             })));

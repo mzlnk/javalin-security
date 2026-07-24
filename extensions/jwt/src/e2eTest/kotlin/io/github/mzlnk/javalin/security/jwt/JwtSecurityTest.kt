@@ -108,7 +108,7 @@ class JwtSecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticationStrategy = jwt { jwt ->
+                    http.authentication = jwt { jwt ->
                         jwt.decoder = adminDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                         jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
@@ -134,7 +134,7 @@ class JwtSecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticationStrategy = jwt { jwt ->
+                    http.authentication = jwt { jwt ->
                         jwt.decoder = testDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                     }
@@ -212,7 +212,7 @@ class JwtSecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticationStrategy = jwt { jwt ->
+                    http.authentication = jwt { jwt ->
                         jwt.decoder = testDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                         jwt.tokenResolver = TokenResolver.cookie("access_token")
@@ -242,7 +242,7 @@ class JwtSecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http { http ->
-                    http.authenticationStrategy = jwt { jwt ->
+                    http.authentication = jwt { jwt ->
                         jwt.decoder = testDecoder
                         jwt.keySource = JwtKeySource.secret("test-secret")
                         jwt.tokenResolver = TokenResolver.cookie("access_token")
@@ -265,7 +265,7 @@ class JwtSecurityTest {
     private fun app(bearerChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
             security.http { http ->
-                http.authenticationStrategy = jwt { jwt ->
+                http.authentication = jwt { jwt ->
                     jwt.decoder = testDecoder
                     jwt.keySource = JwtKeySource.secret("test-secret-not-actually-used-by-test-double")
                     jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)

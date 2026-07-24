@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.github.mzlnk.javalin.security.E2EJavaTestSupport.authenticationStrategy;
-import static io.github.mzlnk.javalin.security.ExtensionsKt.principal;
+import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
 import static io.javalin.http.HandlerType.DELETE;
 import static io.javalin.http.HandlerType.GET;
 import static io.javalin.http.HandlerType.POST;
@@ -163,7 +163,7 @@ class JavalinSecurityHttpJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.add("/api/v1/*", GET, Rules.allow()));
-                http.authenticationStrategy = authenticationStrategy(headerAuthenticator);
+                http.authentication = authenticationStrategy(headerAuthenticator);
             })));
             config.routes.get("/internal", ctx -> ctx.result("secret"));
         });
@@ -247,7 +247,7 @@ class JavalinSecurityHttpJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = authenticationStrategy(headerAuthenticator);
+                http.authentication = authenticationStrategy(headerAuthenticator);
                 http.rules(rules -> rules.fallback = Rules.deny()); // rule table must NOT be consulted
             })));
             config.routes.get("/admin", ctx -> ctx.result("admin-ok"), Role.ADMIN);
@@ -271,7 +271,7 @@ class JavalinSecurityHttpJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = authenticationStrategy(headerAuthenticator);
+                http.authentication = authenticationStrategy(headerAuthenticator);
                 http.rules(rules -> rules.fallback = Rules.allow()); // even a permissive fallback must not apply
             })));
             config.routes.get("/admin", ctx -> ctx.result("admin-ok"), Role.ADMIN);
@@ -294,7 +294,7 @@ class JavalinSecurityHttpJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authenticationStrategy = authenticationStrategy(ctx -> new AuthenticationResult.Success(
+                http.authentication = authenticationStrategy(ctx -> new AuthenticationResult.Success(
                         Authentication.authenticated(new TestPrincipal("alice"), Role.ADMIN)));
                 http.rules(rules -> rules.add("/plain", GET, Rules.deny()));
             })));
@@ -319,7 +319,7 @@ class JavalinSecurityHttpJavaTest {
                     rules.add("/api/v1/*", DELETE, Rules.hasRole(Role.ADMIN));
                 });
                 if (authenticator != null) {
-                    http.authenticationStrategy = authenticationStrategy(authenticator);
+                    http.authentication = authenticationStrategy(authenticator);
                 }
             })));
             config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));

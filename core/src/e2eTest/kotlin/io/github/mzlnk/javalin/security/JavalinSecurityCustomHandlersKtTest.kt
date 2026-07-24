@@ -33,7 +33,7 @@ class JavalinSecurityCustomHandlersKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authenticationStrategy = authenticationStrategy(alwaysBob)
+                    http.authentication = authenticationStrategy(alwaysBob)
                 }
             }
             cfg.routes.get("/api/v1/me") { it.result(it.principal<TestPrincipal>()!!.name) }
@@ -56,7 +56,7 @@ class JavalinSecurityCustomHandlersKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authenticationStrategy = authenticationStrategy(
+                    http.authentication = authenticationStrategy(
                         unauthorizedHandler = { ctx, _ ->
                             ctx.header("WWW-Authenticate", "Bearer")
                             throw UnauthorizedResponse()
@@ -84,7 +84,7 @@ class JavalinSecurityCustomHandlersKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.hasRole(Role.ADMIN)) }
-                    http.authenticationStrategy = authenticationStrategy(
+                    http.authentication = authenticationStrategy(
                         authenticator = headerAuthenticator,
                         forbiddenHandler = { _, _ ->
                             throw io.javalin.http.ForbiddenResponse("custom denied")
@@ -112,7 +112,7 @@ class JavalinSecurityCustomHandlersKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.allow) }
-                    http.authenticationStrategy = authenticationStrategy(headerAuthenticator)
+                    http.authentication = authenticationStrategy(headerAuthenticator)
                 }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
@@ -135,7 +135,7 @@ class JavalinSecurityCustomHandlersKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authenticationStrategy = authenticationStrategy(
+                    http.authentication = authenticationStrategy(
                         unauthorizedHandler = { ctx, _ -> ctx.status(401).result("denied-without-throwing") },
                     )
                 }
@@ -162,7 +162,7 @@ class JavalinSecurityCustomHandlersKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.hasRole(Role.ADMIN)) }
-                    http.authenticationStrategy = authenticationStrategy(
+                    http.authentication = authenticationStrategy(
                         authenticator = headerAuthenticator,
                         forbiddenHandler = { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") },
                     )
@@ -190,7 +190,7 @@ class JavalinSecurityCustomHandlersKtTest {
             cfg.security { security ->
                 security.http { http ->
                     http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authenticationStrategy = authenticationStrategy(headerAuthenticator)
+                    http.authentication = authenticationStrategy(headerAuthenticator)
                 }
             }
             cfg.routes.get("/api/v1/resource") { ctx ->

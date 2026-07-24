@@ -1,6 +1,6 @@
 dependencies {
     api(project(":javalin-security"))
-    api(project(":javalin-security-extensions-common"))
+    api(project(":javalin-security-common"))
     compileOnly(libs.javalin)
     compileOnly(libs.slf4j.api)
 

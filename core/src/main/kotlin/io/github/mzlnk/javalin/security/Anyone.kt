@@ -10,6 +10,10 @@ import io.javalin.security.RouteRole
  * config.routes.get("/public", handler, Anyone)
  * ```
  *
+ * ```java
+ * config.routes.get("/public", handler, Anyone.INSTANCE);
+ * ```
+ *
  * This is the RouteRole-based equivalent of the pattern-table's `allow` rule, for routes that
  * declare their roles directly rather than relying on a pattern match.
  */

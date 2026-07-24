@@ -23,7 +23,7 @@ class JwtConfigurationTest {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http { http ->
-                        http.authenticationStrategy = jwt { jwt ->
+                        http.authentication = jwt { jwt ->
                             jwt.keySource = JwtKeySource.secret("test-secret")
                             // decoder not set — should fail
                         }
@@ -41,7 +41,7 @@ class JwtConfigurationTest {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http { http ->
-                        http.authenticationStrategy = jwt { jwt ->
+                        http.authentication = jwt { jwt ->
                             jwt.decoder = testDecoder
                             // keySource not set — should fail
                         }
