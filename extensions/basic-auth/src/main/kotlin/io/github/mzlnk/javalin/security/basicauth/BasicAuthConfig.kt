@@ -9,79 +9,47 @@ import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 import java.util.function.Consumer
 
 /**
- * Configuration object for the [basicAuth] strategy factory.
+ * Configuration for the [basicAuth] strategy factory (HTTP Basic, RFC 7617).
  *
- * Configures HTTP Basic authentication (RFC 7617). [userLookup] is the only required field; all
- * other settings have defaults.
- *
- * The addon (this config) owns the decision of *how users are looked up* — [userLookup] — and *how
- * a raw password is compared against the stored one* — [passwordEncoder] — as well as *where the
- * raw credentials are located in the request* — [credentialsResolver]. The [io.javalin.security.RouteRole]s
- * granted to a caller come directly from [BasicUser.roles], supplied by [userLookup] — there is no
- * separate role-mapping step.
- *
- * What [basicAuth] builds from this config:
- * - A [BasicAuthenticator] from [userLookup], [passwordEncoder] and [credentialsResolver] — the
- *   [AuthenticationStrategy.Sync.authenticator] of the returned strategy.
- * - The strategy's [AuthenticationStrategy.forbiddenHandler] directly from [forbiddenHandler].
- * - The strategy's [AuthenticationStrategy.unauthorizedHandler]: a [BasicChallengeUnauthorizedHandler]
- *   when [basicChallenge] is `true`, otherwise [UnauthorizedHandler.DEFAULT].
- *
- * This config does not configure the rule table — use `http.rules { }` alongside
- * `http.authentication = basicAuth { }`. HTTP Basic authentication is HTTP-only; there is no WS
- * variant of this strategy.
+ * [userLookup] is required. Roles come from [BasicUser.roles]. Builds a [BasicAuthenticator] and,
+ * when [basicChallenge] is `true`, a [BasicChallengeUnauthorizedHandler]; otherwise uses
+ * [UnauthorizedHandler.DEFAULT]. HTTP-only — there is no WebSocket variant.
  */
 class BasicAuthConfig internal constructor() {
 
     /**
-     * The [UserLookup] used to resolve a username to its stored [BasicUser] record. **Required.**
-     *
-     * Throws [SecurityConfigurationException] if `null` when the strategy is built.
+     * Resolves a username to its stored [BasicUser]. Required; throws
+     * [SecurityConfigurationException] if unset when the strategy is built.
      */
     @JvmField
     var userLookup: UserLookup? = null
 
     /**
-     * Compares the raw password supplied by the caller against the stored (encoded) password.
-     *
-     * Defaults to [PasswordEncoder.noOp], a plain constant-time string comparison with no hashing.
-     * Real deployments should supply an encoder backed by a proper password-hashing algorithm.
+     * Compares the caller's raw password against the stored encoded password.
+     * Defaults to [PasswordEncoder.noOp].
      */
     @JvmField
     var passwordEncoder: PasswordEncoder = PasswordEncoder.noOp()
 
     /**
-     * Locates the raw credentials within the incoming request.
-     *
-     * Defaults to [BasicCredentialsResolver.DEFAULT], i.e. the `Authorization: Basic ...` header.
+     * Locates raw credentials in the request.
+     * Defaults to [BasicCredentialsResolver.DEFAULT] (`Authorization: Basic ...`).
      */
     @JvmField
     var credentialsResolver: BasicCredentialsResolver = BasicCredentialsResolver.DEFAULT
 
-    /**
-     * The strategy's [AuthenticationStrategy.forbiddenHandler].
-     *
-     * Overrides how access-denied for an authenticated caller is rendered. Defaults to a bare
-     * HTTP 403.
-     */
+    /** Renders 403 responses for authenticated callers denied by authorization. Defaults to a bare 403. */
     @JvmField
     var forbiddenHandler: ForbiddenHandler = ForbiddenHandler.DEFAULT
 
     /**
-     * When `true`, failed or absent authentication responds with a
-     * `WWW-Authenticate: Basic ...` header alongside the 401.
-     *
-     * Defaults to `false`. Enable when clients (e.g. browsers) need the challenge to prompt the
-     * user for credentials.
+     * When `true`, failed or absent authentication includes a `WWW-Authenticate: Basic ...` header.
+     * Defaults to `false`.
      */
     @JvmField
     var basicChallenge: Boolean = false
 
-    /**
-     * The `realm` attribute included in the `WWW-Authenticate` header when [basicChallenge] is `true`.
-     *
-     * Defaults to `"API"`.
-     */
+    /** Realm attribute for the Basic challenge when [basicChallenge] is `true`. Defaults to `"API"`. */
     @JvmField
     var realm: String = "API"
 
@@ -102,28 +70,11 @@ class BasicAuthConfig internal constructor() {
 }
 
 /**
- * Builds an [AuthenticationStrategy.Sync] configured for HTTP Basic authentication (RFC 7617).
+ * Builds an [AuthenticationStrategy.Sync] for HTTP Basic authentication.
  *
- * The same one-stop configuration works from both languages — the [BasicAuthConfig] arrives as an
- * explicit `Consumer` parameter, just like every other configuration block in this library, and
- * the returned strategy is assigned directly to `http.authentication`:
- *
- * ```kotlin
- * http.authentication = basicAuth { basic ->
- *     basic.userLookup = myUserLookup
- * }
- * ```
- *
- * ```java
- * http.authentication = BasicAuthSecurity.basicAuth(basic -> {
- *     basic.userLookup = myUserLookup;
- * });
- * ```
- *
- * Users who want the [BasicAuthenticator] object itself can build one via
- * [BasicAuthenticator.builder] and wrap it in a custom [AuthenticationStrategy.Sync] implementation.
- *
- * The [BasicAuthConfig.userLookup] field is the only required setting.
+ * Assign the result to `http.authentication`. Only [BasicAuthConfig.userLookup] is required.
+ * To use [BasicAuthenticator] directly, call [BasicAuthenticator.builder] and wrap it in a custom
+ * [AuthenticationStrategy.Sync].
  */
 fun basicAuth(configure: Consumer<BasicAuthConfig>): AuthenticationStrategy.Sync {
     val config = BasicAuthConfig().also(configure::accept)

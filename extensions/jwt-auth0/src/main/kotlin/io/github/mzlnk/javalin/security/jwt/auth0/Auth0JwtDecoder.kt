@@ -17,48 +17,13 @@ import java.security.interfaces.RSAPublicKey
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * A [JwtDecoder] implementation backed by the [auth0 java-jwt](https://github.com/auth0/java-jwt)
- * library (v4.x), with JWKS support provided by [jwks-rsa](https://github.com/auth0/jwks-rsa-java).
+ * A [JwtDecoder] backed by [auth0 java-jwt](https://github.com/auth0/java-jwt) (v4.x), with JWKS
+ * support from [jwks-rsa](https://github.com/auth0/jwks-rsa-java).
  *
- * **Dependency:** `com.auth0:java-jwt` and `com.auth0:jwks-rsa` are `compileOnly` dependencies of
- * this module, not bundled transitively — add them yourself (matching the versions this module
- * was built against) if you use this decoder. This keeps consumers who pick a different
- * [JwtDecoder] adapter (e.g. `NimbusJwtDecoder`) free of these libraries on their classpath.
- *
- * This adapter is stateless: it holds no configuration of its own (other than an internal cache
- * for remote JWKS providers) and performs signature verification + claim checks purely from the
- * [JwtVerification] passed to [decode]. All key-source and claim-validation configuration lives
- * in the `jwt { }` block (or [JwtVerification.builder]), not here — analogous to how
- * Javalin's `JavalinJackson` implements `JsonMapper` without owning any Jackson configuration
- * itself.
- *
- * Register it as the decoder:
- *
- * ```kotlin
- * http.authentication = jwt { jwt ->
- *     jwt.decoder = Auth0JwtDecoder
- *     jwt.keySource = JwtKeySource.publicKey(rsaPublicKey)
- * }
- * ```
- *
- * **PEM format:** only the X.509/PKCS#8 public key format is supported
- * (`-----BEGIN PUBLIC KEY-----`). PKCS#1 RSA keys (`-----BEGIN RSA PUBLIC KEY-----`)
- * must be converted first with `openssl rsa -pubin -in key.pem -RSAPublicKey_out | openssl rsa -RSAPublicKey_in -pubout`.
- *
- * **Algorithm selection:** unlike Nimbus's key selector (which is handed the token and returns
- * candidate keys), auth0's `JWTVerifier` is built for one concrete [Algorithm] instance up front.
- * This adapter first decodes the token *without* verifying it to read the `alg`/`kid` header
- * fields (auth0's own documented pattern for JWKS use cases), picks a concrete algorithm
- * consistent with the configured key's type, and only then builds and runs the verifier:
- * - RSA local keys: when no explicit algorithms are configured, all RSA/PSS JWS algorithms are
- *   accepted (RS256/384/512, PS256/384/512). The token's `alg` header selects the specific one.
- *   The `kid` header is ignored for local keys. RSASSA-PSS (`PS*`) verification requires a JCE
- *   provider that implements it; the JDK's built-in providers only do so from Java 11 onwards.
- * - EC local keys: when no explicit algorithms are configured, ES256/384/512 are accepted based on
- *   the token's `alg` header. The `kid` header is ignored for local keys.
- * - HMAC: the algorithm is explicit (e.g. `"HS256"`), taken from the key source, not the token.
- * - JWKS: the key is resolved by matching the token's `kid` against the remote JWK set; the
- *   algorithm is then picked based on the resolved key's type (RSA or EC) and the token's `alg`.
+ * `com.auth0:java-jwt` and `com.auth0:jwks-rsa` are `compileOnly` dependencies of this module; add
+ * them yourself (matching the versions this module was built against) when using this decoder.
+ * Signature verification and claim checks use the [JwtVerification] passed to [decode]. Local PEM
+ * keys must be X.509/PKCS#8 (`-----BEGIN PUBLIC KEY-----`); PKCS#1 RSA PEMs are not accepted.
  */
 object Auth0JwtDecoder : JwtDecoder {
 

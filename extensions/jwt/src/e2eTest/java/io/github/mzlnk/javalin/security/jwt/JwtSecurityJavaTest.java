@@ -290,7 +290,6 @@ class JwtSecurityJavaTest {
         return null;
     }
 
-    /** Wraps a plain {@link Authenticator} (e.g. a built {@link JwtAuthenticator}) in a minimal {@link AuthenticationStrategy.Sync}. */
     private static AuthenticationStrategy.Sync authenticationStrategy(Authenticator authenticator) {
         return new AuthenticationStrategy.Sync() {
             @Override

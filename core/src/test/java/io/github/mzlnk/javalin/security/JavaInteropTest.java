@@ -140,11 +140,6 @@ class JavaInteropTest {
         assertThat(app).isNotNull();
     }
 
-    /**
-     * Builds an {@link AuthenticationStrategy.Sync} directly from Java — the way a custom
-     * authentication mechanism (not provided by a companion library's {@code jwt { }} /
-     * {@code basicAuth { }} factory) is wired up.
-     */
     private static AuthenticationStrategy.Sync authenticationStrategy(Authenticator authenticator) {
         return new AuthenticationStrategy.Sync() {
             @Override

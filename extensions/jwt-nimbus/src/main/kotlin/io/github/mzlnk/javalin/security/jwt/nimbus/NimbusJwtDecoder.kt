@@ -26,42 +26,12 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * A [JwtDecoder] implementation backed by the [Nimbus JOSE+JWT](https://connect2id.com/products/nimbus-jose-jwt)
- * library (v10.x).
+ * A [JwtDecoder] backed by [Nimbus JOSE+JWT](https://connect2id.com/products/nimbus-jose-jwt) (v10.x).
  *
- * **Dependency:** `com.nimbusds:nimbus-jose-jwt` is a `compileOnly` dependency of this module, not
- * bundled transitively — add it yourself (matching the version this module was built against) if
- * you use this decoder. This keeps consumers who pick a different [JwtDecoder] adapter (e.g.
- * `Auth0JwtDecoder`) free of Nimbus on their classpath.
- *
- * This adapter is stateless: it holds no configuration of its own (other than an internal cache
- * for remote JWKS sources) and performs signature verification + claim checks purely from the
- * [JwtVerification] passed to [decode]. All key-source and claim-validation configuration lives
- * in the `jwt { }` block (or [JwtVerification.builder]), not here — analogous to how
- * Javalin's `JavalinJackson` implements `JsonMapper` without owning any Jackson configuration
- * itself.
- *
- * Register it as the decoder:
- *
- * ```kotlin
- * http.authentication = jwt { jwt ->
- *     jwt.decoder = NimbusJwtDecoder
- *     jwt.keySource = JwtKeySource.publicKey(rsaPublicKey)
- * }
- * ```
- *
- * **PEM format:** only the X.509/PKCS#8 public key format is supported
- * (`-----BEGIN PUBLIC KEY-----`). PKCS#1 RSA keys (`-----BEGIN RSA PUBLIC KEY-----`)
- * must be converted first with `openssl rsa -pubin -in key.pem -RSAPublicKey_out | openssl rsa -RSAPublicKey_in -pubout`.
- *
- * **Algorithm selection:**
- * - RSA local keys: when no explicit algorithms are configured, all RSA/PSS JWS algorithms are accepted
- *   (RS256/384/512, PS256/384/512). The token's `alg` header selects the specific one. The `kid` header
- *   is ignored for local keys.
- * - EC local keys: when no explicit algorithms are configured, ES256/384/512 are accepted based on the
- *   token's `alg` header. The `kid` header is ignored for local keys.
- * - HMAC: the algorithm is explicit (e.g. `"HS256"`).
- * - JWKS: algorithms and key selection are resolved by matching the token's `kid` against the remote JWK set.
+ * `com.nimbusds:nimbus-jose-jwt` is a `compileOnly` dependency of this module; add it yourself
+ * (matching the version this module was built against) when using this decoder. Signature
+ * verification and claim checks use the [JwtVerification] passed to [decode]. Local PEM keys must
+ * be X.509/PKCS#8 (`-----BEGIN PUBLIC KEY-----`); PKCS#1 RSA PEMs are not accepted.
  */
 object NimbusJwtDecoder : JwtDecoder {
 

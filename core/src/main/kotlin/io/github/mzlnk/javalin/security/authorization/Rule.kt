@@ -4,13 +4,14 @@ import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.javalin.http.Context
 
 /**
- * A single access decision applied to a request that matched a configured pattern.
+ * Access decision for a request that matched a configured pattern.
  *
- * Implementations receive the current [Authentication] and the request [Context] and return
- * whether access is granted. Custom rules can be supplied as lambdas thanks to the SAM conversion.
+ * Returns whether access is granted for the given [Authentication] and [Context]. Custom rules
+ * may be supplied as lambdas (SAM conversion).
  */
 fun interface Rule {
 
+    /** Returns `true` when access is granted for [authentication] on [context]. */
     fun isGranted(authentication: Authentication, context: Context): Boolean
 
 }

@@ -16,44 +16,13 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletionException
 
 /**
- * The WebSocket upgrade-time security pipeline.
+ * WebSocket upgrade-time security pipeline, registered as a `wsBeforeUpgrade` handler.
  *
- * Registered as a [wsBeforeUpgrade][io.javalin.config.RouterConfig.wsBeforeUpgrade] handler, which
- * runs on the HTTP upgrade request before the WebSocket handshake completes. The pipeline:
- *
- * 1. **Origin check (CSWSH)** — when [allowedOrigins] is configured, the `Origin` header is
- *    validated first. A missing or unlisted origin invokes the configured [ForbiddenHandler]
- *    (403 by default) and halts the upgrade before authentication runs.
- * 2. **Authenticate** — authenticate the upgrade request (sync, or async resolved by a blocking
- *    join, see below).
- * 3. **Authorize** — if the matched WS endpoint declares [RouteRole]s, grant access when they
- *    include [Anyone] or intersect the caller's own [Authentication.roles]; otherwise evaluate
- *    the configured WS rule table. On grant, the guard returns and the upgrade proceeds to
- *    [onConnect][io.javalin.websocket.WsConnectContext]. On deny, the configured
- *    [UnauthorizedHandler] (401) or [ForbiddenHandler] (403) is invoked and the upgrade is halted
- *    via [Context.skipRemainingHandlers].
- *
- * **Deny-by-default:** a path that matches no configured WS rule (and declares no granted role) is
- * denied outright (anonymous caller → 401, authenticated caller → 403).
- *
- * **Sync path (default, zero overhead):** when [authenticator] is present, or neither manager is
- * set (anonymous), the pipeline is fully synchronous.
- *
- * **Async (blocking) path (opt-in):** when [asyncAuthenticator] is present, the returned
- * [java.util.concurrent.CompletableFuture] is joined on the upgrade thread. `ctx.future` is not
- * used because the WebSocket handshake is synchronous — deferring the upgrade via `ctx.future` is
- * not a supported Javalin pattern. With `config.concurrency.useVirtualThreads = true` the blocking
- * join is cheap; for heavy I/O, virtual threads or a pre-fetched token cache are recommended.
- *
- * If the async future completes exceptionally, or [asyncAuthenticator] throws synchronously, the
- * error is caught and converted to [AuthenticationResult.Failure] so the pipeline remains
- * fail-closed and no internal detail is leaked to the caller.
- *
- * [authenticator] and [asyncAuthenticator] are resolved by [io.github.mzlnk.javalin.security.JavalinSecurityPlugin]
- * from the single [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy] assigned
- * to `ws.authentication`; the two are mutually exclusive by construction (a strategy is either
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Sync] or
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Async], never both).
+ * When [allowedOrigins] is set, validates `Origin` first and rejects missing/unlisted values via
+ * [forbiddenHandler]. Then authenticates (sync, or async resolved by blocking `join()`), publishes
+ * [Authentication] on the [Context], and authorizes via route roles or [authorizationManager].
+ * Unmatched paths are denied (anonymous → 401, authenticated → 403). [authenticator] and
+ * [asyncAuthenticator] are mutually exclusive.
  */
 internal class WsSecurityGuard(
     private val authenticator: Authenticator?,
@@ -65,6 +34,7 @@ internal class WsSecurityGuard(
     private val allowedOrigins: Set<String>?,
 ) {
 
+    /** Runs the upgrade security pipeline for [context]. */
     fun handle(context: Context) {
         val path = pathNormalizer.normalize(context.path())
 
@@ -153,11 +123,7 @@ internal class WsSecurityGuard(
         }
     }
 
-    /**
-     * Grants access when the matched WS endpoint's declared [RouteRole]s include [Anyone], or
-     * when they intersect the caller's own [Authentication.roles]. A plain set-membership check,
-     * relying on [RouteRole] equality.
-     */
+    /** Returns `true` when [routeRoles] include [Anyone] or intersect [Authentication.roles]. */
     private fun grantedByRole(routeRoles: Set<RouteRole>, authentication: Authentication): Boolean =
         Anyone in routeRoles || routeRoles.any { it in authentication.roles }
 

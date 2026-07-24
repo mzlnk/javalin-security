@@ -5,17 +5,8 @@ import io.github.mzlnk.javalin.security.authentication.Identity
 /**
  * The [Identity] produced by JWT authentication.
  *
- * Wraps the fully verified and decoded [token] so that route handlers and authorization rules can
- * read any claim without re-parsing the token:
- *
- * ```kotlin
- * val principal: JwtPrincipal? = ctx.principal()
- * val roles: List<String>? = principal?.token?.claim("roles")
- * ```
- *
- * [name] is the `sub` (subject) claim; it is used for logging and as the human-readable identity.
- * When no `sub` claim was present in the token, [name] is an empty string — callers that require a
- * non-empty subject should validate it in their [JwtRolesMapper] or a custom authorization rule.
+ * Wraps the verified [token] so handlers and authorization rules can read claims without
+ * re-parsing. [name] is the `sub` claim; when `sub` is absent, [name] is an empty string.
  */
 class JwtPrincipal(val token: DecodedJwt) : Identity {
 

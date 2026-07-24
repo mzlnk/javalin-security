@@ -3,17 +3,14 @@ package io.github.mzlnk.javalin.security.authorization
 import io.javalin.security.RouteRole
 
 /**
- * The single source of truth for built-in [Rule] logic.
+ * Built-in [Rule] factories.
  *
- * Java users call these `@JvmStatic` methods directly — e.g. `Rules.allow()`,
- * `Rules.hasRole(Role.ADMIN)` — with no extra indirection.
- *
- * Kotlin users access the same rules as unqualified DSL members inside a rule-declaration block
- * (e.g. `rules { }`) via [RuleFactory] delegation to [DefaultRules], which delegates here.
+ * Call from Java as `Rules.allow()`, `Rules.hasRole(...)`, etc. From Kotlin, the same rules are
+ * available as unqualified DSL members inside `rules { }` via [RuleFactory].
  */
 object Rules {
 
-    /** Always grants access, even to unauthenticated callers. */
+    /** Always grants access, including to unauthenticated callers. */
     @JvmStatic
     fun allow(): Rule = Rule { _, _ -> true }
 
@@ -26,19 +23,16 @@ object Rules {
     fun authenticated(): Rule = Rule { authentication, _ -> authentication.isAuthenticated }
 
     /**
-     * Grants access when the caller holds the given [role].
-     *
-     * Matching is a plain `role in authentication.roles` set-membership check, so it relies on
-     * [RouteRole] equality — enum constants and data classes compare correctly out of the box.
+     * Grants access when the caller holds [role].
+     * Matching uses [RouteRole] equality via set membership on the caller's roles.
      */
     @JvmStatic
     fun hasRole(role: RouteRole): Rule =
         Rule { authentication, _ -> authentication.isAuthenticated && role in authentication.roles }
 
     /**
-     * Grants access when the caller holds at least one of the given [roles].
-     *
-     * Matching is a plain set-membership check per [RouteRole] equality (see [hasRole]).
+     * Grants access when the caller holds at least one of [roles].
+     * Matching uses [RouteRole] equality (see [hasRole]).
      */
     @JvmStatic
     fun hasAnyRole(vararg roles: RouteRole): Rule =

@@ -10,16 +10,11 @@ import org.slf4j.LoggerFactory
 /**
  * Implements JWT bearer-token authentication.
  *
- * The pipeline is explicit and has no hidden side-effects:
- * 1. Extract the raw token from the request via [TokenResolver].
- *    No token -> [AuthenticationResult.NotAuthenticated] (anonymous; authorization rules decide access).
- * 2. Call [JwtDecoder.decode] with the configured [JwtVerification]. Any thrown exception ->
- *    [AuthenticationResult.Failure] (logged; 401).
- * 3. Map the [DecodedJwt] to a [JwtPrincipal] and resolve roles via [JwtRolesMapper].
- * 4. Return [AuthenticationResult.Success] with the populated [Authentication].
- *
- * Construct via the `jwt { }` block (which assigns it to `http.authentication` or
- * `ws.authentication`) or use [Builder] to obtain an instance directly.
+ * Extracts the raw token via [TokenResolver]: missing token yields
+ * [AuthenticationResult.NotAuthenticated]. Calls [JwtDecoder.decode] with the configured
+ * [JwtVerification]; any thrown exception yields [AuthenticationResult.Failure]. On success, maps
+ * the [DecodedJwt] to a [JwtPrincipal], resolves roles via [JwtRolesMapper], and returns
+ * [AuthenticationResult.Success]. Construct via `jwt { }` or [Builder].
  */
 class JwtAuthenticator private constructor(
     private val decoder: JwtDecoder,
@@ -44,18 +39,7 @@ class JwtAuthenticator private constructor(
         return AuthenticationResult.Success(Authentication.authenticated(principal, roles))
     }
 
-    /**
-     * Fluent builder for Java interop.
-     *
-     * Usage from Java:
-     *
-     * ```java
-     * JwtVerification verification = JwtVerification.builder(JwtKeySource.publicKey(rsaKey)).build();
-     * JwtAuthenticator authenticator = JwtAuthenticator.builder(NimbusJwtDecoder.INSTANCE, verification)
-     *     .rolesMapper(JwtRolesMapper.fromClaim("roles", name -> Role.valueOf(name)))
-     *     .build();
-     * ```
-     */
+    /** Fluent builder for constructing a [JwtAuthenticator]. */
     class Builder(
         private val decoder: JwtDecoder,
         private val verification: JwtVerification,
@@ -64,20 +48,23 @@ class JwtAuthenticator private constructor(
         private var rolesMapper: JwtRolesMapper = JwtRolesMapper.noRoles()
         private var tokenResolver: TokenResolver = TokenResolver.DEFAULT
 
+        /** Sets the [JwtRolesMapper] used to resolve roles from a verified token. Defaults to [JwtRolesMapper.noRoles]. */
         fun rolesMapper(mapper: JwtRolesMapper): Builder {
             this.rolesMapper = mapper
             return this
         }
 
         /**
-         * Overrides how the raw token is located in the request (defaults to [TokenResolver.DEFAULT],
-         * i.e. the `Authorization: Bearer ...` header).
+         * Overrides how the raw token is located in the request.
+         *
+         * Defaults to [TokenResolver.DEFAULT] (`Authorization: Bearer ...`).
          */
         fun tokenResolver(resolver: TokenResolver): Builder {
             this.tokenResolver = resolver
             return this
         }
 
+        /** Builds a [JwtAuthenticator] with the configured settings. */
         fun build(): JwtAuthenticator = JwtAuthenticator(
             decoder = decoder,
             verification = verification,
@@ -94,12 +81,12 @@ class JwtAuthenticator private constructor(
         /**
          * Creates a [Builder] pre-loaded with the required [decoder] and [verification].
          *
-         * These are the only required arguments; all other settings have sensible defaults.
+         * These are the only required arguments; other settings use defaults.
          */
         @JvmStatic
         fun builder(decoder: JwtDecoder, verification: JwtVerification): Builder = Builder(decoder, verification)
 
-        /** Creates a [JwtAuthenticator] with the given [decoder], [verification] and default settings. */
+        /** Creates a [JwtAuthenticator] with the given [decoder], [verification], and default settings. */
         @JvmStatic
         fun of(decoder: JwtDecoder, verification: JwtVerification): JwtAuthenticator =
             Builder(decoder, verification).build()

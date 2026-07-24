@@ -5,54 +5,36 @@ import io.javalin.security.RouteRole
 /**
  * Maps a decoded JWT to the set of [RouteRole]s granted to the caller.
  *
- * The resulting set is passed directly to
- * [io.github.mzlnk.javalin.security.authentication.Authentication.authenticated] and is therefore
- * the value read by declared-role routes/endpoints and by authorization rules such as
- * `hasRole(Role.ADMIN)`.
- *
- * Register via the `jwt { }` block (`rolesMapper` field, e.g. [fromClaim]) or supply a lambda.
- * The default (when not configured) returns an empty set.
- *
- * Custom mappers receive the fully-verified [DecodedJwt] and may read any claim:
- *
- * ```kotlin
- * jwt {
- *     decoder = myDecoder
- *     rolesMapper = JwtRolesMapper { token ->
- *         val dept = token.claim<String>("department") ?: return@JwtRolesMapper emptySet()
- *         setOf(Role.valueOf("DEPT_$dept"))
- *     }
- * }
- * ```
+ * The resulting set is passed to
+ * [io.github.mzlnk.javalin.security.authentication.Authentication.authenticated] and is used by
+ * declared-role routes and authorization rules such as `hasRole`. Register via the `jwt { }` block
+ * (`rolesMapper`); the default when unset is [noRoles]. Custom mappers receive a verified
+ * [DecodedJwt] and may read any claim.
  */
 fun interface JwtRolesMapper {
 
+    /** Returns the [RouteRole]s granted for the given verified [token]. */
     fun map(token: DecodedJwt): Set<RouteRole>
 
     companion object {
 
         /**
-         * Returns an empty-set mapper. This is the default when no mapper is configured.
+         * Returns a mapper that always yields an empty set.
          *
-         * Authorization rules that require specific roles will never be satisfied; use this only
-         * when all protected routes rely solely on `authenticated` / `allow`.
+         * This is the default when no mapper is configured. Authorization rules that require
+         * specific roles will never match; use only when protected routes rely solely on
+         * `authenticated` / `allow`.
          */
         @JvmStatic
         fun noRoles(): JwtRolesMapper = JwtRolesMapper { emptySet() }
 
         /**
-         * Reads roles from a single string or list-of-strings claim named [claimName], converting
-         * each string value to a [RouteRole] via the app-supplied [roleOf] factory.
+         * Reads roles from a string or list-of-strings claim named [claimName], converting each
+         * value to a [RouteRole] via [roleOf].
          *
-         * - If the claim value is a `String`, it is treated as a single role name.
-         * - If the claim value is a `Collection<*>`, each element's `toString()` is used.
-         * - If the claim is absent or of an unrecognised type, an empty set is returned.
-         * - Any name for which [roleOf] returns `null` is dropped.
-         *
-         * Example — for a token with `"roles": ["ADMIN", "USER"]`:
-         * ```kotlin
-         * rolesMapper = JwtRolesMapper.fromClaim("roles") { name -> Role.entries.find { it.name == name } }
-         * ```
+         * A `String` claim is treated as a single role name; a `Collection<*>` uses each element's
+         * `toString()`. An absent or unrecognized claim yields an empty set. Names for which
+         * [roleOf] returns `null` are dropped.
          */
         @JvmStatic
         fun fromClaim(claimName: String, roleOf: (String) -> RouteRole?): JwtRolesMapper = JwtRolesMapper { token ->
@@ -65,16 +47,11 @@ fun interface JwtRolesMapper {
         }
 
         /**
-         * Reads roles from the space-delimited `scope` claim (OAuth 2.0 convention), converting
-         * each scope token to a [RouteRole] via the app-supplied [roleOf] factory.
+         * Reads roles from the space-delimited `scope` claim (OAuth 2.0), converting each scope
+         * token to a [RouteRole] via [roleOf].
          *
-         * Each scope token is looked up individually. Absent or blank scopes produce an empty
-         * set. Any scope for which [roleOf] returns `null` is dropped.
-         *
-         * Example — for a token with `"scope": "read:orders write:orders"`:
-         * ```kotlin
-         * rolesMapper = JwtRolesMapper.fromScope { scope -> Role.entries.find { it.scope == scope } }
-         * ```
+         * Absent or blank scopes yield an empty set. Scopes for which [roleOf] returns `null` are
+         * dropped.
          */
         @JvmStatic
         fun fromScope(roleOf: (String) -> RouteRole?): JwtRolesMapper = JwtRolesMapper { token ->

@@ -5,15 +5,10 @@ import io.javalin.config.RouterConfig
 import io.javalin.router.matcher.PathParser
 
 /**
- * Compiles [pattern] into a Javalin [PathParser] using exactly the same syntax and matching rules
- * Javalin's own router uses for route paths (`*`, `{param}`, `<param>`) — so a security rule
- * pattern can never drift from how Javalin itself would match the same path. [routerConfig] is
- * read at plugin startup, mirroring `ignoreTrailingSlashes`, `treatMultipleSlashesAsSingleSlash`
- * and `caseInsensitiveRoutes`.
+ * Compiles [pattern] into a Javalin [PathParser] using the same route syntax as Javalin's router
+ * (`*`, `{param}`, `<param>`), with [routerConfig] applied at plugin startup.
  *
- * Rejects the Ant-style tokens (`**`, `?`) supported by the legacy matcher this library used to
- * ship, so a pattern copied from an older config fails fast at startup with migration guidance
- * instead of silently matching differently.
+ * Rejects Ant-style tokens (`**`, `?`) with a [SecurityConfigurationException].
  */
 internal fun compilePattern(pattern: String, routerConfig: RouterConfig): PathParser {
     if ("**" in pattern) {

@@ -8,20 +8,12 @@ import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 
-/**
- * A minimal [Identity] used to identify the caller across e2e tests, standing in for a real
- * application principal (e.g. a JPA `User` entity or a decoded token subject).
- */
+/** Minimal [Identity] for e2e tests. */
 data class TestPrincipal(override val name: String) : Identity
 
 /**
- * Builds an [AuthenticationStrategy.Sync] directly, without going through a companion library's
- * `jwt { }` / `basicAuth { }` factory — the way a fully custom authentication mechanism is wired
- * up (see [AuthenticationStrategy]).
- *
- * [authenticator] defaults to a no-op authenticator that always reports
- * [AuthenticationResult.NotAuthenticated] (anonymous), so a strategy can be built purely to carry
- * an [unauthorizedHandler] or [forbiddenHandler] override.
+ * Builds an [AuthenticationStrategy.Sync] for e2e tests.
+ * [authenticator] defaults to always returning [AuthenticationResult.NotAuthenticated].
  */
 fun authenticationStrategy(
     authenticator: Authenticator = Authenticator { AuthenticationResult.NotAuthenticated },
@@ -33,7 +25,7 @@ fun authenticationStrategy(
     override fun authenticator(): Authenticator = authenticator
 }
 
-/** Builds an [AuthenticationStrategy.Async] directly. See [authenticationStrategy] for the optional overrides. */
+/** Builds an [AuthenticationStrategy.Async] for e2e tests. */
 fun asyncAuthenticationStrategy(
     asyncAuthenticator: AsyncAuthenticator,
     unauthorizedHandler: UnauthorizedHandler = UnauthorizedHandler.DEFAULT,

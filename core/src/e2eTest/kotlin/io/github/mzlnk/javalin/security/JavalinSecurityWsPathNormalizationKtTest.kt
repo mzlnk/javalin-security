@@ -121,14 +121,6 @@ class JavalinSecurityWsPathNormalizationKtTest {
         return connected.get() to statusCode.get()
     }
 
-    /**
-     * Sends a raw HTTP WebSocket upgrade request via a plain TCP socket, giving full control
-     * over which headers are included (or omitted) — used for headers the JDK WebSocket client
-     * manages automatically, such as `Origin`.
-     *
-     * Returns the HTTP response status code from the server's status line (e.g. 101, 401, 403).
-     */
-
     private fun rawUpgradeStatusCode(
         host: String,
         port: Int,

@@ -5,23 +5,19 @@ import io.javalin.http.Context
 import io.javalin.http.ForbiddenResponse
 
 /**
- * Invoked when an authenticated caller is denied access by the authorization rules.
+ * Handles access denied for an authenticated caller.
  *
- * Applications override this to customise the 403 response (body, headers, problem+json, etc.).
- * The default implementation responds with a bare `403 Forbidden`, mirroring Javalin's own
- * [ForbiddenResponse].
- *
- * Implementations do not need to throw to stop the request: the guard skips all remaining handlers
- * after invoking this callback, so the matched handler is never reached. Simply rendering the desired
- * response (status, headers, body) is sufficient.
+ * Defaults to a bare `403 Forbidden` via [ForbiddenResponse]. Implementations only need to render
+ * the response; the guard skips remaining handlers afterward.
  */
 fun interface ForbiddenHandler {
 
+    /** Renders the forbidden response for [context] given the caller's [authentication]. */
     fun handle(context: Context, authentication: Authentication)
 
     companion object {
 
-        /** The default handler: a bare `403 Forbidden`. */
+        /** Default handler: bare `403 Forbidden`. */
         @JvmStatic
         val DEFAULT: ForbiddenHandler = ForbiddenHandler { _, _ -> throw ForbiddenResponse() }
 

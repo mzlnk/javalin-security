@@ -18,24 +18,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Java-side counterpart of the WebSocket test helpers duplicated across the Kotlin e2e WS test
- * classes — attempts a WebSocket upgrade and reports whether it succeeded or was rejected by the
- * security guard before the handshake completed.
- */
+/** Shared WebSocket upgrade helpers for Java e2e tests. */
 final class WsTestClient {
 
     private WsTestClient() {
     }
 
-    /** The outcome of a WebSocket upgrade attempt. */
+    /** Result of a WebSocket upgrade attempt. */
     record UpgradeAttempt(boolean connected, Integer statusCode) {
     }
 
-    /**
-     * Attempts a WebSocket upgrade and returns whether it connected, and — on HTTP-level
-     * rejection — the server's status code (extracted from {@link WebSocketHandshakeException}).
-     */
+    /** Attempts a WebSocket upgrade; on HTTP rejection, {@code statusCode} holds the response status. */
     static UpgradeAttempt tryConnect(String origin, String path, Map<String, String> headers) {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean connected = new AtomicBoolean(false);
@@ -64,10 +57,7 @@ final class WsTestClient {
         return new UpgradeAttempt(connected.get(), statusCode.get());
     }
 
-    /**
-     * Attempts a WebSocket upgrade and returns the rejection response body as a String. Used only
-     * to verify that no internal detail is present in a denial response.
-     */
+    /** Attempts a WebSocket upgrade and returns the HTTP rejection response body, if any. */
     static String upgradeRejectionBody(String origin, String path, Map<String, String> headers) {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> body = new AtomicReference<>("");
@@ -95,13 +85,7 @@ final class WsTestClient {
         return body.get();
     }
 
-    /**
-     * Sends a raw HTTP WebSocket upgrade request via a plain TCP socket, giving full control over
-     * which headers are included (or omitted) — used for headers the JDK WebSocket client manages
-     * automatically, such as {@code Origin}.
-     *
-     * Returns the HTTP response status code from the server's status line (e.g. 101, 401, 403).
-     */
+    /** Sends a raw WebSocket upgrade over TCP and returns the HTTP status code from the status line. */
     static int rawUpgradeStatusCode(String host, int port, String path, Map<String, String> extraHeaders) {
         try (Socket socket = new Socket(host, port)) {
             socket.setSoTimeout(5_000);

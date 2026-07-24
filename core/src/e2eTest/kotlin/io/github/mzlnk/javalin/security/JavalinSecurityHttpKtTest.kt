@@ -15,11 +15,6 @@ import org.junit.jupiter.api.Test
 class JavalinSecurityHttpKtTest {
     private enum class Role : RouteRole { ADMIN, USER }
 
-    /**
-     * Test authenticator: authenticates when an `X-User` header is present, granting the roles
-     * listed (comma separated) in `X-Roles`. A user named "invalid" simulates a bad credential.
-     */
-
     private val headerAuthenticator = Authenticator { context ->
         when (val user = context.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated

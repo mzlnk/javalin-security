@@ -17,64 +17,23 @@ import io.javalin.plugin.PluginPriority
 import java.util.function.Consumer
 
 /**
- * The Javalin plugin that installs the security framework.
+ * Javalin plugin that installs HTTP and WebSocket security guards.
  *
- * Public, `Consumer`-configured, and installed exactly like every other Javalin plugin:
- *
- * ```kotlin
- * config.registerPlugin(JavalinSecurityPlugin { security ->
- *     security.http { http -> ... }
- * })
- * ```
- *
- * ```java
- * config.registerPlugin(new JavalinSecurityPlugin(security -> {
- *     security.http(http -> ...);
- * }));
- * ```
- *
- * As a [io.javalin.plugin.ContextPlugin], it also exposes the resolved
- * [io.github.mzlnk.javalin.security.authentication.Authentication] via `ctx.with(JavalinSecurityPlugin.class)`
- * — the same language-neutral access path every Javalin `ContextPlugin` uses, with no Kotlin-only
- * extension-function indirection required.
- *
- * All wiring happens in [onStart], which Javalin invokes once the entire `Javalin.create { }` block
- * has been applied. This is deliberate: the authorization matcher and the [PathNormalizer] mirror
- * Javalin's own router settings (`caseInsensitiveRoutes`, `ignoreTrailingSlashes`,
- * `treatMultipleSlashesAsSingleSlash`), and reading them at startup - rather than at the moment the
- * plugin is configured - guarantees they reflect the final router configuration regardless of the
- * order in which the user declares things. A mismatch there would be an authorization bypass, so
- * this ordering-independence is a security property, not just ergonomics.
- *
- * **Both guards are opt-in.** A guard is registered only when the corresponding block is configured:
- * the HTTP guard requires [Config.http] to have been called, and the WS guard requires
- * [Config.ws]. Calling `registerPlugin(JavalinSecurityPlugin { })` with neither configured
- * installs no guards at all, leaving all routes unprotected. This keeps the two protocols symmetric
- * and prevents silent over-protection of routes when only one protocol is in use.
- *
- * **HTTP guard:** registered as a `beforeMatched` handler. The plugin runs at [PluginPriority.EARLY]
- * so the guard is registered before `beforeMatched` handlers added by other plugins (those with
- * [PluginPriority.NORMAL] or [PluginPriority.LATE]). However, handlers added directly via
- * `cfg.routes.beforeMatched()` inside `Javalin.create { }` are registered before any plugin's
- * `onStart`, so they run before the guard. To observe a resolved
- * [io.github.mzlnk.javalin.security.authentication.Authentication], add user `beforeMatched`
- * handlers on the Javalin instance after creation (`app.beforeMatched { ... }`).
- *
- * **WS guard:** registered as a `wsBeforeUpgrade` handler, which runs on the HTTP upgrade request
- * before the WebSocket handshake completes. This is the correct lifecycle hook for WS security —
- * `beforeMatched` does not fire for WebSocket upgrade requests in Javalin 7. The WS guard and the
- * HTTP guard are independent; they share no ordering coupling.
- *
- * The plugin is not repeatable (context-extending plugins never are), so accidentally registering
- * it twice fails fast.
+ * Register via `config.registerPlugin(JavalinSecurityPlugin { ... })` or [security]. Each guard is
+ * installed only when its block (`http` / `ws`) is configured. Wiring runs in [onStart]. Resolved
+ * authentication is available via `ctx.with(JavalinSecurityPlugin::class)` and the package extensions.
+ * HTTP uses `beforeMatched` at [PluginPriority.EARLY]; WebSocket uses `wsBeforeUpgrade`.
  */
 class JavalinSecurityPlugin(userConfig: Consumer<Config>) :
     ContextPlugin<JavalinSecurityPlugin.Config, SecurityContext>(userConfig, Config()) {
 
+    /** Runs before other plugins' `beforeMatched` handlers so the guard executes early. */
     override fun priority(): PluginPriority = PluginPriority.EARLY
 
+    /** Creates the per-request [SecurityContext] extension. */
     override fun createExtension(context: Context): SecurityContext = SecurityContext(context)
 
+    /** Validates config and registers the HTTP and/or WebSocket guards. */
     override fun onStart(state: JavalinState) {
         val http = pluginConfig.http
         val ws = pluginConfig.ws
@@ -139,16 +98,10 @@ class JavalinSecurityPlugin(userConfig: Consumer<Config>) :
     }
 
     /**
-     * The mutable security configuration consumed by [JavalinSecurityPlugin].
+     * Mutable security configuration for [JavalinSecurityPlugin].
      *
-     * A single field-assignment config, the same shape as every other Javalin plugin config (compare
-     * `RateLimitPlugin.Config`): install with
-     * `config.registerPlugin(JavalinSecurityPlugin { security -> ... })` and configure inline.
-     *
-     * **Both guards are opt-in.** The HTTP guard is installed only when [http] was called at least
-     * once; the WS guard is installed only when [ws] was called at least once. If neither is called,
-     * no guards are installed and all routes remain unprotected. This keeps the two protocols
-     * symmetric and prevents silent over-protection of routes when only one protocol is in use.
+     * The HTTP guard is installed only when [http] is called at least once; the WS guard only when
+     * [ws] is called at least once. If neither is called, no guards are installed.
      */
     class Config internal constructor() {
 
@@ -159,9 +112,8 @@ class JavalinSecurityPlugin(userConfig: Consumer<Config>) :
         internal val ws: WsSecurityConfig? get() = wsConfig
 
         /**
-         * Configures the HTTP security block. May be called more than once; later calls configure the
-         * same [HttpSecurityConfig] instance (fields are last-write-wins, [HttpSecurityConfig.rules]
-         * entries accumulate).
+         * Configures the HTTP security block. Repeated calls reuse the same [HttpSecurityConfig]
+         * (fields are last-write-wins; rule entries accumulate).
          */
         fun http(configure: Consumer<HttpSecurityConfig>) {
             val config = httpConfig ?: HttpSecurityConfig().also { httpConfig = it }
@@ -169,9 +121,8 @@ class JavalinSecurityPlugin(userConfig: Consumer<Config>) :
         }
 
         /**
-         * Configures the WebSocket security block. May be called more than once; later calls configure
-         * the same [WsSecurityConfig] instance (fields are last-write-wins, [WsSecurityConfig.rules]
-         * entries accumulate).
+         * Configures the WebSocket security block. Repeated calls reuse the same [WsSecurityConfig]
+         * (fields are last-write-wins; rule entries accumulate).
          */
         fun ws(configure: Consumer<WsSecurityConfig>) {
             val config = wsConfig ?: WsSecurityConfig().also { wsConfig = it }
@@ -182,7 +133,7 @@ class JavalinSecurityPlugin(userConfig: Consumer<Config>) :
 
     companion object {
 
-        /** Request attribute key under which the resolved [io.github.mzlnk.javalin.security.authentication.Authentication] is stored on the [Context]. */
+        /** Request attribute key for the resolved [io.github.mzlnk.javalin.security.authentication.Authentication]. */
         const val AUTHENTICATION_ATTRIBUTE: String = "io.github.mzlnk.javalin.security.Authentication"
 
     }

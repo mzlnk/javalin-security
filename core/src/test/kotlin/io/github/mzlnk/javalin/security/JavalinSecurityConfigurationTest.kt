@@ -143,7 +143,6 @@ class JavalinSecurityConfigurationTest {
         }.doesNotThrowAnyException()
     }
 
-    /** Builds a fresh [JavalinSecurityPlugin] and runs its startup wiring/validation without booting a real server. */
     private fun start(configure: (JavalinSecurityPlugin.Config) -> Unit) {
         JavalinSecurityPlugin { configure(it) }.onStart(JavalinState())
     }

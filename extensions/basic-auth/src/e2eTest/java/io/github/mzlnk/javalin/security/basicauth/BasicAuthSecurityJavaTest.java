@@ -281,7 +281,6 @@ class BasicAuthSecurityJavaTest {
         return "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
     }
 
-    /** Wraps a plain {@link Authenticator} (e.g. a built {@link BasicAuthenticator}) in a minimal {@link AuthenticationStrategy.Sync}. */
     private static AuthenticationStrategy.Sync authenticationStrategy(Authenticator authenticator) {
         return authenticationStrategy(authenticator, UnauthorizedHandler.getDEFAULT(), ForbiddenHandler.getDEFAULT());
     }

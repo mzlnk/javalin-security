@@ -6,12 +6,7 @@ import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy;
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler;
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler;
 
-/**
- * Java-side counterpart of {@code E2ETestSupport.kt}'s {@code authenticationStrategy}/{@code asyncAuthenticationStrategy} —
- * building an {@link AuthenticationStrategy} directly from Java, the way a fully custom
- * authentication mechanism (not provided by a companion library's {@code jwt( )} /
- * {@code basicAuth( )} factory) is wired up.
- */
+/** Java helpers for building an {@link AuthenticationStrategy} in e2e tests. */
 final class E2EJavaTestSupport {
 
     private E2EJavaTestSupport() {

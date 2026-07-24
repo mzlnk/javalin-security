@@ -11,24 +11,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Java-side counterpart of the WebSocket test helper duplicated across the Kotlin e2e WS test
- * classes — attempts a WebSocket upgrade and reports whether it succeeded or was rejected by the
- * security guard before the handshake completed.
- */
+/** Shared WebSocket upgrade helpers for JWT e2e tests. */
 final class WsTestClient {
 
     private WsTestClient() {
     }
 
-    /** The outcome of a WebSocket upgrade attempt. */
+    /** Result of a WebSocket upgrade attempt. */
     record UpgradeAttempt(boolean connected, Integer statusCode) {
     }
 
-    /**
-     * Attempts a WebSocket upgrade and returns whether it connected, and — on HTTP-level
-     * rejection — the server's status code (extracted from {@link WebSocketHandshakeException}).
-     */
+    /** Attempts a WebSocket upgrade; on HTTP rejection, {@code statusCode} holds the response status. */
     static UpgradeAttempt tryConnect(String origin, String path, Map<String, String> headers) {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean connected = new AtomicBoolean(false);

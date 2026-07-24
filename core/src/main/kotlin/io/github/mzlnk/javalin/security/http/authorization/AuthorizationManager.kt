@@ -6,22 +6,14 @@ import io.github.mzlnk.javalin.security.authorization.compilePattern
 import io.javalin.config.RouterConfig
 import io.javalin.http.Context
 import io.javalin.http.HandlerType
-import io.javalin.router.matcher.PathParser
 
 /**
- * Evaluates the configured pattern-based rule table against a request that has no route-declared
- * roles (see [io.github.mzlnk.javalin.security.SecurityGuard] for where the RouteRole check runs).
+ * Evaluates the HTTP pattern-based rule table for requests with no route-declared roles.
  *
- * Matching is first-match-wins in declaration order. Each pattern is compiled once, at plugin
- * startup, into a Javalin [PathParser] and evaluated directly against the concrete (already
- * context-path-stripped) request path — the exact same primitive Javalin's own router uses for
- * its routes, so a rule pattern can never drift from how the corresponding route would actually
- * be matched.
- *
- * A request that matches no entry falls through to [fallback] (deny, by default) — this is the
- * deny-by-default guarantee. This component performs no control flow via exceptions - it returns
- * whether access is [granted][isGranted] and leaves the response decision to the
- * [io.github.mzlnk.javalin.security.SecurityGuard].
+ * First match wins in declaration order. Patterns are compiled once at startup into a Javalin
+ * [io.javalin.router.matcher.PathParser] and matched against the context-path-stripped request path.
+ * Unmatched requests fall through to [fallback] (deny when unset). Returns a boolean; the guard
+ * renders the response.
  */
 internal class AuthorizationManager(
     private val entries: List<Entry>,
@@ -29,6 +21,7 @@ internal class AuthorizationManager(
     private val allowCorsPreflight: Boolean,
 ) {
 
+    /** Compiled rule entry for a path pattern and optional HTTP method. */
     class Entry(
         pattern: String,
         val method: HandlerType?,
@@ -37,6 +30,7 @@ internal class AuthorizationManager(
     ) {
         private val parser = compilePattern(pattern, routerConfig)
 
+        /** Returns `true` when [method] and [path] match this entry. */
         fun matches(method: HandlerType, path: String): Boolean =
             methodMatches(method) && parser.matches(path)
 
@@ -50,6 +44,7 @@ internal class AuthorizationManager(
         }
     }
 
+    /** Returns whether access is granted for [method] and [path] given [authentication]. */
     fun isGranted(method: HandlerType, path: String, authentication: Authentication, context: Context): Boolean {
         // Narrowly-scoped CORS preflight bypass, checked ahead of the rule table so it is
         // unaffected by an otherwise deny-by-default fallback. Does not exempt regular OPTIONS

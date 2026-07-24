@@ -3,18 +3,9 @@ package io.github.mzlnk.javalin.security
 import io.javalin.security.RouteRole
 
 /**
- * A built-in [RouteRole] that marks a route as publicly accessible, even to unauthenticated
- * callers, when declared alongside this library's guard:
+ * Built-in [RouteRole] that grants public access to a route, including unauthenticated callers.
  *
- * ```kotlin
- * config.routes.get("/public", handler, Anyone)
- * ```
- *
- * ```java
- * config.routes.get("/public", handler, Anyone.INSTANCE);
- * ```
- *
- * This is the RouteRole-based equivalent of the pattern-table's `allow` rule, for routes that
- * declare their roles directly rather than relying on a pattern match.
+ * Equivalent to the pattern-table `allow` rule when roles are declared on the route itself
+ * (e.g. `config.routes.get("/public", handler, Anyone)`).
  */
 object Anyone : RouteRole

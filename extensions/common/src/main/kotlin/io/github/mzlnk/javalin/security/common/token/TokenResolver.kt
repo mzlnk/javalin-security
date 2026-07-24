@@ -3,21 +3,13 @@ package io.github.mzlnk.javalin.security.common.token
 import io.javalin.http.Context
 
 /**
- * The single pluggable hook for locating a raw token/credential string within an incoming request.
+ * Locates a raw token string within an incoming request.
  *
- * Implementations decide *where* the token travels — the `Authorization` header, a cookie, a
- * query parameter, or anything else derivable from the [io.javalin.http.Context] — and return the raw token
- * string, or `null` when no token is present. A `null` return causes the request to proceed as
- * anonymous; authorization rules then decide whether access is allowed.
- *
- * This is deliberately separate from any scheme-specific verification (JWT signature checks,
- * opaque token introspection, etc.): the resolver only extracts the raw string from the transport
- * (header/cookie/query param); it performs no validation and must never throw for the "no token
- * present" case.
- *
- * Shared across companion authentication extensions (e.g. `javalin-security-jwt`) so each scheme
- * doesn't need to reinvent header/cookie extraction. Defaults to [DEFAULT] (equivalent to
- * [bearerHeader]) when not configured.
+ * Implementations extract the token from a header, cookie, query parameter, or other
+ * [io.javalin.http.Context] source and return it, or `null` when absent. A `null` return leaves
+ * the request anonymous for authorization rules to decide. Resolvers must not throw when no token
+ * is present and must not perform scheme-specific verification. Defaults to [DEFAULT]
+ * ([bearerHeader]) when not configured.
  */
 fun interface TokenResolver {
 
@@ -29,13 +21,11 @@ fun interface TokenResolver {
         private const val BEARER_PREFIX = "bearer "
 
         /**
-         * Extracts the token from the `Bearer` scheme of the given [headerName] (defaults to
-         * `Authorization`).
+         * Extracts the token from the `Bearer` scheme of [headerName] (defaults to `Authorization`).
          *
-         * Recognises the `Bearer` scheme case-insensitively. Returns `null` when the header is
-         * absent, does not start with `Bearer ` (scheme token + one space), or the token portion
-         * after the scheme prefix is blank. The extracted token is trimmed but otherwise returned
-         * as-is; no further validation is performed here.
+         * Recognises `Bearer` case-insensitively. Returns `null` when the header is absent, does
+         * not start with `Bearer `, or the token portion is blank. The extracted token is trimmed
+         * but otherwise returned as-is.
          */
         @JvmStatic
         @JvmOverloads
@@ -47,12 +37,10 @@ fun interface TokenResolver {
         }
 
         /**
-         * Extracts the token from the value of the cookie named [name].
+         * Extracts the token from the cookie named [name].
          *
-         * Useful for browser/SPA flows that store the token in a (typically httpOnly) cookie
-         * rather than sending an `Authorization` header. The cookie's raw value is trimmed and
-         * used as-is — unlike [bearerHeader], no scheme prefix is expected or stripped. Returns
-         * `null` when the cookie is absent or its value is blank.
+         * The cookie value is trimmed and used as-is with no scheme prefix. Returns `null` when
+         * the cookie is absent or blank.
          */
         @JvmStatic
         fun cookie(name: String): TokenResolver = TokenResolver { context ->

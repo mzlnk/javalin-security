@@ -177,7 +177,6 @@ class JwtWsSecurityTest {
         cfg.routes.ws("/ws/chat") { }
     }
 
-    /** Attempts a WebSocket upgrade and returns (connected, statusCodeOnFailure). */
     private fun tryConnect(
         origin: String,
         path: String,

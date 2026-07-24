@@ -13,20 +13,17 @@ import java.net.URL
 import java.util.Base64
 
 /**
- * Describes where the key(s) used to verify a JWT's signature come from.
+ * Describes where the key(s) used to verify a JWT signature come from.
  *
- * This is a library-agnostic description consumed by a [JwtDecoder] adapter (e.g.
- * `NimbusJwtDecoder`) — it carries no dependency on any specific JOSE/JWT library.
- *
- * Register via `jwt { keySource = JwtKeySource.publicKey(...) }` or pass to
- * [JwtVerification.builder].
+ * This is a library-agnostic description consumed by a [JwtDecoder]. Register via the `jwt { }`
+ * block (`keySource`) or pass to [JwtVerification.builder].
  */
 sealed interface JwtKeySource {
 
     /** Verifies tokens using a single local public key (RSA or EC). */
     class PublicKeySource internal constructor(
         val publicKey: PublicKey,
-        /** Accepted JWS algorithm names (e.g. `"RS256"`). Empty means "all algorithms matching the key type". */
+        /** Accepted JWS algorithm names (e.g. `"RS256"`). Empty means all algorithms matching the key type. */
         val algorithms: Set<String>,
     ) : JwtKeySource
 
@@ -36,7 +33,7 @@ sealed interface JwtKeySource {
         val algorithm: String,
     ) : JwtKeySource
 
-    /** Verifies tokens using keys resolved (and cached) from a remote JWKS endpoint, matched by `kid`. */
+    /** Verifies tokens using keys resolved from a remote JWKS endpoint, matched by `kid`. */
     class JwksSource internal constructor(
         val url: URL,
     ) : JwtKeySource
@@ -47,8 +44,8 @@ sealed interface JwtKeySource {
          * Verifies tokens using the given local [publicKey] (RSA or EC).
          *
          * When [algorithms] is empty (the default), all JWS algorithms matching the key type are
-         * accepted: RS256/384/512 + PS256/384/512 for RSA, ES256/384/512 for EC. The token's `alg`
-         * header selects the specific one; `kid` is ignored — the provided key is always used.
+         * accepted: RS256/384/512 and PS256/384/512 for RSA, ES256/384/512 for EC. The token's
+         * `alg` header selects the specific one; `kid` is ignored and the provided key is always used.
          */
         @JvmStatic
         @JvmOverloads
@@ -58,10 +55,9 @@ sealed interface JwtKeySource {
         /**
          * Verifies tokens using a public key parsed from a PEM [string].
          *
-         * Supports `-----BEGIN PUBLIC KEY-----` (X.509/PKCS#8 format) for both RSA and EC keys.
-         * The key type is detected automatically.
-         *
-         * @throws IllegalArgumentException if the PEM string cannot be parsed or the key type is unsupported.
+         * Supports `-----BEGIN PUBLIC KEY-----` (X.509/PKCS#8) for both RSA and EC; the key type is
+         * detected automatically. Throws [IllegalArgumentException] if the PEM cannot be parsed or
+         * the key type is unsupported.
          */
         @JvmStatic
         fun pem(pem: String): JwtKeySource {
@@ -77,10 +73,9 @@ sealed interface JwtKeySource {
         /**
          * Verifies tokens using a public key loaded from a PEM [file].
          *
-         * The file must contain an X.509/PKCS#8 public key in PEM format
-         * (`-----BEGIN PUBLIC KEY-----`). Both RSA and EC keys are supported.
-         *
-         * @throws IllegalArgumentException if the file cannot be parsed or the key type is unsupported.
+         * The file must contain an X.509/PKCS#8 public key (`-----BEGIN PUBLIC KEY-----`); RSA and
+         * EC are supported. Throws [IllegalArgumentException] if the file cannot be parsed or the
+         * key type is unsupported.
          */
         @JvmStatic
         fun pemFile(path: Path): JwtKeySource = pem(Files.readString(path))
@@ -88,8 +83,8 @@ sealed interface JwtKeySource {
         /**
          * Verifies tokens using an HMAC [secret] string.
          *
-         * The [algorithm] defaults to `"HS256"`. Pass `"HS384"` or `"HS512"` explicitly when using
-         * longer secrets. The secret is encoded as UTF-8 bytes; for binary secrets use [secretBytes].
+         * [algorithm] defaults to `"HS256"`; pass `"HS384"` or `"HS512"` when needed. The secret is
+         * encoded as UTF-8 bytes; for binary secrets use [secretBytes].
          */
         @JvmStatic
         @JvmOverloads
@@ -99,7 +94,8 @@ sealed interface JwtKeySource {
         /**
          * Verifies tokens using raw HMAC secret [bytes].
          *
-         * Useful when the secret was originally stored as bytes (e.g. Base64-decoded).
+         * Use when the secret is already available as bytes (for example Base64-decoded).
+         * [algorithm] defaults to `"HS256"`.
          */
         @JvmStatic
         @JvmOverloads
@@ -109,11 +105,8 @@ sealed interface JwtKeySource {
         /**
          * Verifies tokens using a remote JWKS endpoint at [url].
          *
-         * The JWK set is fetched and cached automatically by the adapter. Key selection is
-         * `kid`-based: the token header's `kid` is matched against the remote JWK set. Both RSA
-         * and EC keys are supported.
-         *
-         * @param url the JWKS endpoint URL string (e.g. `https://auth.example.com/.well-known/jwks.json`)
+         * The JWK set is fetched and cached by the decoder adapter. Key selection is `kid`-based;
+         * RSA and EC keys are supported.
          */
         @JvmStatic
         fun jwks(url: String): JwtKeySource = jwks(URI.create(url).toURL())

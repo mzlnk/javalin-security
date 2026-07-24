@@ -1,21 +1,16 @@
 package io.github.mzlnk.javalin.security.authentication
 
-/**
- * The outcome of an [Authenticator.authenticate] call.
- *
- * Modelled as a sealed hierarchy to make all cases explicit and avoid nullable handling.
- */
+/** Outcome of an [Authenticator.authenticate] call. */
 sealed interface AuthenticationResult {
 
-    /** The request was successfully authenticated as [authentication]. */
+    /** Successful authentication as [authentication]. */
     data class Success(val authentication: Authentication) : AuthenticationResult
 
     /**
-     * Credentials were present but invalid (e.g. an expired or malformed token).
+     * Credentials were present but invalid (expired, malformed, etc.).
      *
-     * This short-circuits the request to the configured
-     * [io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler] (HTTP 401 by
-     * default). The [message] and [cause] are for logging only and are not returned to the client.
+     * Short-circuits to [UnauthorizedHandler] (HTTP 401 by default). [message] and [cause] are
+     * for logging only and are not returned to the client.
      */
     data class Failure(
         val message: String? = null,
@@ -23,8 +18,8 @@ sealed interface AuthenticationResult {
     ) : AuthenticationResult
 
     /**
-     * No credentials were present. The request continues as unauthenticated (anonymous) and the
-     * authorization rules decide whether access is allowed.
+     * No credentials were present. The request continues as anonymous and authorization decides
+     * whether access is allowed.
      */
     data object NotAuthenticated : AuthenticationResult
 

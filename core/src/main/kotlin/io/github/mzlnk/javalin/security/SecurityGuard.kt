@@ -14,33 +14,14 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 
 /**
- * The request-time pipeline and the sole bridge between the framework and Javalin.
+ * HTTP request-time security pipeline: authenticate, publish [Authentication] on the [Context],
+ * then authorize.
  *
- * It authenticates, publishes the [Authentication] on the [Context], then authorizes. Failures are
- * delegated to the configured [UnauthorizedHandler] (401) and [ForbiddenHandler] (403); the
- * guard itself contains no interception, reflection or thread-locals.
- *
- * **Authorization has two paths**, checked in order:
- * 1. If the matched route declares [RouteRole]s (`ctx.routeRoles()` is non-empty), access is
- *    granted when those roles include [Anyone], or when they intersect the resolved
- *    [Authentication]'s own [Authentication.roles]. Matching is a plain set-membership check,
- *    relying on [RouteRole] equality.
- * 2. Otherwise, [authorizationManager] evaluates the pattern-based rule table.
- *
- * **Sync path (default, zero overhead):** When [authenticator] is present (or no
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy] is configured, treating
- * all requests as anonymous), the pipeline is entirely synchronous.
- *
- * **Async path (opt-in):** When [asyncAuthenticator] is present, authentication resolves via
- * [Context.future] so the request thread is released while the [CompletableFuture] is in flight.
- * Authorization and all fail-closed semantics run inside the completion stage, so the same
- * security guarantees apply across the async boundary.
- *
- * [authenticator] and [asyncAuthenticator] are resolved by [io.github.mzlnk.javalin.security.JavalinSecurityPlugin]
- * from the single [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy] assigned
- * to `http.authentication`; the two are mutually exclusive by construction (a strategy is either
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Sync] or
- * [io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy.Async], never both).
+ * Failures go to [unauthorizedHandler] (401) or [forbiddenHandler] (403). When the matched route
+ * declares [RouteRole]s, access is granted if they include [Anyone] or intersect
+ * [Authentication.roles]; otherwise [authorizationManager] evaluates the pattern table.
+ * Uses [authenticator] synchronously, or [asyncAuthenticator] via [Context.future] when present
+ * (the two are mutually exclusive).
  */
 internal class SecurityGuard(
     private val authenticator: Authenticator?,
@@ -51,6 +32,7 @@ internal class SecurityGuard(
     private val forbiddenHandler: ForbiddenHandler,
 ) {
 
+    /** Runs the security pipeline for [context]. */
     fun handle(context: Context) {
         val method = context.method()
         val path = pathNormalizer.normalize(context.path())
@@ -152,11 +134,7 @@ internal class SecurityGuard(
         }
     }
 
-    /**
-     * Grants access when the matched route's declared [RouteRole]s include [Anyone], or when
-     * they intersect the caller's own [Authentication.roles]. A plain set-membership check,
-     * relying on [RouteRole] equality.
-     */
+    /** Returns `true` when [routeRoles] include [Anyone] or intersect [Authentication.roles]. */
     private fun grantedByRole(routeRoles: Set<RouteRole>, authentication: Authentication): Boolean =
         Anyone in routeRoles || routeRoles.any { it in authentication.roles }
 

@@ -9,21 +9,12 @@ import org.slf4j.LoggerFactory
 /**
  * Implements HTTP Basic authentication (RFC 7617).
  *
- * The pipeline is explicit and has no hidden side-effects:
- * 1. Extract [BasicCredentials] from the request via [BasicCredentialsResolver].
- *    No credentials -> [AuthenticationResult.NotAuthenticated] (anonymous; authorization rules
- *    decide access). Malformed credentials (bad Base64, missing `:` separator) ->
- *    [AuthenticationResult.Failure].
- * 2. Look up the username via [UserLookup]. Unknown username -> [AuthenticationResult.Failure].
- *    The configured [PasswordEncoder] is still invoked against a dummy encoded value in this case
- *    so that responding to an unknown username takes a similar code path/time as a known username
- *    with a wrong password.
- * 3. Compare the supplied raw password against the stored [BasicUser.password] via
- *    [PasswordEncoder]. A mismatch -> [AuthenticationResult.Failure].
- * 4. Return [AuthenticationResult.Success] with a [BasicAuthPrincipal] and the user's roles.
- *
- * Construct via the `basicAuth { }` block (which assigns it to `http.authentication`) or use
- * [Builder] to obtain an instance directly.
+ * Extracts [BasicCredentials] via [BasicCredentialsResolver]: missing credentials yield
+ * [AuthenticationResult.NotAuthenticated]; malformed credentials yield [AuthenticationResult.Failure].
+ * Looks up the username via [UserLookup] and compares the raw password with [PasswordEncoder]; an
+ * unknown username or password mismatch yields [AuthenticationResult.Failure]. On success, returns
+ * [AuthenticationResult.Success] with a [BasicAuthPrincipal] and the user's roles. Construct via
+ * `basicAuth { }` or [Builder].
  */
 class BasicAuthenticator private constructor(
     private val userLookup: UserLookup,
@@ -57,36 +48,29 @@ class BasicAuthenticator private constructor(
         return AuthenticationResult.Success(Authentication.authenticated(principal, user.roles))
     }
 
-    /**
-     * Fluent builder for Java interop.
-     *
-     * Usage from Java:
-     *
-     * ```java
-     * BasicAuthenticator authenticator = BasicAuthenticator.builder(userLookup)
-     *     .passwordEncoder(PasswordEncoder.noOp())
-     *     .build();
-     * ```
-     */
+    /** Fluent builder for constructing a [BasicAuthenticator]. */
     class Builder(private val userLookup: UserLookup) {
 
         private var passwordEncoder: PasswordEncoder = PasswordEncoder.noOp()
         private var credentialsResolver: BasicCredentialsResolver = BasicCredentialsResolver.DEFAULT
 
+        /** Sets the [PasswordEncoder] used to compare passwords. Defaults to [PasswordEncoder.noOp]. */
         fun passwordEncoder(encoder: PasswordEncoder): Builder {
             this.passwordEncoder = encoder
             return this
         }
 
         /**
-         * Overrides how the raw credentials are located in the request (defaults to
-         * [BasicCredentialsResolver.DEFAULT], i.e. the `Authorization: Basic ...` header).
+         * Overrides how credentials are located in the request.
+         *
+         * Defaults to [BasicCredentialsResolver.DEFAULT] (`Authorization: Basic ...`).
          */
         fun credentialsResolver(resolver: BasicCredentialsResolver): Builder {
             this.credentialsResolver = resolver
             return this
         }
 
+        /** Builds a [BasicAuthenticator] with the configured settings. */
         fun build(): BasicAuthenticator = BasicAuthenticator(
             userLookup = userLookup,
             passwordEncoder = passwordEncoder,
@@ -106,7 +90,7 @@ class BasicAuthenticator private constructor(
         /**
          * Creates a [Builder] pre-loaded with the required [userLookup].
          *
-         * This is the only required argument; all other settings have sensible defaults.
+         * [userLookup] is the only required argument; other settings use defaults.
          */
         @JvmStatic
         fun builder(userLookup: UserLookup): Builder = Builder(userLookup)

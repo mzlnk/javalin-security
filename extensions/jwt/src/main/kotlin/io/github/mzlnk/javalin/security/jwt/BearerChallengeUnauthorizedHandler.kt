@@ -5,27 +5,12 @@ import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.javalin.http.Context
 
 /**
- * An [UnauthorizedHandler] that includes a `WWW-Authenticate: Bearer` challenge in the 401 response.
+ * An [UnauthorizedHandler] that includes a `WWW-Authenticate: Bearer` challenge on 401 responses.
  *
- * This is opt-in behavior. To activate it, set `bearerChallenge = true` inside the `jwt { }`
- * block:
- *
- * ```kotlin
- * http { http ->
- *     http.authentication = jwt { jwt ->
- *         jwt.decoder = myDecoder
- *         jwt.bearerChallenge = true    // emits WWW-Authenticate header
- *         jwt.realm = "My API"          // optional, defaults to "API"
- *     }
- * }
- * ```
- *
- * The response body is intentionally empty — the only information sent to the caller is the
- * `WWW-Authenticate` header. No internal failure detail is ever exposed.
- *
- * When [failure] carries an [AuthenticationResult.Failure] (bad/expired token), the response
- * includes `error="invalid_token"`. When the caller was simply unauthenticated (no token sent),
- * [failure] is `null` and no `error` attribute is included.
+ * Enable by setting `bearerChallenge = true` in the `jwt { }` block (optional `realm`, default
+ * `"API"`). The response body is empty; only the challenge header is sent. When [failure] is an
+ * [AuthenticationResult.Failure], the header includes `error="invalid_token"`; when the caller was
+ * simply unauthenticated, [failure] is `null` and no `error` attribute is included.
  */
 class BearerChallengeUnauthorizedHandler(private val realm: String = "API") : UnauthorizedHandler {
 

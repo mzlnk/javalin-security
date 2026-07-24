@@ -5,25 +5,12 @@ import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.javalin.http.Context
 
 /**
- * An [UnauthorizedHandler] that includes a `WWW-Authenticate: Basic` challenge (RFC 7617) in the
- * 401 response.
+ * An [UnauthorizedHandler] that includes a `WWW-Authenticate: Basic` challenge (RFC 7617) on 401
+ * responses.
  *
- * This is opt-in behavior. To activate it, set `basicChallenge = true` inside the `basicAuth { }`
- * block:
- *
- * ```kotlin
- * http { http ->
- *     http.authentication = basicAuth { basic ->
- *         basic.userLookup = myUserLookup
- *         basic.basicChallenge = true   // emits WWW-Authenticate header
- *         basic.realm = "My API"        // optional, defaults to "API"
- *     }
- * }
- * ```
- *
- * The response body is intentionally empty — the only information sent to the caller is the
- * `WWW-Authenticate` header. No internal failure detail (e.g. which of "unknown user" or "wrong
- * password" occurred) is ever exposed, regardless of whether [failure] is present.
+ * Enable by setting `basicChallenge = true` in the `basicAuth { }` block (optional `realm`,
+ * default `"API"`). The response body is empty; only the challenge header is sent. Failure detail
+ * is never exposed, regardless of whether [failure] is present.
  */
 class BasicChallengeUnauthorizedHandler(private val realm: String = "API") : UnauthorizedHandler {
 

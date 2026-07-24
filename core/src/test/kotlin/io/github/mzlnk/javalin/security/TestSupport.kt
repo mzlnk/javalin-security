@@ -12,10 +12,10 @@ import io.javalin.http.HandlerType
 import io.mockk.every
 import io.mockk.mockk
 
-/** Minimal [authentication.AuthenticatedPrincipal] used across tests. */
+/** Minimal [Identity] for unit tests. */
 data class TestPrincipal(override val name: String) : Identity
 
-/** Creates a bare [Context] mock with [Context.method], [Context.path] and [Context.header] stubbed. */
+/** Creates a [Context] mock with [Context.method], [Context.path], and [Context.header] stubbed. */
 fun mockContext(
     method: HandlerType = HandlerType.GET,
     path: String = "/",
@@ -28,12 +28,8 @@ fun mockContext(
     }
 
 /**
- * Builds an [AuthenticationStrategy.Sync] for tests, without going through a companion library's
- * `jwt { }` / `basicAuth { }` factory.
- *
- * [authenticator] defaults to a no-op authenticator that always reports
- * [AuthenticationResult.NotAuthenticated] (anonymous), so a strategy can be built purely to carry
- * an [unauthorizedHandler] or [forbiddenHandler] override.
+ * Builds an [AuthenticationStrategy.Sync] for tests.
+ * [authenticator] defaults to always returning [AuthenticationResult.NotAuthenticated].
  */
 fun authenticationStrategy(
     authenticator: Authenticator = Authenticator { AuthenticationResult.NotAuthenticated },
@@ -45,7 +41,7 @@ fun authenticationStrategy(
     override fun authenticator(): Authenticator = authenticator
 }
 
-/** Builds an [AuthenticationStrategy.Async] for tests. See [authenticationStrategy] for the optional overrides. */
+/** Builds an [AuthenticationStrategy.Async] for tests. */
 fun asyncAuthenticationStrategy(
     asyncAuthenticator: AsyncAuthenticator,
     unauthorizedHandler: UnauthorizedHandler = UnauthorizedHandler.DEFAULT,

@@ -1,14 +1,14 @@
 package io.github.mzlnk.javalin.security.authentication
 
 /**
- * Represents the identity of a successfully authenticated caller.
+ * Identity of a successfully authenticated caller.
  *
- * Companion libraries (e.g. a JWT integration) provide concrete implementations that carry
- * whatever identity data they resolve from the request (subject, claims, etc.).
+ * Companion libraries supply concrete types that carry scheme-specific data such as subject or
+ * claims. Stored on [Authentication.identity] for the duration of the request.
  */
 interface Identity {
 
-    /** A human-readable identifier for the principal (e.g. username or subject). */
+    /** Human-readable identifier for the principal (username, subject, or similar). */
     val name: String
 
 }

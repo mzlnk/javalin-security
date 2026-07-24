@@ -618,11 +618,6 @@ class JavalinSecurityWsKtTest {
         }
     }
 
-    /**
-     * Attempts a WebSocket upgrade and returns (connected, statusCodeOnFailure).
-     * On success, [connected] is `true`. On HTTP-level rejection, [statusCodeOnFailure] holds the
-     * server's status code (extracted from [WebSocketHandshakeException]).
-     */
     private fun tryConnect(
         origin: String,
         path: String,
@@ -654,11 +649,6 @@ class JavalinSecurityWsKtTest {
         latch.await(timeoutMs, TimeUnit.MILLISECONDS)
         return connected.get() to statusCode.get()
     }
-
-    /**
-     * Attempts a WebSocket upgrade and returns the rejection response body as a String. Used only
-     * for verifying that no internal detail is present in the denial response.
-     */
 
     private fun upgradeRejectionBody(
         origin: String,

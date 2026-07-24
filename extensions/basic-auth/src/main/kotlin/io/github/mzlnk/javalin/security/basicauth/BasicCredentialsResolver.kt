@@ -4,24 +4,19 @@ import io.javalin.http.Context
 import java.util.Base64
 
 /**
- * The single pluggable hook for locating [BasicCredentials] within an incoming request.
+ * Locates [BasicCredentials] within an incoming request.
  *
- * Implementations decide *where* the credentials travel — by default the standard
- * `Authorization: Basic ...` header (RFC 7617) — and return the decoded [BasicCredentials], or
- * `null` when no credentials are present. A `null` return causes the request to proceed as
- * anonymous; authorization rules then decide whether access is allowed.
- *
- * Unlike the "absent" case, a *malformed* `Basic` header (invalid Base64, or a decoded value with
- * no `:` separator) is a genuine authentication failure, not an anonymous request — resolvers
- * should throw an [IllegalArgumentException] in that case so [BasicAuthenticator] can
- * surface it as [io.github.mzlnk.javalin.security.authentication.AuthenticationResult.Failure].
+ * Returns decoded credentials, or `null` when absent so the request proceeds as anonymous.
+ * Malformed credentials (invalid Base64 or missing `:` separator) must throw
+ * [IllegalArgumentException] so [BasicAuthenticator] can surface
+ * [io.github.mzlnk.javalin.security.authentication.AuthenticationResult.Failure].
  */
 fun interface BasicCredentialsResolver {
 
     /**
      * Returns the [BasicCredentials] extracted from [context], or `null` when absent.
      *
-     * @throws IllegalArgumentException when credentials are present but malformed.
+     * Throws [IllegalArgumentException] when credentials are present but malformed.
      */
     fun resolve(context: Context): BasicCredentials?
 
@@ -30,14 +25,12 @@ fun interface BasicCredentialsResolver {
         private const val BASIC_PREFIX = "basic "
 
         /**
-         * Extracts credentials from the `Basic` scheme of the given [headerName] (defaults to
-         * `Authorization`).
+         * Extracts credentials from the `Basic` scheme of [headerName] (defaults to `Authorization`).
          *
-         * Recognises the `Basic` scheme case-insensitively. Returns `null` when the header is
-         * absent or does not start with `Basic ` (scheme token + one space). When the header does
-         * carry the `Basic` scheme, the remainder is decoded as Base64 and split on the first `:`
-         * into a username and password; malformed Base64 or a missing `:` separator throws an
-         * [IllegalArgumentException] rather than being treated as "no credentials".
+         * Recognises `Basic` case-insensitively. Returns `null` when the header is absent or does
+         * not start with `Basic `. When the scheme is present, the remainder is Base64-decoded and
+         * split on the first `:`; malformed Base64 or a missing separator throws
+         * [IllegalArgumentException].
          */
         @JvmStatic
         @JvmOverloads
