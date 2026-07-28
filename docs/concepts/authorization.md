@@ -1,0 +1,129 @@
+# Authorization
+
+Authorization answers **"is this caller allowed?"**. It runs *after* authentication, using the
+resolved identity and roles.
+
+## Two ways to authorize
+
+Checked in this order:
+
+1. **Route roles** — `RouteRole`s attached to the route itself
+   (`config.routes.get("/admin", handler, Role.ADMIN)`). Checked first.
+2. **Rule table** — path patterns declared in `http.rules { }` / `ws.rules { }`. Used **only**
+   when the route declares no roles.
+
+=== "Kotlin"
+
+    ```kotlin
+    security.http { http ->
+        http.rules { r ->
+            r.add("/public/*", GET, r.allow)
+            r.add("/api/*", r.authenticated)
+            r.fallback = r.deny
+        }
+    }
+    config.routes.get("/admin", { it.result("ok") }, Role.ADMIN)  // route roles win for this route
+    ```
+
+=== "Java"
+
+    ```java
+    security.http(http ->
+        http.rules(r -> {
+            r.add("/public/*", GET, Rules.allow());
+            r.add("/api/*", Rules.authenticated());
+            r.fallback = Rules.deny();
+        }));
+    config.routes.get("/admin", ctx -> ctx.result("ok"), Role.ADMIN);
+    ```
+
+If a route declares any `RouteRole`, the rule table (including `fallback`) is **skipped** for
+that route. Use `Anyone` as the route-role equivalent of `allow`.
+
+## Built-in rules
+
+| Rule              | Grants when…                                     |
+|-------------------|--------------------------------------------------|
+| `allow`           | Always (including anonymous).                    |
+| `deny`            | Never.                                           |
+| `authenticated`   | Caller is logged in.                             |
+| `hasRole(role)`   | Caller holds that role.                          |
+| `hasAnyRole(…)`   | Caller holds at least one of the listed roles.   |
+
+Kotlin: `r.allow`, `r.hasRole(…)` inside `rules { }`. Java: `Rules.allow()`, `Rules.hasRole(…)`.
+
+HTTP rules can match on path + method (`add(pattern, method, rule)`) or path only. WebSocket
+rules are path-only. A `GET` rule also governs `HEAD`.
+
+## Deny by default
+
+Entries are evaluated in order; **first match wins**. If nothing matches, `fallback` decides —
+and when `fallback` is unset, access is **denied**.
+
+```kotlin
+http.rules { r ->
+    r.add("/public/*", GET, r.allow)
+    r.add("/api/*", r.authenticated)
+    r.fallback = r.deny   // explicit; also the default
+}
+```
+
+Put specific patterns before broader ones (`/api/admin/*` before `/api/*`); otherwise the broad
+rule shadows the specific one.
+
+Typical fallbacks: `deny` (locked down), `authenticated` (login required by default), or — rarely
+— `allow` (open by default).
+
+## Path patterns
+
+Use **Javalin** route syntax — the same as your routes:
+
+| Token       | Meaning                    | Example         |
+|-------------|----------------------------|-----------------|
+| `*`         | Wildcard across segments   | `/api/*`        |
+| `{param}`   | One segment                | `/users/{id}`   |
+| `<param>`   | Slash-accepting            | `/files/<path>` |
+
+Ant-style `**` and `?` are rejected at startup. Patterns match the path **without** the context
+path prefix.
+
+## Custom rules
+
+A `Rule` is a lambda `(Authentication, Context) -> Boolean`. Use it for ownership checks and
+similar per-request logic.
+
+=== "Kotlin"
+
+    ```kotlin
+    val sameTenant = Rule { auth, ctx ->
+        val principal = auth.identity as? JwtPrincipal ?: return@Rule false
+        principal.token.claim<String>("tenant") == ctx.pathParam("tenant")
+    }
+    http.rules { r -> r.add("/tenants/{tenant}/*", sameTenant) }
+    ```
+
+=== "Java"
+
+    ```java
+    Rule sameTenant = (auth, ctx) -> {
+        if (!(auth.getIdentity() instanceof JwtPrincipal principal)) return false;
+        String tenant = principal.getToken().claim("tenant");
+        return tenant != null && tenant.equals(ctx.pathParam("tenant"));
+    };
+    http.rules(r -> r.add("/tenants/{tenant}/*", sameTenant));
+    ```
+
+Always guard against anonymous callers (`identity == null`) inside custom rules.
+
+## Denial status
+
+| Caller                 | Status     |
+|------------------------|------------|
+| Anonymous, denied      | **401**    |
+| Authenticated, denied  | **403**    |
+
+## Next steps
+
+- [Authentication](authentication.md) — where roles come from.
+- [Error handling](error-handling.md) — customize 401 / 403.
+- [HTTP security](../http-security.md) — config cheatsheet.

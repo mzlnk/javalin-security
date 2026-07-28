@@ -40,3 +40,10 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Docs (MkDocs / Dokka) ###
+site/
+.cache/
+.tmp-site/
+.tmp-docs-venv/
+docs/.venv/

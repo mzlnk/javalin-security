@@ -1,0 +1,3 @@
+# Python dependencies for building the javalin-security documentation site.
+# Pinned to a compatible range so CI builds are reproducible.
+mkdocs-material>=9.5,<10

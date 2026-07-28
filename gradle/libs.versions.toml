@@ -1,5 +1,6 @@
 [versions]
 kotlin = "2.4.0"
+dokka = "2.0.0"
 javalin = "7.2.2"
 slf4j = "2.0.16"
 junit-bom = "5.11.4"
@@ -24,3 +25,4 @@ auth0-jwks-rsa = { module = "com.auth0:jwks-rsa", version.ref = "auth0-jwks-rsa"
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

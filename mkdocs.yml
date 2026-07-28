@@ -1,0 +1,126 @@
+site_name: javalin-security
+site_description: >-
+  Authentication and authorization for Javalin 7 — HTTP & WebSocket security,
+  role-based access control, pluggable JWT and HTTP Basic strategies, for Java and Kotlin.
+site_author: mzlnk
+site_url: https://mzlnk.github.io/javalin-security/
+
+repo_name: mzlnk/javalin-security
+repo_url: https://github.com/mzlnk/javalin-security
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; mzlnk — Apache License 2.0
+
+docs_dir: docs
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - content.tabs.link
+    - content.code.copy
+    - content.code.annotate
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.tracking
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Anchor link to this section
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.tilde
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/mzlnk/javalin-security
+
+nav:
+  - About:
+      - index.md
+      - Getting started:
+          - Installation: getting-started/installation.md
+          - Secure HTTP endpoints: getting-started/secure-http-endpoints.md
+          - Secure WebSocket endpoints: getting-started/secure-websocket-endpoints.md
+          - Access caller identity: getting-started/access-caller-identity.md
+      - Concepts:
+          - Authentication: concepts/authentication.md
+          - Authorization: concepts/authorization.md
+          - Error handling: concepts/error-handling.md
+      - Extensions:
+          - Basic Auth: extensions/basic-auth.md
+          - JWT:
+              - extensions/jwt/index.md
+              - Nimbus: extensions/jwt/nimbus.md
+              - Auth0: extensions/jwt/auth0.md
+              - Key sources: extensions/jwt/key-sources.md
+              - Roles mapping: extensions/jwt/roles-mapping.md
+      - Guides:
+          - Custom authentication: guides/custom-authentication.md
+          - CORS: guides/cors.md
+          - Testing: guides/testing.md
+  - Reference:
+      - API reference: api-reference.md
+      - HTTP security: http-security.md
+      - WebSocket security: websocket-security.md
+  - Contributing: contributing.md
+  - Release Notes: changelog.md
