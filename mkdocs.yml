@@ -116,6 +116,7 @@ nav:
               - Roles mapping: extensions/jwt/roles-mapping.md
       - Guides:
           - Custom authentication: guides/custom-authentication.md
+          - Custom authorization rules: guides/custom-rules.md
           - CORS: guides/cors.md
           - Testing: guides/testing.md
   - Reference:

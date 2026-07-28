@@ -2,29 +2,41 @@
 
 **Authentication and authorization for [Javalin 7](https://javalin.io/), in Java and Kotlin.**
 
-`javalin-security` secures HTTP routes and WebSocket upgrades with pluggable authentication
-strategies and role-based access rules, all configured inside `Javalin.create { … }`. Every code
-sample on this site is shown in both languages.
+`javalin-security` is a lightweight, open-source security plugin for
+[Javalin](https://javalin.io/) applications. It gives you a batteries-included way to add
+authentication and authorization to your app without pulling in a heavyweight framework or
+learning a large new configuration surface — just register the plugin inside
+`Javalin.create { … }` and you are ready to go.
+
+The plugin is designed to be **pluggable and extensible**: authentication runs through a small
+`AuthenticationStrategy` interface, so you are free to pick whichever mechanism fits your app.
+Reach for a built-in strategy like [JWT](extensions/jwt/index.md) or
+[HTTP Basic Auth](extensions/basic-auth.md), or [implement a fully custom strategy](guides/custom-authentication.md) —
+API keys, opaque session tokens, mTLS, HMAC signing, whatever your system needs. The same is true for authorization: use
+the built-in rule table and role checks, or drop in your own `Rule` predicates.
+
+The whole library is intentionally built on a **small set of simple abstractions** —
+`AuthenticationStrategy`, `Authentication`, `Identity`, `Rule` — so the mental model stays easy
+to reason about, while every extension point is open for customization.
 
 ## How it works
 
-```mermaid
-flowchart LR
-  request[Request] --> strategy[AuthenticationStrategy]
-  strategy --> auth[Authentication]
-  auth --> rules[Rule table or route roles]
-  rules --> allow[Allow]
-  rules --> deny401[401 anonymous]
-  rules --> deny403[403 authenticated]
-```
+Security runs as a guard before matched handlers (HTTP) or during the WebSocket upgrade. The
+flow has two stages:
 
-1. **Authentication.** An `AuthenticationStrategy` answers *who is calling?* and produces an
-   `Authentication` (identity + roles). Without a strategy, every caller is anonymous.
-2. **Authorization.** Route `RouteRole`s — or, if the route declares none, a path-based rule table —
-   decide *is this caller allowed?* Unmatched requests are denied by default.
+1. **Authentication.** An `AuthenticationStrategy` inspects the request (headers, cookies, or
+   whatever your scheme uses) and produces an `Authentication` — the caller's identity plus any
+   granted roles. Missing credentials yield an anonymous result; invalid credentials are a
+   failure (typically 401). Without a strategy assigned, every caller is anonymous.
+2. **Authorization.** Once identity is known, the library checks whether that caller may proceed.
+   Routes that declare `RouteRole`s are matched against the caller's roles. Routes that declare
+   none fall through to a path-based rule table (`allow`, `authenticated`, `hasRole`, custom
+   rules, or `deny`). Unmatched requests are denied by default.
 
-Extensions such as [Basic Auth](extensions/basic-auth.md) and [JWT](extensions/jwt/index.md) supply
-ready-made strategies. You can also [write your own](guides/custom-authentication.md).
+On success, the resolved `Authentication` is attached to the `Context` (and to the `WsContext`
+for the life of a WebSocket session) so handlers can read the caller. Extensions such as
+[Basic Auth](extensions/basic-auth.md) and [JWT](extensions/jwt/index.md) supply ready-made
+strategies; you can also [write your own](guides/custom-authentication.md).
 
 ## Example
 
@@ -78,16 +90,12 @@ ready-made strategies. You can also [write your own](guides/custom-authenticatio
 
 ## Supported versions
 
-| Component   | Version                                       |
-|-------------|-----------------------------------------------|
-| Java        | **17+**                                       |
-| Kotlin      | **2.4** (consumers may use any JVM language)  |
-| Javalin     | **7.2.x**                                     |
+| Component   | Version                                           |
+|-------------|---------------------------------------------------|
+| Java        | **17+**                                           |
+| Kotlin      | **2.4** (consumers may use any JVM language)      |
+| Javalin     | **7.2.x**                                         |
 | Coordinates | `io.github.mzlnk:javalin-security:1.0.0-SNAPSHOT` |
-
-!!! warning "Bring your own runtime dependencies"
-    Core and extensions do **not** bundle Javalin, SLF4J, or the JOSE libraries used by the JWT
-    adapters — add them to your own build. See [Installation](getting-started/installation.md).
 
 ## Where to start
 
@@ -99,6 +107,8 @@ ready-made strategies. You can also [write your own](guides/custom-authenticatio
    user inside handlers.
 5. [Authentication](concepts/authentication.md) and [Authorization](concepts/authorization.md) —
    the two concepts in depth.
-6. **Extensions** and **Guides** — Basic Auth, JWT, CORS, testing.
+6. Extensions — [Basic Auth](extensions/basic-auth.md), [JWT](extensions/jwt/index.md).
+7. Guides — [Custom authentication](guides/custom-authentication.md), [CORS](guides/cors.md),
+   [Testing](guides/testing.md).
 
 For the generated KDoc, see the [API reference](https://mzlnk.github.io/javalin-security/api/).
