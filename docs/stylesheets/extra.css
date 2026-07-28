@@ -1,0 +1,20 @@
+/* Graphite / black accent for both light and dark palettes. */
+
+:root,
+[data-md-color-scheme="default"] {
+  --md-accent-fg-color:              #2b2b2b;
+  --md-accent-fg-color--transparent: rgba(43, 43, 43, 0.1);
+  --md-accent-bg-color:              #ffffff;
+  --md-accent-bg-color--light:       #f5f5f5;
+
+  --md-typeset-a-color:              #2b2b2b;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-accent-fg-color:              #d0d0d0;
+  --md-accent-fg-color--transparent: rgba(208, 208, 208, 0.12);
+  --md-accent-bg-color:              #1e1e1e;
+  --md-accent-bg-color--light:       #2b2b2b;
+
+  --md-typeset-a-color:              #e0e0e0;
+}
