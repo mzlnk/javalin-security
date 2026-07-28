@@ -64,17 +64,17 @@ class BasicAuthenticatorTest {
     }
 
     @Test
-    fun `should return Success with BasicAuthPrincipal when credentials are valid`() {
+    fun `should return Success with BasicAuthIdentity when credentials are valid`() {
         val manager = BasicAuthenticator.of(userLookup)
         val result = manager.authenticate(ctx(basicHeader("alice", "correct-password")))
 
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
         val success = result as AuthenticationResult.Success
         assertThat(success.authentication.isAuthenticated).isTrue()
-        assertThat(success.authentication.identity).isInstanceOf(BasicAuthPrincipal::class.java)
+        assertThat(success.authentication.identity).isInstanceOf(BasicAuthIdentity::class.java)
 
-        val principal = success.authentication.identity as BasicAuthPrincipal
-        assertThat(principal.name).isEqualTo("alice")
+        val identity = success.authentication.identity as BasicAuthIdentity
+        assertThat(identity.name).isEqualTo("alice")
     }
 
     @Test
@@ -144,9 +144,9 @@ class BasicAuthenticatorTest {
     }
 
     @Test
-    fun `BasicAuthPrincipal name is the username`() {
-        val principal = BasicAuthPrincipal("carol")
-        assertThat(principal.name).isEqualTo("carol")
+    fun `BasicAuthIdentity name is the username`() {
+        val identity = BasicAuthIdentity("carol")
+        assertThat(identity.name).isEqualTo("carol")
     }
 
     private fun basicHeader(username: String, password: String): String =

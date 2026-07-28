@@ -13,7 +13,7 @@ Once authentication is configured, your handlers can read *who* is calling from 
 | Extension                                       | Returns                            | Anonymous caller                              |
 |-------------------------------------------------|------------------------------------|-----------------------------------------------|
 | `ctx.authentication()`                          | `Authentication` (identity + roles) | Non-null, `isAuthenticated == false`         |
-| `ctx.principal<T>()` / `ctx.principal(T.class)` | Typed principal                    | `null`                                        |
+| `ctx.identity<T>()` / `ctx.identity(T.class)` | Typed identity                    | `null`                                        |
 
 Import them from `io.github.mzlnk.javalin.security`:
 
@@ -21,28 +21,28 @@ Import them from `io.github.mzlnk.javalin.security`:
 
     ```kotlin
     import io.github.mzlnk.javalin.security.authentication
-    import io.github.mzlnk.javalin.security.principal
+    import io.github.mzlnk.javalin.security.identity
     ```
 
 === "Java"
 
     ```java
     import static io.github.mzlnk.javalin.security.SecurityExtensions.authentication;
-    import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
+    import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
     ```
 
 ## In HTTP handlers
 
-The principal type depends on your strategy — `BasicAuthPrincipal` for Basic Auth,
-`JwtPrincipal` for JWT, or your own `Identity` subtype for a custom authenticator.
+The identity type depends on your strategy — `BasicAuthIdentity` for Basic Auth,
+`JwtIdentity` for JWT, or your own `Identity` subtype for a custom authenticator.
 
 === "Kotlin"
 
     ```kotlin
-    import io.github.mzlnk.javalin.security.basicauth.BasicAuthPrincipal
+    import io.github.mzlnk.javalin.security.basicauth.BasicAuthIdentity
 
     config.routes.get("/api/v1/me") { ctx ->
-        val user = ctx.principal<BasicAuthPrincipal>()   // null when anonymous
+        val user = ctx.identity<BasicAuthIdentity>()   // null when anonymous
         ctx.result(user?.name ?: "anonymous")
     }
     ```
@@ -50,15 +50,15 @@ The principal type depends on your strategy — `BasicAuthPrincipal` for Basic A
 === "Java"
 
     ```java
-    import io.github.mzlnk.javalin.security.basicauth.BasicAuthPrincipal;
+    import io.github.mzlnk.javalin.security.basicauth.BasicAuthIdentity;
 
     config.routes.get("/api/v1/me", ctx -> {
-        BasicAuthPrincipal user = principal(ctx, BasicAuthPrincipal.class);
+        BasicAuthIdentity user = identity(ctx, BasicAuthIdentity.class);
         ctx.result(user != null ? user.getName() : "anonymous");
     });
     ```
 
-When the route is guarded by `r.authenticated` or `r.hasRole(...)`, the principal is guaranteed
+When the route is guarded by `r.authenticated` or `r.hasRole(...)`, the identity is guaranteed
 non-null inside the handler — it is safe to unwrap with `!!` (Kotlin) or without a null check
 (Java).
 
@@ -71,12 +71,12 @@ every `WsContext` for the session and never re-checked per message.
 
     ```kotlin
     import io.github.mzlnk.javalin.security.authentication
-    import io.github.mzlnk.javalin.security.principal
-    import io.github.mzlnk.javalin.security.jwt.JwtPrincipal
+    import io.github.mzlnk.javalin.security.identity
+    import io.github.mzlnk.javalin.security.jwt.JwtIdentity
 
     config.routes.ws("/ws/chat") { ws ->
         ws.onConnect { ctx ->
-            val user = ctx.principal<JwtPrincipal>() ?: return@onConnect
+            val user = ctx.identity<JwtIdentity>() ?: return@onConnect
             ctx.send("welcome ${user.name}")
         }
         ws.onMessage { ctx ->
@@ -89,11 +89,11 @@ every `WsContext` for the session and never re-checked per message.
 === "Java"
 
     ```java
-    import io.github.mzlnk.javalin.security.jwt.JwtPrincipal;
+    import io.github.mzlnk.javalin.security.jwt.JwtIdentity;
 
     config.routes.ws("/ws/chat", ws -> {
         ws.onConnect(ctx -> {
-            JwtPrincipal user = principal(ctx, JwtPrincipal.class);
+            JwtIdentity user = identity(ctx, JwtIdentity.class);
             if (user == null) return;
             ctx.send("welcome " + user.getName());
         });
@@ -143,10 +143,10 @@ presented. Use it when you need the full picture.
 
 ## Common pitfalls
 
-- **`principal<T>()` returns `null` for anonymous callers.** Do not dereference without a null
+- **`identity<T>()` returns `null` for anonymous callers.** Do not dereference without a null
   check unless the route is behind an `authenticated` / `hasRole` rule.
-- **Wrong type.** `principal(BasicAuthPrincipal::class.java)` on a JWT-secured route returns
-  `null` (the type cast fails silently). Always use the principal that matches your strategy.
+- **Wrong type.** `identity(ctx, BasicAuthIdentity.class)` on a JWT-secured route throws
+  `ClassCastException`. Always use the identity type that matches your strategy.
 - **`Context` vs `WsContext`.** Both expose the same extensions, but importing the wrong one
   will not compile. Both live in `io.github.mzlnk.javalin.security`.
 - **WebSocket identity is fixed for the session.** If you need to react to token expiry
@@ -156,4 +156,4 @@ presented. Use it when you need the full picture.
 
 - [Authentication](../concepts/authentication.md) — identities, roles, and the three outcomes.
 - [Authorization](../concepts/authorization.md) — pair identity with rules and route roles.
-- [Custom authentication](../guides/custom-authentication.md) — supply your own principal type.
+- [Custom authentication](../guides/custom-authentication.md) — supply your own identity type.

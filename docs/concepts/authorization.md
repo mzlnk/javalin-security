@@ -96,8 +96,8 @@ similar per-request logic.
 
     ```kotlin
     val sameTenant = Rule { auth, ctx ->
-        val principal = auth.identity as? JwtPrincipal ?: return@Rule false
-        principal.token.claim<String>("tenant") == ctx.pathParam("tenant")
+        val identity = auth.identity as? JwtIdentity ?: return@Rule false
+        identity.token.claim<String>("tenant") == ctx.pathParam("tenant")
     }
     http.rules { r -> r.add("/tenants/{tenant}/*", sameTenant) }
     ```
@@ -106,8 +106,8 @@ similar per-request logic.
 
     ```java
     Rule sameTenant = (auth, ctx) -> {
-        if (!(auth.getIdentity() instanceof JwtPrincipal principal)) return false;
-        String tenant = principal.getToken().claim("tenant");
+        if (!(auth.getIdentity() instanceof JwtIdentity identity)) return false;
+        String tenant = identity.getToken().claim("tenant");
         return tenant != null && tenant.equals(ctx.pathParam("tenant"));
     };
     http.rules(r -> r.add("/tenants/{tenant}/*", sameTenant));

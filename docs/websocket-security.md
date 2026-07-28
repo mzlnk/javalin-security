@@ -91,7 +91,7 @@ Origins must be exact strings (scheme + host + optional port).
 ## Upgrade-time only
 
 Authentication runs during `wsBeforeUpgrade`. Denied upgrades never reach `onConnect`. Read
-identity with `WsContext.authentication()` / `principal<T>()`. Mid-session expiry is not
+identity with `WsContext.authentication()` / `identity<T>()`. Mid-session expiry is not
 re-checked — enforce it in your protocol if needed.
 
 ## JWT in the browser

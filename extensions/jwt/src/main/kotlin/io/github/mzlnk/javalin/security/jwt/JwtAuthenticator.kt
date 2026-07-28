@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
  * Extracts the raw token via [TokenResolver]: missing token yields
  * [AuthenticationResult.NotAuthenticated]. Calls [JwtDecoder.decode] with the configured
  * [JwtVerification]; any thrown exception yields [AuthenticationResult.Failure]. On success, maps
- * the [DecodedJwt] to a [JwtPrincipal], resolves roles via [JwtRolesMapper], and returns
+ * the [DecodedJwt] to a [JwtIdentity], resolves roles via [JwtRolesMapper], and returns
  * [AuthenticationResult.Success]. Construct via `jwt { }` or [Builder].
  */
 class JwtAuthenticator private constructor(
@@ -34,9 +34,9 @@ class JwtAuthenticator private constructor(
             return AuthenticationResult.Failure(message = ex.message, cause = ex)
         }
 
-        val principal = JwtPrincipal(decoded)
+        val identity = JwtIdentity(decoded)
         val roles = rolesMapper.map(decoded)
-        return AuthenticationResult.Success(Authentication.authenticated(principal, roles))
+        return AuthenticationResult.Success(Authentication.authenticated(identity, roles))
     }
 
     /** Fluent builder for constructing a [JwtAuthenticator]. */

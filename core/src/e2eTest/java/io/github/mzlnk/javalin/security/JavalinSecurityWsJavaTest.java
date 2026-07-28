@@ -36,7 +36,7 @@ class JavalinSecurityWsJavaTest {
                 : java.util.Arrays.stream(rolesHeader.split(","))
                         .map(name -> (RouteRole) Role.valueOf(name))
                         .collect(java.util.stream.Collectors.toSet());
-        return new AuthenticationResult.Success(Authentication.authenticated(new TestPrincipal(user), roles));
+        return new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user), roles));
     };
 
     @Test
@@ -145,7 +145,7 @@ class JavalinSecurityWsJavaTest {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
                 ws.rules(rules -> rules.add("/ws/*", Rules.hasRole(Role.ADMIN)));
                 ws.authentication = authenticationStrategy(ctx -> new AuthenticationResult.Success(
-                        Authentication.authenticated(new TestPrincipal("alice"), Role.ADMIN)));
+                        Authentication.authenticated(new TestIdentity("alice"), Role.ADMIN)));
             })));
             config.routes.ws("/ws/admin", ws -> { });
         });
@@ -326,7 +326,7 @@ class JavalinSecurityWsJavaTest {
                 ws.authentication = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx -> CompletableFuture.supplyAsync(() -> {
                     String user = ctx.header("X-User");
                     return user != null
-                            ? new AuthenticationResult.Success(Authentication.authenticated(new TestPrincipal(user)))
+                            ? new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user)))
                             : AuthenticationResult.NotAuthenticated.INSTANCE;
                 }));
             })));
@@ -479,7 +479,7 @@ class JavalinSecurityWsJavaTest {
     @Test
     void should_expose_the_authentication_set_during_upgrade_from_WsContext_in_onConnect() throws Exception {
         // given
-        AtomicReference<String> principalName = new AtomicReference<>(null);
+        AtomicReference<String> identityName = new AtomicReference<>(null);
         CountDownLatch connectLatch = new CountDownLatch(1);
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
@@ -488,7 +488,7 @@ class JavalinSecurityWsJavaTest {
             })));
             config.routes.ws("/ws/chat", ws -> ws.onConnect(ctx -> {
                 Authentication authentication = SecurityExtensions.authentication(ctx);
-                principalName.set(authentication.getIdentity() instanceof TestPrincipal p ? p.getName() : null);
+                identityName.set(authentication.getIdentity() instanceof TestIdentity p ? p.getName() : null);
                 connectLatch.countDown();
             }));
         });
@@ -499,7 +499,7 @@ class JavalinSecurityWsJavaTest {
 
             // then
             assertThat(connectLatch.await(3, TimeUnit.SECONDS)).isTrue();
-            assertThat(principalName.get()).isEqualTo("alice");
+            assertThat(identityName.get()).isEqualTo("alice");
         });
     }
 

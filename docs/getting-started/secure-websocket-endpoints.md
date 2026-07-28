@@ -130,7 +130,7 @@ denies.
         }
         config.routes.ws("/ws/chat") { ws ->
             ws.onConnect { ctx ->
-                ctx.send("welcome ${ctx.principal<JwtPrincipal>()?.name}")
+                ctx.send("welcome ${ctx.identity<JwtIdentity>()?.name}")
             }
             ws.onMessage { ctx -> ctx.send("echo: ${ctx.message()}") }
         }
@@ -149,7 +149,7 @@ denies.
     import java.util.List;
     import java.util.Set;
 
-    import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
+    import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
 
     Javalin app = Javalin.create(config -> {
         config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
@@ -172,7 +172,7 @@ denies.
         })));
         config.routes.ws("/ws/chat", ws -> {
             ws.onConnect(ctx -> {
-                JwtPrincipal p = principal(ctx, JwtPrincipal.class);
+                JwtIdentity p = identity(ctx, JwtIdentity.class);
                 ctx.send("welcome " + (p != null ? p.getName() : "?"));
             });
             ws.onMessage(ctx -> ctx.send("echo: " + ctx.message()));

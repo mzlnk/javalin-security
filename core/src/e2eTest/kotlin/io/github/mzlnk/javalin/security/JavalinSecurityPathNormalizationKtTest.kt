@@ -15,7 +15,7 @@ class JavalinSecurityPathNormalizationKtTest {
         when (val user = context.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             "invalid" -> AuthenticationResult.Failure(message = "super secret internal reason")
-            else -> AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user)))
+            else -> AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user)))
         }
     }
 

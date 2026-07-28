@@ -11,7 +11,7 @@ _Current version: `1.0.0-SNAPSHOT`._
 ### Added
 
 - **Core** (`javalin-security`): opt-in HTTP and WebSocket guards, `security { }` configuration,
-  `authentication()` / `principal()` accessors.
+  `authentication()` / `identity()` accessors.
 - **Authentication SPI**: sync and async strategies, `AuthenticationResult`, `Identity`,
   unauthorized handlers.
 - **Authorization**: built-in rules, rule tables, `Anyone`, deny-by-default fallback, path

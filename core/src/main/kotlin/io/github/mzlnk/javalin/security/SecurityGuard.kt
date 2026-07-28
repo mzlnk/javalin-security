@@ -118,13 +118,13 @@ internal class SecurityGuard(
 
         if (granted) {
             if (log.isDebugEnabled) {
-                log.debug("Access granted to {} for {} {}", principalName(authentication), method, LogSanitizer.sanitize(path))
+                log.debug("Access granted to {} for {} {}", identityName(authentication), method, LogSanitizer.sanitize(path))
             }
             return
         }
 
         if (authentication.isAuthenticated) {
-            log.warn("Access denied to {} for {} {}", principalName(authentication), method, LogSanitizer.sanitize(path))
+            log.warn("Access denied to {} for {} {}", identityName(authentication), method, LogSanitizer.sanitize(path))
             forbiddenHandler.handle(context, authentication)
             context.skipRemainingHandlers()
         } else {
@@ -152,7 +152,7 @@ internal class SecurityGuard(
         )
     }
 
-    private fun principalName(authentication: Authentication): String =
+    private fun identityName(authentication: Authentication): String =
         LogSanitizer.sanitize(authentication.identity?.name ?: "anonymous")
 
     private companion object {

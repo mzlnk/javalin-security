@@ -13,7 +13,7 @@ import io.mockk.every
 import io.mockk.mockk
 
 /** Minimal [Identity] for unit tests. */
-data class TestPrincipal(override val name: String) : Identity
+data class TestIdentity(override val name: String) : Identity
 
 /** Creates a [Context] mock with [Context.method], [Context.path], and [Context.header] stubbed. */
 fun mockContext(

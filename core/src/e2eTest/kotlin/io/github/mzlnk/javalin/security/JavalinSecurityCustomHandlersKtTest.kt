@@ -19,7 +19,7 @@ class JavalinSecurityCustomHandlersKtTest {
         when (val user = context.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
             "invalid" -> AuthenticationResult.Failure(message = "super secret internal reason")
-            else -> AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user)))
+            else -> AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user)))
         }
     }
 
@@ -27,7 +27,7 @@ class JavalinSecurityCustomHandlersKtTest {
     fun `should authenticate with a custom authenticator when one is provided`() {
         // given
         val alwaysBob = Authenticator {
-            AuthenticationResult.Success(Authentication.authenticated(TestPrincipal("bob")))
+            AuthenticationResult.Success(Authentication.authenticated(TestIdentity("bob")))
         }
         val app = Javalin.create { cfg ->
             cfg.security { security ->
@@ -36,7 +36,7 @@ class JavalinSecurityCustomHandlersKtTest {
                     http.authentication = authenticationStrategy(alwaysBob)
                 }
             }
-            cfg.routes.get("/api/v1/me") { it.result(it.principal<TestPrincipal>()!!.name) }
+            cfg.routes.get("/api/v1/me") { it.result(it.identity<TestIdentity>()!!.name) }
         }
 
         JavalinTest.test(app) { _, client ->
@@ -195,7 +195,7 @@ class JavalinSecurityCustomHandlersKtTest {
             }
             cfg.routes.get("/api/v1/resource") { ctx ->
                 // Route handler: only reachable when the security guard grants access
-                ctx.result((ctx.authentication().identity as TestPrincipal).name)
+                ctx.result((ctx.authentication().identity as TestIdentity).name)
             }
         }
 

@@ -21,7 +21,7 @@ class JavalinSecurityWsAllowedOriginsKtTest {
     private val headerAuthenticator = Authenticator { ctx ->
         when (val user = ctx.header("X-User")) {
             null -> AuthenticationResult.NotAuthenticated
-            else -> AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user)))
+            else -> AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user)))
         }
     }
 

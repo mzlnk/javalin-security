@@ -21,7 +21,7 @@ class JavalinSecurityWsPathNormalizationJavaTest {
         String user = ctx.header("X-User");
         return user == null
                 ? AuthenticationResult.NotAuthenticated.INSTANCE
-                : new AuthenticationResult.Success(Authentication.authenticated(new TestPrincipal(user)));
+                : new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user)));
     };
 
     @Test

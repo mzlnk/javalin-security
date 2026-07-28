@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.github.mzlnk.javalin.security.E2EJavaTestSupport.authenticationStrategy;
-import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
+import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
 import static io.javalin.http.HandlerType.DELETE;
 import static io.javalin.http.HandlerType.GET;
 import static io.javalin.http.HandlerType.POST;
@@ -33,7 +33,7 @@ class JavalinSecurityHttpJavaTest {
                 : Arrays.stream(rolesHeader.split(","))
                         .map(name -> (RouteRole) Role.valueOf(name))
                         .collect(Collectors.toSet());
-        return new AuthenticationResult.Success(Authentication.authenticated(new TestPrincipal(user), roles));
+        return new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user), roles));
     };
 
     @Test
@@ -143,7 +143,7 @@ class JavalinSecurityHttpJavaTest {
     }
 
     @Test
-    void should_expose_the_authenticated_principal_on_the_context_when_the_caller_is_authenticated() {
+    void should_expose_the_authenticated_identity_on_the_context_when_the_caller_is_authenticated() {
         // given
         Javalin app = app();
 
@@ -295,7 +295,7 @@ class JavalinSecurityHttpJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.authentication = authenticationStrategy(ctx -> new AuthenticationResult.Success(
-                        Authentication.authenticated(new TestPrincipal("alice"), Role.ADMIN)));
+                        Authentication.authenticated(new TestIdentity("alice"), Role.ADMIN)));
                 http.rules(rules -> rules.add("/plain", GET, Rules.deny()));
             })));
             config.routes.get("/plain", ctx -> ctx.result("ok")); // no roles declared
@@ -325,7 +325,7 @@ class JavalinSecurityHttpJavaTest {
             config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));
             config.routes.post("/api/v1/resource", ctx -> ctx.result("created"));
             config.routes.delete("/api/v1/resource", ctx -> ctx.result("deleted"));
-            config.routes.get("/api/v1/me", ctx -> ctx.result(principal(ctx, TestPrincipal.class).getName()));
+            config.routes.get("/api/v1/me", ctx -> ctx.result(identity(ctx, TestIdentity.class).getName()));
         });
     }
 

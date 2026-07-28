@@ -33,7 +33,7 @@ class JavalinSecurityWsKtTest {
                     ?.mapNotNull { name -> Role.entries.find { it.name == name } }
                     ?.toSet()
                     ?: emptySet()
-                AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user), roles))
+                AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user), roles))
             }
         }
     }
@@ -157,7 +157,7 @@ class JavalinSecurityWsKtTest {
                     ws.authentication = authenticationStrategy(
                         Authenticator {
                             AuthenticationResult.Success(
-                                Authentication.authenticated(TestPrincipal("alice"), Role.ADMIN),
+                                Authentication.authenticated(TestIdentity("alice"), Role.ADMIN),
                             )
                         },
                     )
@@ -362,7 +362,7 @@ class JavalinSecurityWsKtTest {
                             CompletableFuture.supplyAsync {
                                 val user = ctx.header("X-User")
                                 if (user != null) {
-                                    AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user)))
+                                    AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user)))
                                 } else {
                                     AuthenticationResult.NotAuthenticated
                                 }
@@ -544,7 +544,7 @@ class JavalinSecurityWsKtTest {
     @Test
     fun `should expose the authentication set during upgrade from WsContext in onConnect`() {
         // given
-        val principalName = AtomicReference<String?>(null)
+        val identityName = AtomicReference<String?>(null)
         val connectLatch = CountDownLatch(1)
         val app = Javalin.create { cfg ->
             cfg.security { security ->
@@ -555,7 +555,7 @@ class JavalinSecurityWsKtTest {
             }
             cfg.routes.ws("/ws/chat") { ws ->
                 ws.onConnect { ctx ->
-                    principalName.set((ctx.authentication().identity as? TestPrincipal)?.name)
+                    identityName.set((ctx.authentication().identity as? TestIdentity)?.name)
                     connectLatch.countDown()
                 }
             }
@@ -567,7 +567,7 @@ class JavalinSecurityWsKtTest {
 
             // then
             assertThat(connectLatch.await(3, TimeUnit.SECONDS)).isTrue()
-            assertThat(principalName.get()).isEqualTo("alice")
+            assertThat(identityName.get()).isEqualTo("alice")
         }
     }
 

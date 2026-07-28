@@ -1,6 +1,6 @@
 package io.github.mzlnk.javalin.security.authorization
 
-import io.github.mzlnk.javalin.security.TestPrincipal
+import io.github.mzlnk.javalin.security.TestIdentity
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.http.authorization.AuthorizationManager
 import io.github.mzlnk.javalin.security.mockContext
@@ -251,7 +251,7 @@ class AuthorizationManagerTest {
     }
 
     private fun authenticated(vararg roles: RouteRole): Authentication =
-        Authentication.authenticated(TestPrincipal("bob"), *roles)
+        Authentication.authenticated(TestIdentity("bob"), *roles)
 
     private fun entry(pattern: String, method: HandlerType?, rule: Rule, router: RouterConfig = defaultRouter) =
         AuthorizationManager.Entry(pattern, method, rule, router)

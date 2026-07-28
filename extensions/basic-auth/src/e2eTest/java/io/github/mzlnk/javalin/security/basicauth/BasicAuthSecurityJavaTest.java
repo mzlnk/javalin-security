@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Base64;
 import java.util.Set;
 
-import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
+import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
 import static io.javalin.http.HandlerType.GET;
 import static io.javalin.http.HandlerType.POST;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -150,14 +150,14 @@ class BasicAuthSecurityJavaTest {
     }
 
     @Test
-    void should_expose_BasicAuthPrincipal_on_the_context_when_the_caller_is_authenticated() {
+    void should_expose_BasicAuthIdentity_on_the_context_when_the_caller_is_authenticated() {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.authentication = BasicAuthSecurity.basicAuth(basic -> basic.userLookup = testUserLookup);
                 http.rules(rules -> rules.fallback = Rules.authenticated());
             })));
-            config.routes.get("/me", ctx -> ctx.result(principal(ctx, BasicAuthPrincipal.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, BasicAuthIdentity.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -230,7 +230,7 @@ class BasicAuthSecurityJavaTest {
                 });
                 http.rules(rules -> rules.fallback = Rules.authenticated());
             })));
-            config.routes.get("/me", ctx -> ctx.result(principal(ctx, BasicAuthPrincipal.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, BasicAuthIdentity.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {

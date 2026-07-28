@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
+import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
 import static io.javalin.http.HandlerType.GET;
 import static io.javalin.http.HandlerType.POST;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -127,7 +127,7 @@ class JwtSecurityJavaTest {
     }
 
     @Test
-    void should_expose_JwtPrincipal_on_the_context_when_the_caller_is_authenticated() {
+    void should_expose_JwtIdentity_on_the_context_when_the_caller_is_authenticated() {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
@@ -137,7 +137,7 @@ class JwtSecurityJavaTest {
                 });
                 http.rules(rules -> rules.fallback = Rules.authenticated());
             })));
-            config.routes.get("/me", ctx -> ctx.result(principal(ctx, JwtPrincipal.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, JwtIdentity.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -211,7 +211,7 @@ class JwtSecurityJavaTest {
                 });
                 http.rules(rules -> rules.fallback = Rules.authenticated());
             })));
-            config.routes.get("/me", ctx -> ctx.result(principal(ctx, JwtPrincipal.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, JwtIdentity.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {

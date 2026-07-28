@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
  * [AuthenticationResult.NotAuthenticated]; malformed credentials yield [AuthenticationResult.Failure].
  * Looks up the username via [UserLookup] and compares the raw password with [PasswordEncoder]; an
  * unknown username or password mismatch yields [AuthenticationResult.Failure]. On success, returns
- * [AuthenticationResult.Success] with a [BasicAuthPrincipal] and the user's roles. Construct via
+ * [AuthenticationResult.Success] with a [BasicAuthIdentity] and the user's roles. Construct via
  * `basicAuth { }` or [Builder].
  */
 class BasicAuthenticator private constructor(
@@ -44,8 +44,8 @@ class BasicAuthenticator private constructor(
             return AuthenticationResult.Failure(message = "invalid username or password")
         }
 
-        val principal = BasicAuthPrincipal(user.username)
-        return AuthenticationResult.Success(Authentication.authenticated(principal, user.roles))
+        val identity = BasicAuthIdentity(user.username)
+        return AuthenticationResult.Success(Authentication.authenticated(identity, user.roles))
     }
 
     /** Fluent builder for constructing a [BasicAuthenticator]. */

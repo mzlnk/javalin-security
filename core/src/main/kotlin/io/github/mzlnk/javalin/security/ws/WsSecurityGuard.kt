@@ -107,13 +107,13 @@ internal class WsSecurityGuard(
 
         if (granted) {
             if (log.isDebugEnabled) {
-                log.debug("WS access granted to {} for {}", principalName(authentication), LogSanitizer.sanitize(path))
+                log.debug("WS access granted to {} for {}", identityName(authentication), LogSanitizer.sanitize(path))
             }
             return
         }
 
         if (authentication.isAuthenticated) {
-            log.warn("WS access denied to {} for {}", principalName(authentication), LogSanitizer.sanitize(path))
+            log.warn("WS access denied to {} for {}", identityName(authentication), LogSanitizer.sanitize(path))
             forbiddenHandler.handle(context, authentication)
             context.skipRemainingHandlers()
         } else {
@@ -138,7 +138,7 @@ internal class WsSecurityGuard(
         )
     }
 
-    private fun principalName(authentication: Authentication): String =
+    private fun identityName(authentication: Authentication): String =
         LogSanitizer.sanitize(authentication.identity?.name ?: "anonymous")
 
     private companion object {

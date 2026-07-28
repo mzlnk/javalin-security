@@ -27,7 +27,7 @@ class JavalinSecurityHttpKtTest {
                     ?.mapNotNull { name -> Role.entries.find { it.name == name } }
                     ?.toSet()
                     ?: emptySet()
-                AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user), roles))
+                AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user), roles))
             }
         }
     }
@@ -139,7 +139,7 @@ class JavalinSecurityHttpKtTest {
     }
 
     @Test
-    fun `should expose the authenticated principal on the context when the caller is authenticated`() {
+    fun `should expose the authenticated identity on the context when the caller is authenticated`() {
         // given
         val app = app()
 
@@ -301,7 +301,7 @@ class JavalinSecurityHttpKtTest {
                 security.http { http ->
                     http.authentication = authenticationStrategy(
                         Authenticator {
-                            AuthenticationResult.Success(Authentication.authenticated(TestPrincipal("alice"), Role.ADMIN))
+                            AuthenticationResult.Success(Authentication.authenticated(TestIdentity("alice"), Role.ADMIN))
                         },
                     )
                     http.rules { r -> r.add("/plain", GET, r.deny) }
@@ -334,6 +334,6 @@ class JavalinSecurityHttpKtTest {
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
             cfg.routes.post("/api/v1/resource") { it.result("created") }
             cfg.routes.delete("/api/v1/resource") { it.result("deleted") }
-            cfg.routes.get("/api/v1/me") { it.result(it.principal<TestPrincipal>()!!.name) }
+            cfg.routes.get("/api/v1/me") { it.result(it.identity<TestIdentity>()!!.name) }
         }
 }

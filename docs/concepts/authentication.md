@@ -45,10 +45,10 @@ An authenticator returns one of three results:
     Missing credentials must be `NotAuthenticated` — otherwise every public route becomes a 401.
     Reserve `Failure` for bad passwords, expired tokens, or malformed headers.
 
-## Identity and principal
+## Identity
 
 `Authentication` wraps an optional `Identity` (the caller) and a set of `RouteRole`s. Extensions
-provide concrete principals (`BasicAuthPrincipal`, `JwtPrincipal`); a custom scheme implements
+provide concrete types (`BasicAuthIdentity`, `JwtIdentity`); a custom scheme implements
 `Identity` in the same way.
 
 | Member            | Meaning                                    |
@@ -59,7 +59,7 @@ provide concrete principals (`BasicAuthPrincipal`, `JwtPrincipal`); a custom sch
 
 ## Reading auth in handlers
 
-Use `ctx.authentication()` (never `null`) or `ctx.principal<T>()` (`null` when anonymous). The
+Use `ctx.authentication()` (never `null`) or `ctx.identity<T>()` (`null` when anonymous). The
 same accessors are available on `WsContext` after a successful upgrade, and auth is **not**
 re-checked per WebSocket message.
 

@@ -42,7 +42,7 @@ Prefer the JOSE versions shown; they are what the adapters were built and tested
 | `JwtVerification`                | Spec: key source, issuer, audiences, clock skew.      |
 | `JwtKeySource`                   | Public key, PEM, HMAC secret, or JWKS.                |
 | `JwtRolesMapper`                 | Maps a verified token to `RouteRole`s.                |
-| `DecodedJwt` / `JwtPrincipal`    | Verified token and identity (exposes claims).         |
+| `DecodedJwt` / `JwtIdentity`    | Verified token and identity (exposes claims).         |
 
 By default the raw token is read from the `Authorization: Bearer …` header.
 
@@ -76,7 +76,7 @@ By default the raw token is read from the `Authorization: Bearer …` header.
                 }
             }
         }
-        config.routes.get("/api/me") { it.result(it.principal<JwtPrincipal>()!!.name) }
+        config.routes.get("/api/me") { it.result(it.identity<JwtIdentity>()!!.name) }
     }
     ```
 
@@ -90,7 +90,7 @@ By default the raw token is read from the `Authorization: Bearer …` header.
     import io.javalin.Javalin;
     import java.util.Set;
 
-    import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
+    import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
     import static io.javalin.http.HandlerType.GET;
 
     Javalin.create(config -> {
@@ -110,7 +110,7 @@ By default the raw token is read from the `Authorization: Bearer …` header.
                 r.fallback = Rules.deny();
             });
         })));
-        config.routes.get("/api/me", ctx -> ctx.result(principal(ctx, JwtPrincipal.class).getName()));
+        config.routes.get("/api/me", ctx -> ctx.result(identity(ctx, JwtIdentity.class).getName()));
     });
     ```
 
@@ -144,7 +144,7 @@ reason is logged, never returned to the client.
 
     ```kotlin
     config.routes.get("/api/me") { ctx ->
-        val jwt = ctx.principal<JwtPrincipal>()!!.token
+        val jwt = ctx.identity<JwtIdentity>()!!.token
         ctx.json(mapOf("sub" to jwt.subject, "email" to jwt.claim<String>("email")))
     }
     ```
@@ -153,7 +153,7 @@ reason is logged, never returned to the client.
 
     ```java
     config.routes.get("/api/me", ctx -> {
-        DecodedJwt jwt = principal(ctx, JwtPrincipal.class).getToken();
+        DecodedJwt jwt = identity(ctx, JwtIdentity.class).getToken();
         ctx.json(Map.of("sub", jwt.getSubject(), "email", jwt.<String>claim("email")));
     });
     ```

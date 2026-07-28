@@ -8,7 +8,7 @@ package io.github.mzlnk.javalin.security.authentication
  */
 interface Identity {
 
-    /** Human-readable identifier for the principal (username, subject, or similar). */
+    /** Human-readable identifier for the caller (username, subject, or similar). */
     val name: String
 
 }

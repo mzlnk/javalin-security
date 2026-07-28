@@ -1,7 +1,7 @@
 # Basic Auth
 
 HTTP Basic authentication (RFC 7617) via `javalin-security-basic-auth`. You supply a
-`UserLookup`; the extension verifies the password and produces a `BasicAuthPrincipal` with roles.
+`UserLookup`; the extension verifies the password and produces a `BasicAuthIdentity` with roles.
 
 !!! info "HTTP only"
     Assign to `http.authentication`. There is no WebSocket variant of Basic Auth.
@@ -136,7 +136,7 @@ Unknown-user lookups still run a dummy password comparison for timing uniformity
 
 Hashing at registration is your application's responsibility; the encoder only verifies.
 
-## Challenge and principal
+## Challenge header and identity
 
 ```kotlin
 basicAuth { basic ->
@@ -145,12 +145,12 @@ basicAuth { basic ->
     basic.realm = "My App"
 }
 
-config.routes.get("/me") { ctx -> ctx.result(ctx.principal<BasicAuthPrincipal>()!!.name) }
+config.routes.get("/me") { ctx -> ctx.result(ctx.identity<BasicAuthIdentity>()!!.name) }
 ```
 
 ## Next steps
 
 - [Access caller identity](../getting-started/access-caller-identity.md) — read
-  `BasicAuthPrincipal` in handlers.
+  `BasicAuthIdentity` in handlers.
 - [Authorization](../concepts/authorization.md) — pair Basic Auth with the rule table.
 - [Error handling](../concepts/error-handling.md) — customize 401 / 403 responses.

@@ -39,18 +39,18 @@ class JwtAuthenticatorTest {
     }
 
     @Test
-    fun `should return Success with JwtPrincipal when decoder succeeds`() {
+    fun `should return Success with JwtIdentity when decoder succeeds`() {
         val manager = JwtAuthenticator.of(successDecoder, verification)
         val result = manager.authenticate(ctx("Bearer $validToken"))
 
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
         val success = result as AuthenticationResult.Success
         assertThat(success.authentication.isAuthenticated).isTrue()
-        assertThat(success.authentication.identity).isInstanceOf(JwtPrincipal::class.java)
+        assertThat(success.authentication.identity).isInstanceOf(JwtIdentity::class.java)
 
-        val principal = success.authentication.identity as JwtPrincipal
-        assertThat(principal.name).isEqualTo("alice")
-        assertThat(principal.token).isEqualTo(decodedJwt)
+        val identity = success.authentication.identity as JwtIdentity
+        assertThat(identity.name).isEqualTo("alice")
+        assertThat(identity.token).isEqualTo(decodedJwt)
     }
 
     @Test
@@ -85,15 +85,15 @@ class JwtAuthenticatorTest {
     }
 
     @Test
-    fun `JwtPrincipal name is the token subject`() {
-        val principal = JwtPrincipal(SimpleDecodedJwt(subject = "carol", claims = emptyMap()))
-        assertThat(principal.name).isEqualTo("carol")
+    fun `JwtIdentity name is the token subject`() {
+        val identity = JwtIdentity(SimpleDecodedJwt(subject = "carol", claims = emptyMap()))
+        assertThat(identity.name).isEqualTo("carol")
     }
 
     @Test
-    fun `JwtPrincipal name is blank string when subject is empty`() {
-        val principal = JwtPrincipal(SimpleDecodedJwt(subject = "", claims = emptyMap()))
-        assertThat(principal.name).isBlank()
+    fun `JwtIdentity name is blank string when subject is empty`() {
+        val identity = JwtIdentity(SimpleDecodedJwt(subject = "", claims = emptyMap()))
+        assertThat(identity.name).isBlank()
     }
 
     @Test

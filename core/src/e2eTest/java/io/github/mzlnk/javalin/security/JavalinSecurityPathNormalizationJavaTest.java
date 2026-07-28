@@ -18,7 +18,7 @@ class JavalinSecurityPathNormalizationJavaTest {
         String user = ctx.header("X-User");
         if (user == null) return AuthenticationResult.NotAuthenticated.INSTANCE;
         if ("invalid".equals(user)) return new AuthenticationResult.Failure("super secret internal reason", null);
-        return new AuthenticationResult.Success(Authentication.authenticated(new TestPrincipal(user)));
+        return new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user)));
     };
 
     @Test

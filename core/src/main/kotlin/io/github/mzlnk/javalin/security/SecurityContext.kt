@@ -7,7 +7,7 @@ import io.javalin.http.Context
 /**
  * Per-request security extension exposed by [JavalinSecurityPlugin].
  *
- * Obtain via `ctx.with(JavalinSecurityPlugin::class)` (Kotlin) or `ctx.with(JavalinSecurityPlugin.class)` (Java). The `Context.authentication()` / `Context.principal()` extensions in this package delegate here.
+ * Obtain via `ctx.with(JavalinSecurityPlugin::class)` (Kotlin) or `ctx.with(JavalinSecurityPlugin.class)` (Java). The `Context.authentication()` / `Context.identity()` extensions in this package delegate here.
  */
 class SecurityContext internal constructor(private val context: Context) {
 
@@ -19,15 +19,15 @@ class SecurityContext internal constructor(private val context: Context) {
     fun authentication(): Authentication =
         context.attribute<Authentication>(JavalinSecurityPlugin.AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()
 
-    /** Returns the principal of the current request, or `null` when unauthenticated. */
+    /** Returns the identity of the current request, or `null` when unauthenticated. */
     @Suppress("UNCHECKED_CAST")
-    fun <T : Identity> principal(): T? = authentication().identity as T?
+    fun <T : Identity> identity(): T? = authentication().identity as T?
 
     /**
-     * Returns the principal of the current request cast to [type], or `null` when unauthenticated.
+     * Returns the identity of the current request cast to [type], or `null` when unauthenticated.
      *
      * Prefer this overload from Java; a wrong type yields an immediate `ClassCastException`.
      */
-    fun <T : Identity> principal(type: Class<T>): T? = type.cast(authentication().identity)
+    fun <T : Identity> identity(type: Class<T>): T? = type.cast(authentication().identity)
 
 }

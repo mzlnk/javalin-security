@@ -1,6 +1,6 @@
 package io.github.mzlnk.javalin.security.authorization
 
-import io.github.mzlnk.javalin.security.TestPrincipal
+import io.github.mzlnk.javalin.security.TestIdentity
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.mockContext
 import io.javalin.security.RouteRole
@@ -88,5 +88,5 @@ class RulesTest {
     }
 
     private fun authenticated(vararg roles: RouteRole): Authentication =
-        Authentication.authenticated(TestPrincipal("bob"), *roles)
+        Authentication.authenticated(TestIdentity("bob"), *roles)
 }

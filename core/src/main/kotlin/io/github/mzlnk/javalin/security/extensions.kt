@@ -23,16 +23,16 @@ fun JavalinConfig.security(configure: Consumer<JavalinSecurityPlugin.Config>) {
 fun Context.authentication(): Authentication = with(JavalinSecurityPlugin::class).authentication()
 
 /**
- * Returns the principal of the current request, or `null` when unauthenticated.
+ * Returns the identity of the current request, or `null` when unauthenticated.
  * Prefer the [Class]-taking overload from Java.
  */
-fun <T : Identity> Context.principal(): T? = with(JavalinSecurityPlugin::class).principal()
+fun <T : Identity> Context.identity(): T? = with(JavalinSecurityPlugin::class).identity()
 
 /**
- * Returns the principal of the current request cast to [type], or `null` when unauthenticated.
- * Throws [ClassCastException] if the principal is not an instance of [type].
+ * Returns the identity of the current request cast to [type], or `null` when unauthenticated.
+ * Throws [ClassCastException] if the identity is not an instance of [type].
  */
-fun <T : Identity> Context.principal(type: Class<T>): T? = with(JavalinSecurityPlugin::class).principal(type)
+fun <T : Identity> Context.identity(type: Class<T>): T? = with(JavalinSecurityPlugin::class).identity(type)
 
 /**
  * Returns the [Authentication] resolved for the current WebSocket session.
@@ -45,14 +45,14 @@ fun WsContext.authentication(): Authentication =
     attribute<Authentication>(JavalinSecurityPlugin.AUTHENTICATION_ATTRIBUTE) ?: Authentication.unauthenticated()
 
 /**
- * Returns the principal of the current WebSocket session, or `null` when unauthenticated.
+ * Returns the identity of the current WebSocket session, or `null` when unauthenticated.
  * Prefer the [Class]-taking overload from Java.
  */
 @Suppress("UNCHECKED_CAST")
-fun <T : Identity> WsContext.principal(): T? = authentication().identity as T?
+fun <T : Identity> WsContext.identity(): T? = authentication().identity as T?
 
 /**
- * Returns the principal of the current WebSocket session cast to [type], or `null` when unauthenticated.
- * Throws [ClassCastException] if the principal is not an instance of [type].
+ * Returns the identity of the current WebSocket session cast to [type], or `null` when unauthenticated.
+ * Throws [ClassCastException] if the identity is not an instance of [type].
  */
-fun <T : Identity> WsContext.principal(type: Class<T>): T? = type.cast(authentication().identity)
+fun <T : Identity> WsContext.identity(type: Class<T>): T? = type.cast(authentication().identity)

@@ -118,7 +118,7 @@ and an unset `fallback` denies.
         config.routes.get("/api/v1/resource") { it.result("ok") }
         config.routes.post("/api/v1/resource") { it.result("created") }
         config.routes.delete("/api/v1/resource") { it.result("deleted") }
-        config.routes.get("/api/v1/me") { it.result(it.principal<BasicAuthPrincipal>()!!.name) }
+        config.routes.get("/api/v1/me") { it.result(it.identity<BasicAuthIdentity>()!!.name) }
     }.start(7070)
     ```
 
@@ -127,7 +127,7 @@ and an unset `fallback` denies.
     ```java
     import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
     import io.javalin.Javalin;
-    import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
+    import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
 
     Javalin app = Javalin.create(config -> {
         config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
@@ -144,7 +144,7 @@ and an unset `fallback` denies.
         config.routes.post("/api/v1/resource", ctx -> ctx.result("created"));
         config.routes.delete("/api/v1/resource", ctx -> ctx.result("deleted"));
         config.routes.get("/api/v1/me", ctx ->
-            ctx.result(principal(ctx, BasicAuthPrincipal.class).getName()));
+            ctx.result(identity(ctx, BasicAuthIdentity.class).getName()));
     }).start(7070);
     ```
 

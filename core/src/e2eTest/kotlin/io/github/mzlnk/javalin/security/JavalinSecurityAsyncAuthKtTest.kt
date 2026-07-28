@@ -24,7 +24,7 @@ class JavalinSecurityAsyncAuthKtTest {
                             CompletableFuture.supplyAsync {
                                 val user = ctx.header("X-User")
                                 if (user != null) {
-                                    AuthenticationResult.Success(Authentication.authenticated(TestPrincipal(user)))
+                                    AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user)))
                                 } else {
                                     AuthenticationResult.NotAuthenticated
                                 }

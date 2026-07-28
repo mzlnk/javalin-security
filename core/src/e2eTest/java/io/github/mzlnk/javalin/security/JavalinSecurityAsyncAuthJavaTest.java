@@ -24,7 +24,7 @@ class JavalinSecurityAsyncAuthJavaTest {
                 http.authentication = E2EJavaTestSupport.asyncAuthenticationStrategy(ctx -> CompletableFuture.supplyAsync(() -> {
                     String user = ctx.header("X-User");
                     return user != null
-                            ? new AuthenticationResult.Success(Authentication.authenticated(new TestPrincipal(user)))
+                            ? new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user)))
                             : AuthenticationResult.NotAuthenticated.INSTANCE;
                 }));
             })));

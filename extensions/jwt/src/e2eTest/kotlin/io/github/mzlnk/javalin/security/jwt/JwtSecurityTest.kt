@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security.jwt
 
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
-import io.github.mzlnk.javalin.security.principal
+import io.github.mzlnk.javalin.security.identity
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
 import io.javalin.http.HandlerType.GET
@@ -129,7 +129,7 @@ class JwtSecurityTest {
     }
 
     @Test
-    fun `should expose JwtPrincipal on the context when the caller is authenticated`() {
+    fun `should expose JwtIdentity on the context when the caller is authenticated`() {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
@@ -142,8 +142,8 @@ class JwtSecurityTest {
                 }
             }
             cfg.routes.get("/me") { ctx ->
-                val principal = ctx.principal<JwtPrincipal>()!!
-                ctx.result(principal.name)
+                val identity = ctx.identity<JwtIdentity>()!!
+                ctx.result(identity.name)
             }
         }
 
@@ -221,8 +221,8 @@ class JwtSecurityTest {
                 }
             }
             cfg.routes.get("/me") { ctx ->
-                val principal = ctx.principal<JwtPrincipal>()!!
-                ctx.result(principal.name)
+                val identity = ctx.identity<JwtIdentity>()!!
+                ctx.result(identity.name)
             }
         }
 

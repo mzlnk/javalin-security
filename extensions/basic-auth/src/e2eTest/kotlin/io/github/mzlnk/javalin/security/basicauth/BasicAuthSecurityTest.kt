@@ -1,6 +1,6 @@
 package io.github.mzlnk.javalin.security.basicauth
 
-import io.github.mzlnk.javalin.security.principal
+import io.github.mzlnk.javalin.security.identity
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
 import io.javalin.http.HandlerType.GET
@@ -140,7 +140,7 @@ class BasicAuthSecurityTest {
     }
 
     @Test
-    fun `should expose BasicAuthPrincipal on the context when the caller is authenticated`() {
+    fun `should expose BasicAuthIdentity on the context when the caller is authenticated`() {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
@@ -150,8 +150,8 @@ class BasicAuthSecurityTest {
                 }
             }
             cfg.routes.get("/me") { ctx ->
-                val principal = ctx.principal<BasicAuthPrincipal>()!!
-                ctx.result(principal.name)
+                val identity = ctx.identity<BasicAuthIdentity>()!!
+                ctx.result(identity.name)
             }
         }
 
@@ -228,8 +228,8 @@ class BasicAuthSecurityTest {
                 }
             }
             cfg.routes.get("/me") { ctx ->
-                val principal = ctx.principal<BasicAuthPrincipal>()!!
-                ctx.result(principal.name)
+                val identity = ctx.identity<BasicAuthIdentity>()!!
+                ctx.result(identity.name)
             }
         }
 

@@ -9,7 +9,7 @@ import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 
 /** Minimal [Identity] for e2e tests. */
-data class TestPrincipal(override val name: String) : Identity
+data class TestIdentity(override val name: String) : Identity
 
 /**
  * Builds an [AuthenticationStrategy.Sync] for e2e tests.

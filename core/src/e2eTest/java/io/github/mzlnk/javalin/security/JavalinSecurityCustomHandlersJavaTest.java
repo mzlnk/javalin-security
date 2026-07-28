@@ -12,7 +12,7 @@ import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
 
 import static io.github.mzlnk.javalin.security.E2EJavaTestSupport.authenticationStrategy;
-import static io.github.mzlnk.javalin.security.SecurityExtensions.principal;
+import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
 import static io.javalin.http.HandlerType.GET;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,20 +24,20 @@ class JavalinSecurityCustomHandlersJavaTest {
         String user = ctx.header("X-User");
         if (user == null) return AuthenticationResult.NotAuthenticated.INSTANCE;
         if ("invalid".equals(user)) return new AuthenticationResult.Failure("super secret internal reason", null);
-        return new AuthenticationResult.Success(Authentication.authenticated(new TestPrincipal(user)));
+        return new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user)));
     };
 
     @Test
     void should_authenticate_with_a_custom_authenticator_when_one_is_provided() {
         // given
         Authenticator alwaysBob = ctx ->
-                new AuthenticationResult.Success(Authentication.authenticated(new TestPrincipal("bob")));
+                new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity("bob")));
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
                 http.rules(rules -> rules.add("/api/v1/*", GET, Rules.authenticated()));
                 http.authentication = authenticationStrategy(alwaysBob);
             })));
-            config.routes.get("/api/v1/me", ctx -> ctx.result(principal(ctx, TestPrincipal.class).getName()));
+            config.routes.get("/api/v1/me", ctx -> ctx.result(identity(ctx, TestIdentity.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {

@@ -5,7 +5,7 @@ request signing — implement your own `Authenticator` on top of core. No extra 
 
 ## The recipe
 
-1. Define an `Identity` (principal) for your scheme.
+1. Define an `Identity` for your scheme.
 2. Write an `Authenticator` that returns `Success`, `Failure`, or `NotAuthenticated`.
 3. Wrap it in an `AuthenticationStrategy.Sync` (or `.Async`) and assign it.
 
@@ -20,7 +20,7 @@ request signing — implement your own `Authenticator` on top of core. No extra 
 
     enum class Role : RouteRole { SERVICE }
 
-    class ApiKeyPrincipal(override val name: String, val tenant: String) : Identity
+    class ApiKeyIdentity(override val name: String, val tenant: String) : Identity
 
     // Your store: key -> (name, tenant, roles)
     val keys = mapOf("k-123" to Triple("orders-svc", "acme", setOf(Role.SERVICE)))
@@ -33,7 +33,7 @@ request signing — implement your own `Authenticator` on top of core. No extra 
                     ?: return@Authenticator AuthenticationResult.Failure("unknown api key")
                 val (name, tenant, roles) = record
                 AuthenticationResult.Success(
-                    Authentication.authenticated(ApiKeyPrincipal(name, tenant), roles),
+                    Authentication.authenticated(ApiKeyIdentity(name, tenant), roles),
                 )
             }
         }
@@ -60,9 +60,9 @@ request signing — implement your own `Authenticator` on top of core. No extra 
 
     enum Role implements RouteRole { SERVICE }
 
-    final class ApiKeyPrincipal implements Identity {
+    final class ApiKeyIdentity implements Identity {
         private final String name; private final String tenant;
-        ApiKeyPrincipal(String name, String tenant) { this.name = name; this.tenant = tenant; }
+        ApiKeyIdentity(String name, String tenant) { this.name = name; this.tenant = tenant; }
         @Override public String getName() { return name; }
         public String getTenant() { return tenant; }
     }
@@ -77,7 +77,7 @@ request signing — implement your own `Authenticator` on top of core. No extra 
         KeyRecord rec = keys.get(key);
         if (rec == null) return new AuthenticationResult.Failure("unknown api key", null);
         return new AuthenticationResult.Success(
-            Authentication.authenticated(new ApiKeyPrincipal(rec.name(), rec.tenant()), rec.roles()));
+            Authentication.authenticated(new ApiKeyIdentity(rec.name(), rec.tenant()), rec.roles()));
     };
 
     AuthenticationStrategy.Sync apiKeyStrategy = new AuthenticationStrategy.Sync() {
@@ -117,7 +117,7 @@ For remote validation (introspection endpoint, DB), implement `AuthenticationStr
                 ?: return@AsyncAuthenticator CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated)
             introspectAsync(key).thenApply { record ->
                 if (record == null) AuthenticationResult.Failure("unknown api key")
-                else AuthenticationResult.Success(Authentication.authenticated(record.principal, record.roles))
+                else AuthenticationResult.Success(Authentication.authenticated(record.identity, record.roles))
             }
         }
     }
@@ -133,7 +133,7 @@ For remote validation (introspection endpoint, DB), implement `AuthenticationStr
                 if (key == null) return CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated.INSTANCE);
                 return introspectAsync(key).thenApply(record -> record == null
                     ? new AuthenticationResult.Failure("unknown api key", null)
-                    : new AuthenticationResult.Success(Authentication.authenticated(record.principal(), record.roles())));
+                    : new AuthenticationResult.Success(Authentication.authenticated(record.identity(), record.roles())));
             };
         }
     };

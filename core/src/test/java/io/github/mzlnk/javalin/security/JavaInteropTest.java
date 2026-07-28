@@ -25,7 +25,7 @@ class JavaInteropTest {
         String user = ctx.header("X-User");
         if (user == null) return AuthenticationResult.NotAuthenticated.INSTANCE;
         return new AuthenticationResult.Success(
-                Authentication.authenticated(new TestPrincipal(user))
+                Authentication.authenticated(new TestIdentity(user))
         );
     };
 
@@ -72,7 +72,7 @@ class JavaInteropTest {
     void custom_authenticator_as_java_lambda() {
         Authenticator alwaysBob = ctx ->
                 new AuthenticationResult.Success(
-                        Authentication.authenticated(new TestPrincipal("bob")));
+                        Authentication.authenticated(new TestIdentity("bob")));
 
         Javalin app = Javalin.create(config ->
                 config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
