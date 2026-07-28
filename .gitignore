@@ -47,3 +47,7 @@ site/
 .tmp-site/
 .tmp-docs-venv/
 docs/.venv/
+
+### Python ###
+__pycache__/
+*.py[cod]

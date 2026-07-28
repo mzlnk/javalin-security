@@ -17,9 +17,9 @@ baseline.
 
     ```kotlin
     dependencies {
-        implementation("io.github.mzlnk:javalin-security:1.0.0-SNAPSHOT")
-        implementation("io.javalin:javalin:7.2.2")
-        implementation("org.slf4j:slf4j-simple:2.0.16")
+        implementation("io.github.mzlnk:javalin-security:{{ versions.library }}")
+        implementation("io.javalin:javalin:{{ versions.javalin }}")
+        implementation("org.slf4j:slf4j-simple:{{ versions.slf4j }}")
     }
     ```
 
@@ -29,17 +29,17 @@ baseline.
     <dependency>
       <groupId>io.github.mzlnk</groupId>
       <artifactId>javalin-security</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>{{ versions.library }}</version>
     </dependency>
     <dependency>
       <groupId>io.javalin</groupId>
       <artifactId>javalin</artifactId>
-      <version>7.2.2</version>
+      <version>{{ versions.javalin }}</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
-      <version>2.0.16</version>
+      <version>{{ versions.slf4j }}</version>
     </dependency>
     ```
 

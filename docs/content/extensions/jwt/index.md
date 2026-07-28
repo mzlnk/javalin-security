@@ -18,18 +18,18 @@ quick reference:
 === "Nimbus"
 
     ```kotlin
-    implementation("io.github.mzlnk:javalin-security-jwt:1.0.0-SNAPSHOT")
-    implementation("io.github.mzlnk:javalin-security-jwt-nimbus:1.0.0-SNAPSHOT")
-    implementation("com.nimbusds:nimbus-jose-jwt:10.9.1")
+    implementation("io.github.mzlnk:javalin-security-jwt:{{ versions.library }}")
+    implementation("io.github.mzlnk:javalin-security-jwt-nimbus:{{ versions.library }}")
+    implementation("com.nimbusds:nimbus-jose-jwt:{{ versions.nimbus_jose_jwt }}")
     ```
 
 === "Auth0"
 
     ```kotlin
-    implementation("io.github.mzlnk:javalin-security-jwt:1.0.0-SNAPSHOT")
-    implementation("io.github.mzlnk:javalin-security-jwt-auth0:1.0.0-SNAPSHOT")
-    implementation("com.auth0:java-jwt:4.6.0")
-    implementation("com.auth0:jwks-rsa:0.24.1")
+    implementation("io.github.mzlnk:javalin-security-jwt:{{ versions.library }}")
+    implementation("io.github.mzlnk:javalin-security-jwt-auth0:{{ versions.library }}")
+    implementation("com.auth0:java-jwt:{{ versions.auth0_java_jwt }}")
+    implementation("com.auth0:jwks-rsa:{{ versions.auth0_jwks_rsa }}")
     ```
 
 Prefer the JOSE versions shown; they are what the adapters were built and tested against.

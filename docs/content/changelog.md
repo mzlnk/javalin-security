@@ -6,7 +6,7 @@ Notable changes to `javalin-security`. This changelog follows
 
 ## [Unreleased]
 
-_Current version: `1.0.0-SNAPSHOT`._
+_Current version: `{{ versions.library }}`._
 
 ### Added
 
@@ -26,8 +26,8 @@ _Current version: `1.0.0-SNAPSHOT`._
 
 ### Compatibility
 
-- Java **17+**, Javalin **7.2.x**, Kotlin **2.4**.
+- Java **17+**, Javalin **{{ versions.javalin_family }}**, Kotlin **{{ versions.kotlin_family }}**.
 
 !!! note "Pre-release"
-    While the version is `1.0.0-SNAPSHOT`, the public API may still change before the first
-    stable release.
+    While the version is `{{ versions.library }}`, the public API may still change before the
+    first stable release.

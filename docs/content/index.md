@@ -90,12 +90,12 @@ strategies; you can also [write your own](guides/custom-authentication.md).
 
 ## Supported versions
 
-| Component   | Version                                           |
-|-------------|---------------------------------------------------|
-| Java        | **17+**                                           |
-| Kotlin      | **2.4** (consumers may use any JVM language)      |
-| Javalin     | **7.2.x**                                         |
-| Coordinates | `io.github.mzlnk:javalin-security:1.0.0-SNAPSHOT` |
+| Component   | Version                                                       |
+|-------------|---------------------------------------------------------------|
+| Java        | **17+**                                                       |
+| Kotlin      | **{{ versions.kotlin_family }}** (consumers may use any JVM language) |
+| Javalin     | **{{ versions.javalin_family }}**                             |
+| Coordinates | `io.github.mzlnk:javalin-security:{{ versions.library }}`     |
 
 ## Where to start
 

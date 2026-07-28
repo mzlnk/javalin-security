@@ -13,7 +13,7 @@ Add the extension on top of [core](../getting-started/installation.md):
 === "Gradle (Kotlin DSL)"
 
     ```kotlin
-    implementation("io.github.mzlnk:javalin-security-basic-auth:1.0.0-SNAPSHOT")
+    implementation("io.github.mzlnk:javalin-security-basic-auth:{{ versions.library }}")
     // plus javalin-security + Javalin + SLF4J from core
     ```
 
@@ -23,7 +23,7 @@ Add the extension on top of [core](../getting-started/installation.md):
     <dependency>
       <groupId>io.github.mzlnk</groupId>
       <artifactId>javalin-security-basic-auth</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>{{ versions.library }}</version>
     </dependency>
     ```
 

@@ -8,9 +8,9 @@ end-to-end 200 / 401 / 403 behavior.
 ## Test dependencies
 
 ```kotlin
-testImplementation("io.javalin:javalin-testtools:7.2.2")
-testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
-testImplementation("org.assertj:assertj-core:3.27.3")
+testImplementation("io.javalin:javalin-testtools:{{ versions.javalin }}")
+testImplementation("org.junit.jupiter:junit-jupiter:{{ versions.junit_bom }}")
+testImplementation("org.assertj:assertj-core:{{ versions.assertj }}")
 ```
 
 ## Build the app in a factory

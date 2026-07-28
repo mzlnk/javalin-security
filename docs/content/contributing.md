@@ -4,14 +4,16 @@ Thanks for helping improve `javalin-security`.
 
 ## Toolchain
 
-| Tool    | Version                   |
-|---------|---------------------------|
-| JDK     | 17                        |
-| Kotlin  | 2.4                       |
-| Javalin | 7.2.x                     |
-| Build   | Gradle (wrapper included) |
+| Tool    | Version                             |
+|---------|-------------------------------------|
+| JDK     | 17                                  |
+| Kotlin  | {{ versions.kotlin_family }}        |
+| Javalin | {{ versions.javalin_family }}       |
+| Build   | Gradle (wrapper included)           |
 
-Dependency versions live in `gradle/libs.versions.toml`.
+Dependency versions live in `gradle/libs.versions.toml`; the documentation site reads from
+there (and from `build.gradle.kts`) via `docs/main.py`, so bumping a version in Gradle updates
+the docs automatically.
 
 ## Building and testing
 
@@ -33,9 +35,13 @@ Dependency versions live in `gradle/libs.versions.toml`.
 
 ## Documentation
 
+Everything MkDocs-related lives under `docs/`: the config (`docs/mkdocs.yml`), the macros
+helper (`docs/main.py`), the Python dependencies (`docs/requirements.txt`), and the markdown
+sources (`docs/content/`).
+
 ```bash
 pip install -r docs/requirements.txt
-mkdocs serve
+mkdocs serve -f docs/mkdocs.yml
 ```
 
 - Every code sample has Kotlin **and** Java tabs.
@@ -46,5 +52,5 @@ mkdocs serve
 
 1. Fork and branch from `main`.
 2. Add or adjust tests for behavior changes.
-3. Run `./gradlew build` (and `mkdocs build` for doc changes).
+3. Run `./gradlew build` (and `mkdocs build -f docs/mkdocs.yml` for doc changes).
 4. Open a pull request.

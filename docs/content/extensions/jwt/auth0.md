@@ -12,10 +12,10 @@ Auth0 adapter needs **two** third-party libraries:
 === "Gradle (Kotlin DSL)"
 
     ```kotlin
-    implementation("io.github.mzlnk:javalin-security-jwt:1.0.0-SNAPSHOT")
-    implementation("io.github.mzlnk:javalin-security-jwt-auth0:1.0.0-SNAPSHOT")
-    implementation("com.auth0:java-jwt:4.6.0")    // add it yourself
-    implementation("com.auth0:jwks-rsa:0.24.1")   // add it yourself
+    implementation("io.github.mzlnk:javalin-security-jwt:{{ versions.library }}")
+    implementation("io.github.mzlnk:javalin-security-jwt-auth0:{{ versions.library }}")
+    implementation("com.auth0:java-jwt:{{ versions.auth0_java_jwt }}")    // add it yourself
+    implementation("com.auth0:jwks-rsa:{{ versions.auth0_jwks_rsa }}")   // add it yourself
     ```
 
 === "Maven"
@@ -24,22 +24,22 @@ Auth0 adapter needs **two** third-party libraries:
     <dependency>
       <groupId>io.github.mzlnk</groupId>
       <artifactId>javalin-security-jwt-auth0</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>{{ versions.library }}</version>
     </dependency>
     <dependency>
       <groupId>com.auth0</groupId>
       <artifactId>java-jwt</artifactId>
-      <version>4.6.0</version>
+      <version>{{ versions.auth0_java_jwt }}</version>
     </dependency>
     <dependency>
       <groupId>com.auth0</groupId>
       <artifactId>jwks-rsa</artifactId>
-      <version>0.24.1</version>
+      <version>{{ versions.auth0_jwks_rsa }}</version>
     </dependency>
     ```
 
 Neither library ships with the adapter — add both yourself at the versions the adapter was built
-against (**java-jwt 4.6.0**, **jwks-rsa 0.24.1**).
+against (**java-jwt {{ versions.auth0_java_jwt }}**, **jwks-rsa {{ versions.auth0_jwks_rsa }}**).
 
 ## Usage
 

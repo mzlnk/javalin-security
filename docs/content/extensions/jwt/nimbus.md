@@ -10,9 +10,9 @@ On top of [core](../../getting-started/installation.md) and the [JWT extension](
 === "Gradle (Kotlin DSL)"
 
     ```kotlin
-    implementation("io.github.mzlnk:javalin-security-jwt:1.0.0-SNAPSHOT")
-    implementation("io.github.mzlnk:javalin-security-jwt-nimbus:1.0.0-SNAPSHOT")
-    implementation("com.nimbusds:nimbus-jose-jwt:10.9.1")   // add it yourself
+    implementation("io.github.mzlnk:javalin-security-jwt:{{ versions.library }}")
+    implementation("io.github.mzlnk:javalin-security-jwt-nimbus:{{ versions.library }}")
+    implementation("com.nimbusds:nimbus-jose-jwt:{{ versions.nimbus_jose_jwt }}")   // add it yourself
     ```
 
 === "Maven"
@@ -21,17 +21,17 @@ On top of [core](../../getting-started/installation.md) and the [JWT extension](
     <dependency>
       <groupId>io.github.mzlnk</groupId>
       <artifactId>javalin-security-jwt-nimbus</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>{{ versions.library }}</version>
     </dependency>
     <dependency>
       <groupId>com.nimbusds</groupId>
       <artifactId>nimbus-jose-jwt</artifactId>
-      <version>10.9.1</version>
+      <version>{{ versions.nimbus_jose_jwt }}</version>
     </dependency>
     ```
 
 `nimbus-jose-jwt` is not shipped with the adapter — add it yourself, ideally at the version the
-adapter was built against (**10.9.1**).
+adapter was built against (**{{ versions.nimbus_jose_jwt }}**).
 
 ## Usage
 
