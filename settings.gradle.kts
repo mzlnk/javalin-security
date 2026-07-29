@@ -18,3 +18,6 @@ project(":extensions/jwt-auth0").name = "javalin-security-jwt-auth0"
 
 include("extensions/basic-auth")
 project(":extensions/basic-auth").name = "javalin-security-basic-auth"
+
+include("extensions/api-key")
+project(":extensions/api-key").name = "javalin-security-api-key"

@@ -20,6 +20,7 @@ _Current version: `{{ versions.library }}`._
 - **WebSocket**: Origin allow-listing at upgrade.
 - **Basic Auth** (`javalin-security-basic-auth`): `basicAuth { }`, user lookup, password
   encoder, optional `WWW-Authenticate` challenge.
+- **API Key** (`javalin-security-api-key`): `apiKey { }`, key lookup, header/query/cookie resolvers.
 - **JWT** (`javalin-security-jwt`): `jwt { }`, decoder SPI, key sources, roles mapping, optional
   bearer challenge.
 - **Decoder adapters**: Nimbus and Auth0 (JWKS caching, RSA / EC / HMAC).

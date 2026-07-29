@@ -1,7 +1,7 @@
 site_name: javalin-security
 site_description: >-
   Authentication and authorization for Javalin 7 — HTTP & WebSocket security,
-  role-based access control, pluggable JWT and HTTP Basic strategies, for Java and Kotlin.
+  role-based access control, pluggable JWT, HTTP Basic, and API Key strategies, for Java and Kotlin.
 site_author: mzlnk
 site_url: https://mzlnk.github.io/javalin-security/
 
@@ -115,6 +115,7 @@ nav:
           - Error handling: concepts/error-handling.md
       - Extensions:
           - Basic Auth: extensions/basic-auth.md
+          - API Key: extensions/api-key.md
           - JWT:
               - extensions/jwt/index.md
               - Nimbus: extensions/jwt/nimbus.md

@@ -25,6 +25,7 @@ dependencies {
     dokka(project(":javalin-security-jwt-nimbus"))
     dokka(project(":javalin-security-jwt-auth0"))
     dokka(project(":javalin-security-basic-auth"))
+    dokka(project(":javalin-security-api-key"))
 }
 
 dokka {
@@ -94,6 +95,7 @@ val publishedProjects = setOf(
     "javalin-security-jwt-nimbus",
     "javalin-security-jwt-auth0",
     "javalin-security-basic-auth",
+    "javalin-security-api-key",
 )
 
 configure(subprojects.filter { it.name in publishedProjects }) {
