@@ -19,8 +19,11 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Compile
+      - name: Build
         run: ./gradlew assemble
 
-      - name: Run tests
+      - name: Unit tests
         run: ./gradlew test
+
+      - name: E2E testa
+        run: ./gradlew e2eTest
