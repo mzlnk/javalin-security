@@ -1,39 +1,14 @@
-<div align="center">
+# javalin-security
 
-<h1>javalin-security</h1>
+**Authentication and authorization for Javalin 7, in Java and Kotlin.**
 
-<p><strong>Authentication and authorization for Javalin 7, in Java and Kotlin.</strong></p>
-
-<!--License badge-->
-<a href="LICENSE">
-  <img alt="License" src="https://img.shields.io/badge/License-Apache_2.0-blue">
-</a>
-<!--Maven central stable version badge-->
-<a href="https://central.sonatype.com/artifact/io.github.mzlnk/javalin-security">
-  <img alt="Stable Version" src="https://img.shields.io/maven-central/v/io.github.mzlnk/javalin-security?label=stable">
-</a>
-<!--Build Status badge-->
-<a href="https://github.com/mzlnk/javalin-security/actions/workflows/main.yml">
-  <img alt="Build" src="https://github.com/mzlnk/javalin-security/actions/workflows/main.yml/badge.svg?branch=main"/>
-</a>
-<!--Docs Status badge-->
-<a href="https://github.com/mzlnk/javalin-security/actions/workflows/docs.yml">
-  <img alt="Docs Status" src="https://github.com/mzlnk/javalin-security/actions/workflows/docs.yml/badge.svg?branch=main"/>
-</a>
-<!--Java compatibility badge-->
-<a href="https://adoptium.net/">
-  <img alt="Java 17+" src="https://img.shields.io/badge/Java-17%2B-blue?logo=openjdk">
-</a>
-<!--Kotlin compatibility badge-->
-<a href="https://kotlinlang.org/">
-  <img alt="Kotlin 2.4+" src="https://img.shields.io/badge/Kotlin-2.4%2B-blue?logo=kotlin">
-</a>
-<!--Javalin compatibility badge-->
-<a href="https://javalin.io/">
-  <img alt="Javalin 7.x+" src="https://img.shields.io/badge/Javalin-7.x%2B-blue">
-</a>
-
-</div>
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
+[![Stable Version](https://img.shields.io/maven-central/v/io.github.mzlnk/javalin-security?label=stable)](https://central.sonatype.com/artifact/io.github.mzlnk/javalin-security)
+[![Build](https://github.com/mzlnk/javalin-security/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/mzlnk/javalin-security/actions/workflows/main.yml)
+[![Docs Status](https://github.com/mzlnk/javalin-security/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/mzlnk/javalin-security/actions/workflows/docs.yml)
+[![Java 17+](https://img.shields.io/badge/Java-17%2B-blue?logo=openjdk)](https://adoptium.net/)
+[![Kotlin 2.4+](https://img.shields.io/badge/Kotlin-2.4%2B-blue?logo=kotlin)](https://kotlinlang.org/)
+[![Javalin 7.x+](https://img.shields.io/badge/Javalin-7.x%2B-blue)](https://javalin.io/)
 
 ---
 
