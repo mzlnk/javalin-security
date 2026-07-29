@@ -13,12 +13,24 @@
   <img alt="Stable Version" src="https://img.shields.io/maven-central/v/io.github.mzlnk/javalin-security?label=stable">
 </a>
 <!--Build Status badge-->
-<a href="https://github.com/mzlnk/javalin-security/actions/workflows/ci.yml">
-  <img alt="Build Status" src="https://github.com/mzlnk/javalin-security/actions/workflows/ci.yml/badge.svg"/>
+<a href="https://github.com/mzlnk/javalin-security/actions/workflows/main.yml">
+  <img alt="Build" src="https://github.com/mzlnk/javalin-security/actions/workflows/main.yml/badge.svg?branch=main"/>
 </a>
 <!--Docs Status badge-->
 <a href="https://github.com/mzlnk/javalin-security/actions/workflows/docs.yml">
   <img alt="Docs Status" src="https://github.com/mzlnk/javalin-security/actions/workflows/docs.yml/badge.svg?branch=main"/>
+</a>
+<!--Java compatibility badge-->
+<a href="https://adoptium.net/">
+  <img alt="Java 17+" src="https://img.shields.io/badge/Java-17%2B-blue?logo=openjdk">
+</a>
+<!--Kotlin compatibility badge-->
+<a href="https://kotlinlang.org/">
+  <img alt="Kotlin 2.4+" src="https://img.shields.io/badge/Kotlin-2.4%2B-blue?logo=kotlin">
+</a>
+<!--Javalin compatibility badge-->
+<a href="https://javalin.io/">
+  <img alt="Javalin 7.x+" src="https://img.shields.io/badge/Javalin-7.x%2B-blue">
 </a>
 
 </div>
