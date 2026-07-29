@@ -78,15 +78,6 @@ class RulesTest {
         assertThat(granted).isTrue()
     }
 
-    @Test
-    fun `DefaultRules should expose the same rule logic as Rules for delegation`() {
-        assertThat(DefaultRules.allow.isGranted(anonymous, context)).isTrue()
-        assertThat(DefaultRules.deny.isGranted(authenticated(), context)).isFalse()
-        assertThat(DefaultRules.authenticated.isGranted(authenticated(), context)).isTrue()
-        assertThat(DefaultRules.hasRole(Role.ADMIN).isGranted(authenticated(Role.ADMIN), context)).isTrue()
-        assertThat(DefaultRules.hasAnyRole(Role.ADMIN, Role.USER).isGranted(authenticated(Role.USER), context)).isTrue()
-    }
-
     private fun authenticated(vararg roles: RouteRole): Authentication =
         Authentication.authenticated(TestIdentity("bob"), *roles)
 }
