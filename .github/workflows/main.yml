@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -24,11 +26,15 @@ jobs:
       - name: Build
         run: ./gradlew assemble --stacktrace
 
-      - name: Unit tests
-        run: ./gradlew test --stacktrace
+      - name: Tests + coverage
+        run: ./gradlew test e2eTest koverXmlReport --stacktrace
 
-      - name: E2E tests
-        run: ./gradlew e2eTest --stacktrace
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          files: ./build/reports/kover/report.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test reports on failure
         if: failure()

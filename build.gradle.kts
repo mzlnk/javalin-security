@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.dokka)
     alias(libs.plugins.vanniktech.maven.publish) apply false
+    alias(libs.plugins.kover)
 }
 
 allprojects {
@@ -33,6 +34,11 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "idea")
+    apply(plugin = "org.jetbrains.kotlinx.kover")
+
+    rootProject.dependencies {
+        add("kover", this@subprojects)
+    }
 
     repositories {
         mavenCentral()

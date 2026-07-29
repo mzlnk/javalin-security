@@ -10,6 +10,7 @@ nimbus-jose-jwt = "10.9.1"
 auth0-java-jwt = "4.6.0"
 auth0-jwks-rsa = "0.24.1"
 vanniktech-maven-publish = "0.34.0"
+kover = "0.9.9"
 
 [libraries]
 javalin = { module = "io.javalin:javalin", version.ref = "javalin" }
@@ -28,3 +29,4 @@ auth0-jwks-rsa = { module = "com.auth0:jwks-rsa", version.ref = "auth0-jwks-rsa"
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 vanniktech-maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktech-maven-publish" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }

@@ -6,6 +6,7 @@
 [![Stable Version](https://img.shields.io/maven-central/v/io.github.mzlnk/javalin-security?label=stable)](https://central.sonatype.com/artifact/io.github.mzlnk/javalin-security)
 [![Build](https://github.com/mzlnk/javalin-security/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/mzlnk/javalin-security/actions/workflows/main.yml)
 [![Docs Status](https://github.com/mzlnk/javalin-security/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/mzlnk/javalin-security/actions/workflows/docs.yml)
+[![codecov](https://codecov.io/gh/mzlnk/javalin-security/branch/main/graph/badge.svg)](https://codecov.io/gh/mzlnk/javalin-security)
 [![Java 17+](https://img.shields.io/badge/Java-17%2B-blue?logo=openjdk)](https://adoptium.net/)
 [![Kotlin 2.4+](https://img.shields.io/badge/Kotlin-2.4%2B-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Javalin 7.x+](https://img.shields.io/badge/Javalin-7.x%2B-blue)](https://javalin.io/)
