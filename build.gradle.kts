@@ -1,14 +1,16 @@
+import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.dokka)
+    alias(libs.plugins.vanniktech.maven.publish) apply false
 }
 
 allprojects {
-    group = "io.github.mzlnk"
-    version = "1.0.0-SNAPSHOT"
+    group = providers.gradleProperty("group").get()
+    version = providers.gradleProperty("version").get()
 }
 
 repositories {
@@ -17,7 +19,6 @@ repositories {
 
 dependencies {
     dokka(project(":javalin-security"))
-    dokka(project(":javalin-security-common"))
     dokka(project(":javalin-security-jwt"))
     dokka(project(":javalin-security-jwt-nimbus"))
     dokka(project(":javalin-security-jwt-auth0"))
@@ -36,7 +37,7 @@ subprojects {
     repositories {
         mavenCentral()
     }
-    
+
     extensions.configure<KotlinJvmProjectExtension> {
         jvmToolchain(17)
     }
@@ -68,6 +69,51 @@ subprojects {
             testSources.from(file("src/e2eTest/java"))
             testSources.from(file("src/e2eTest/kotlin"))
             testResources.from(e2eTest.resources.srcDirs)
+        }
+    }
+}
+
+val publishedProjects = setOf(
+    "javalin-security",
+    "javalin-security-jwt",
+    "javalin-security-jwt-nimbus",
+    "javalin-security-jwt-auth0",
+    "javalin-security-basic-auth",
+)
+
+configure(subprojects.filter { it.name in publishedProjects }) {
+    apply(plugin = "com.vanniktech.maven.publish")
+
+    configure<MavenPublishBaseExtension> {
+        publishToMavenCentral(automaticRelease = true)
+        signAllPublications()
+
+        coordinates(group.toString(), project.name, version.toString())
+
+        pom {
+            name.set(project.name)
+            description.set("Security extensions for the Javalin web framework.")
+            url.set("https://github.com/mzlnk/javalin-security")
+            inceptionYear.set("2026")
+            licenses {
+                license {
+                    name.set("The Apache License, Version 2.0")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                    distribution.set("repo")
+                }
+            }
+            developers {
+                developer {
+                    id.set("mzlnk")
+                    name.set("mzlnk")
+                    url.set("https://github.com/mzlnk")
+                }
+            }
+            scm {
+                url.set("https://github.com/mzlnk/javalin-security")
+                connection.set("scm:git:git://github.com/mzlnk/javalin-security.git")
+                developerConnection.set("scm:git:ssh://git@github.com/mzlnk/javalin-security.git")
+            }
         }
     }
 }
