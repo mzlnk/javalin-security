@@ -89,8 +89,9 @@ install snippet:
 | Extension  | For                            | Guide                                                                     |
 |------------|--------------------------------|---------------------------------------------------------------------------|
 | Basic Auth | HTTP Basic (RFC 7617)          | [Basic Auth](../extensions/basic-auth.md#installation)                    |
+| API Key    | Opaque API keys (`X-Api-Key`)  | [API Key](../extensions/api-key.md#installation)                          |
 | JWT        | Verified JWTs (HTTP / WebSocket) | [JWT](../extensions/jwt/index.md#installation)                          |
-| Custom     | API keys, mTLS, HMAC, sessions | [Custom authentication](../guides/custom-authentication.md)               |
+| Custom     | mTLS, HMAC, sessions           | [Custom authentication](../guides/custom-authentication.md)               |
 
 ## Next steps
 
