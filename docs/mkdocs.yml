@@ -107,8 +107,7 @@ nav:
       - index.md
       - Getting started:
           - Installation: getting-started/installation.md
-          - Secure HTTP endpoints: getting-started/secure-http-endpoints.md
-          - Secure WebSocket endpoints: getting-started/secure-websocket-endpoints.md
+          - Secure endpoints: getting-started/secure-endpoints.md
           - Access caller identity: getting-started/access-caller-identity.md
       - Concepts:
           - Authentication: concepts/authentication.md
@@ -129,6 +128,7 @@ nav:
           - Testing: guides/testing.md
   - Reference:
       - API reference: api-reference.md
+      - Rules DSL: rules.md
       - HTTP security: http-security.md
       - WebSocket security: websocket-security.md
   - Contributing: contributing.md

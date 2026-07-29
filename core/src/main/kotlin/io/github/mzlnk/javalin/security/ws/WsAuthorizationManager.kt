@@ -10,11 +10,11 @@ import io.javalin.http.Context
  * Evaluates the WebSocket pattern-based rule table for upgrade requests with no route-declared roles.
  *
  * First match wins in declaration order. Patterns are compiled once at startup into a Javalin
- * [io.javalin.router.matcher.PathParser]. Unmatched requests fall through to [fallback] (deny when unset).
+ * [io.javalin.router.matcher.PathParser]. Unmatched requests fall through to [fallback].
  */
 internal class WsAuthorizationManager(
     private val entries: List<Entry>,
-    private val fallback: Rule?,
+    private val fallback: Rule,
 ) {
 
     /** Compiled rule entry for a WS path pattern. */
@@ -31,14 +31,14 @@ internal class WsAuthorizationManager(
 
     /**
      * Returns whether access is granted for [path] given [authentication].
-     * Uses [fallback] when no entry matches; denies when [fallback] is unset.
+     * Uses [fallback] when no entry matches.
      */
     fun isGranted(path: String, authentication: Authentication, context: Context): Boolean {
         val matched = entries.firstOrNull { it.matches(path) }
         if (matched != null) {
             return matched.rule.isGranted(authentication, context)
         }
-        return fallback?.isGranted(authentication, context) ?: false
+        return fallback.isGranted(authentication, context)
     }
 
 }

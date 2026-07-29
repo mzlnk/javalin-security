@@ -51,13 +51,14 @@ wired correctly.
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.security
     import io.javalin.Javalin
 
     fun main() {
         Javalin.create { config ->
             config.security { security ->
-                security.http { http -> http.rules { r -> r.fallback = r.allow } }
+                security.http.fallback = Rules.allow()
             }
             config.routes.get("/") { it.result("ok") }
         }.start(7070)
@@ -74,7 +75,7 @@ wired correctly.
     void main() {
         Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security ->
-                security.http(http -> http.rules(r -> r.fallback = Rules.allow()))));
+                security.http.fallback = Rules.allow()));
             config.routes.get("/", ctx -> ctx.result("ok"));
         }).start(7070);
     }
@@ -93,6 +94,5 @@ install snippet:
 
 ## Next steps
 
-- [Secure HTTP endpoints](secure-http-endpoints.md) — secure your first routes with Basic Auth.
-- [Secure WebSocket endpoints](secure-websocket-endpoints.md) — secure upgrades with JWT.
+- [Secure endpoints](secure-endpoints.md) — secure your first HTTP routes and WebSocket upgrades.
 - [Access caller identity](access-caller-identity.md) — read the authenticated user in handlers.

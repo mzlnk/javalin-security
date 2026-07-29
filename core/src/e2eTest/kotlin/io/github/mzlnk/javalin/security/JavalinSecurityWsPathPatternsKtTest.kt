@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.javalin.Javalin
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
@@ -19,9 +20,7 @@ class JavalinSecurityWsPathPatternsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/room/{id}", r.allow) }
-                }
+                security.rules.ws("/ws/room/{id}", Rules.allow())
             }
             cfg.routes.ws("/ws/room/{id}") { }
         }
@@ -40,7 +39,7 @@ class JavalinSecurityWsPathPatternsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws -> ws.rules { r -> r.add("/ws/room/*", r.allow) } }
+                security.rules.ws("/ws/room/*", Rules.allow())
             }
             cfg.routes.ws("/ws/room/{id}") { }
         }

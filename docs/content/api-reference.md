@@ -8,7 +8,7 @@ Full generated KDoc for every public module:
 
 | Module                          | Key entry points                                                                                                       |
 |---------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `javalin-security`              | `JavalinSecurityPlugin`, `security` / `authentication` / `identity`, `Authenticator`, `AuthenticationStrategy`, `Authentication`, `Rule`, `Rules`, `Anyone`. |
+| `javalin-security`              | `JavalinSecurityPlugin`, `security` / `authentication` / `identity` / `identityOrNull`, `Authenticator`, `AuthenticationStrategy`, `Authentication`, `Rule`, `Rules`, `Anyone`. |
 | `javalin-security-jwt`          | `jwt`, `JwtConfig`, `JwtDecoder`, `JwtVerification`, `JwtKeySource`, `JwtRolesMapper`, `JwtIdentity`, `DecodedJwt`.   |
 | `javalin-security-jwt-nimbus`   | `NimbusJwtDecoder`.                                                                                                    |
 | `javalin-security-jwt-auth0`    | `Auth0JwtDecoder`.                                                                                                     |
@@ -19,7 +19,8 @@ Full generated KDoc for every public module:
 | Kotlin                           | Java                                                                    |
 |----------------------------------|-------------------------------------------------------------------------|
 | `config.security { … }`          | `SecurityExtensions.security(config, …)` or `new JavalinSecurityPlugin(…)`. |
-| `ctx.identity<T>()`             | `SecurityExtensions.identity(ctx, Type.class)`.                        |
+| `ctx.identity<T>()`             | `SecurityExtensions.identity(ctx, Type.class)` (throws when anonymous). |
+| `ctx.identityOrNull<T>()`       | `SecurityExtensions.identityOrNull(ctx, Type.class)`.                  |
 | `jwt { }` / `basicAuth { }`      | `JwtSecurity.jwt(…)` / `BasicAuthSecurity.basicAuth(…)`.                |
 | `NimbusJwtDecoder` / `Anyone`    | `NimbusJwtDecoder.INSTANCE` / `Anyone.INSTANCE`.                        |
 | `Rules.allow()` etc.             | Static `Rules.allow()` etc.                                             |

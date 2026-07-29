@@ -1,11 +1,10 @@
 package io.github.mzlnk.javalin.security.jwt
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.github.mzlnk.javalin.security.identity
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
-import io.javalin.http.HandlerType.GET
-import io.javalin.http.HandlerType.POST
 import io.javalin.security.RouteRole
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
@@ -107,13 +106,11 @@ class JwtSecurityTest {
         }
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.authentication = jwt { jwt ->
-                        jwt.decoder = adminDecoder
-                        jwt.keySource = JwtKeySource.secret("test-secret")
-                        jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
-                    }
-                    http.rules { r -> r.add("/admin/*", GET, r.hasRole(Role.ADMIN)) }
+                security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
+                security.http.authentication = jwt { jwt ->
+                    jwt.decoder = adminDecoder
+                    jwt.keySource = JwtKeySource.secret("test-secret")
+                    jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
                 }
             }
             cfg.routes.get("/admin/dashboard") { it.result("ok") }
@@ -133,16 +130,14 @@ class JwtSecurityTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.authentication = jwt { jwt ->
-                        jwt.decoder = testDecoder
-                        jwt.keySource = JwtKeySource.secret("test-secret")
-                    }
-                    http.rules { r -> r.fallback = r.authenticated }
+                security.http.authentication = jwt { jwt ->
+                    jwt.decoder = testDecoder
+                    jwt.keySource = JwtKeySource.secret("test-secret")
                 }
+                security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<JwtIdentity>()!!
+                val identity = ctx.identity<JwtIdentity>()
                 ctx.result(identity.name)
             }
         }
@@ -211,17 +206,15 @@ class JwtSecurityTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.authentication = jwt { jwt ->
-                        jwt.decoder = testDecoder
-                        jwt.keySource = JwtKeySource.secret("test-secret")
-                        jwt.tokenResolver = TokenResolver.cookie("access_token")
-                    }
-                    http.rules { r -> r.fallback = r.authenticated }
+                security.http.authentication = jwt { jwt ->
+                    jwt.decoder = testDecoder
+                    jwt.keySource = JwtKeySource.secret("test-secret")
+                    jwt.tokenResolver = TokenResolver.cookie("access_token")
                 }
+                security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<JwtIdentity>()!!
+                val identity = ctx.identity<JwtIdentity>()
                 ctx.result(identity.name)
             }
         }
@@ -241,14 +234,12 @@ class JwtSecurityTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.authentication = jwt { jwt ->
-                        jwt.decoder = testDecoder
-                        jwt.keySource = JwtKeySource.secret("test-secret")
-                        jwt.tokenResolver = TokenResolver.cookie("access_token")
-                    }
-                    http.rules { r -> r.fallback = r.authenticated }
+                security.http.authentication = jwt { jwt ->
+                    jwt.decoder = testDecoder
+                    jwt.keySource = JwtKeySource.secret("test-secret")
+                    jwt.tokenResolver = TokenResolver.cookie("access_token")
                 }
+                security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { it.result("ok") }
         }
@@ -264,21 +255,17 @@ class JwtSecurityTest {
 
     private fun app(bearerChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
-            security.http { http ->
-                http.authentication = jwt { jwt ->
-                    jwt.decoder = testDecoder
-                    jwt.keySource = JwtKeySource.secret("test-secret-not-actually-used-by-test-double")
-                    jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
-                    jwt.bearerChallenge = bearerChallenge
-                    jwt.realm = "TestAPI"
-                }
-                http.rules { r ->
-                    r.add("/public/*", GET, r.allow)
-                    r.add("/protected/*", POST, r.authenticated)
-                    r.add("/admin/*", GET, r.hasRole(Role.ADMIN))
-                    r.fallback = r.deny
-                }
+            security.rules.get("/public/*", Rules.allow())
+            security.rules.post("/protected/*", Rules.authenticated())
+            security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
+            security.http.authentication = jwt { jwt ->
+                jwt.decoder = testDecoder
+                jwt.keySource = JwtKeySource.secret("test-secret-not-actually-used-by-test-double")
+                jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
+                jwt.bearerChallenge = bearerChallenge
+                jwt.realm = "TestAPI"
             }
+            security.http.fallback = Rules.deny()
         }
         cfg.routes.get("/public/info") { it.result("public") }
         cfg.routes.post("/protected/data") { it.result("created") }

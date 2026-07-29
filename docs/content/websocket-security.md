@@ -1,11 +1,14 @@
 # WebSocket security
 
-Configuration cheatsheet for the `ws { }` block. If you followed
-[Secure WebSocket endpoints](getting-started/secure-websocket-endpoints.md), you already know the
+Configuration cheatsheet for `security.ws`. If you followed
+[Secure endpoints](getting-started/secure-endpoints.md), you already know the
 essentials — this page lists the fields and the Origin rules.
 
-Calling `ws { }` at least once installs the upgrade guard (`wsBeforeUpgrade`). Enforcement runs
-**once, at the handshake** — not per message.
+Pattern-based rules are declared on [`security.rules`](rules.md) via `rules.ws(…)`. Both HTTP
+and WebSocket guards are installed as soon as the plugin is registered; declare rules on
+`security.rules` or set `http.fallback` / `ws.fallback` to control access (default fallback is
+deny). The WS guard runs as `wsBeforeUpgrade`. Enforcement runs **once, at the handshake** —
+not per message.
 
 ## `WsSecurityConfig`
 
@@ -13,42 +16,35 @@ Calling `ws { }` at least once installs the upgrade guard (`wsBeforeUpgrade`). E
 |--------------------|----------------------------|---------|-----------------------------------------------------------|
 | `authentication`   | `AuthenticationStrategy?`  | `null`  | Upgrade-time authentication; `null` → anonymous.          |
 | `allowedOrigins`   | `Collection<String>?`      | `null`  | Exact origins allowed; checked before authentication.     |
-| `rules { … }`      | `WsSecurityRules`          | empty   | Path-only rule table (entries accumulate).                |
+| `fallback`         | `Rule?`                    | `null`  | When no WS rule matches (`null` = **deny**).              |
 
-## `WsSecurityRules`
-
-| Field / method                                                                | Effect                                                              |
-|-------------------------------------------------------------------------------|---------------------------------------------------------------------|
-| `add(pattern, rule)`                                                          | Rule for matching upgrades.                                         |
-| `fallback`                                                                    | When no entry matches (`null` = **deny**).                          |
-| `allow` / `deny` / `authenticated` / `hasRole` / `hasAnyRole`                 | Built-ins (`Rules.*` in Java).                                      |
-
-Same semantics as HTTP: first match wins, deny-by-default, route roles override the table. WS
-rules match on path only.
+See [Rules DSL](rules.md) for `rules.ws(…)`, built-in rules, and matching semantics. Same as
+HTTP: first match wins, deny-by-default, route roles override the table. WS rules match on path
+only.
 
 ## Example
 
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authentication.Identity
+    import io.github.mzlnk.javalin.security.authorization.Rules
+    import io.github.mzlnk.javalin.security.identity
     import io.github.mzlnk.javalin.security.security
     import io.javalin.Javalin
 
     Javalin.create { config ->
         config.security { security ->
-            security.ws { ws ->
-                ws.authentication = myStrategy
-                ws.allowedOrigins = listOf("https://app.example.com")
-                ws.rules { r ->
-                    r.add("/ws/public/*", r.allow)
-                    r.add("/ws/chat", r.authenticated)
-                    r.add("/ws/admin", r.hasRole(Role.ADMIN))
-                    r.fallback = r.deny
-                }
-            }
+            security.rules.ws("/ws/public/*", Rules.allow())
+            security.rules.ws("/ws/chat", Rules.authenticated())
+            security.rules.ws("/ws/admin", Rules.hasRole(Role.ADMIN))
+            security.ws.authentication = myStrategy
+            security.ws.allowedOrigins = listOf("https://app.example.com")
+            security.ws.fallback = Rules.deny()
         }
         config.routes.ws("/ws/chat") { ws ->
-            ws.onConnect { ctx -> ctx.send("welcome ${ctx.authentication().identity?.name}") }
+            // Behind Rules.authenticated() — identity() is safe
+            ws.onConnect { ctx -> ctx.send("welcome ${ctx.identity<Identity>().name}") }
         }
     }
     ```
@@ -57,28 +53,25 @@ rules match on path only.
 
     ```java
     import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
+    import io.github.mzlnk.javalin.security.authentication.Identity;
     import io.github.mzlnk.javalin.security.authorization.Rules;
     import io.javalin.Javalin;
     import java.util.List;
 
-    import static io.github.mzlnk.javalin.security.SecurityExtensions.authentication;
+    import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
 
     Javalin.create(config -> {
-        config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
-            ws.authentication = myStrategy;
-            ws.allowedOrigins = List.of("https://app.example.com");
-            ws.rules(r -> {
-                r.add("/ws/public/*", Rules.allow());
-                r.add("/ws/chat", Rules.authenticated());
-                r.add("/ws/admin", Rules.hasRole(Role.ADMIN));
-                r.fallback = Rules.deny();
-            });
-        })));
+        config.registerPlugin(new JavalinSecurityPlugin(security -> {
+            security.rules.ws("/ws/public/*", Rules.allow());
+            security.rules.ws("/ws/chat", Rules.authenticated());
+            security.rules.ws("/ws/admin", Rules.hasRole(Role.ADMIN));
+            security.ws.authentication = myStrategy;
+            security.ws.allowedOrigins = List.of("https://app.example.com");
+            security.ws.fallback = Rules.deny();
+        }));
         config.routes.ws("/ws/chat", ws ->
-            ws.onConnect(ctx -> {
-                var id = authentication(ctx).getIdentity();
-                ctx.send("welcome " + (id != null ? id.getName() : "?"));
-            }));
+            // Behind Rules.authenticated() — identity() is safe
+            ws.onConnect(ctx -> ctx.send("welcome " + identity(ctx, Identity.class).getName())));
     });
     ```
 
@@ -91,8 +84,8 @@ Origins must be exact strings (scheme + host + optional port).
 ## Upgrade-time only
 
 Authentication runs during `wsBeforeUpgrade`. Denied upgrades never reach `onConnect`. Read
-identity with `WsContext.authentication()` / `identity<T>()`. Mid-session expiry is not
-re-checked — enforce it in your protocol if needed.
+identity with `WsContext.authentication()` / `identity<T>()` / `identityOrNull<T>()`.
+Mid-session expiry is not re-checked — enforce it in your protocol if needed.
 
 ## JWT in the browser
 
@@ -104,5 +97,6 @@ clients can still use `Authorization: Bearer …`.
 
 ## Related
 
-- [Secure WebSocket endpoints](getting-started/secure-websocket-endpoints.md).
+- [Rules DSL](rules.md).
+- [Secure endpoints](getting-started/secure-endpoints.md).
 - [HTTP security](http-security.md).

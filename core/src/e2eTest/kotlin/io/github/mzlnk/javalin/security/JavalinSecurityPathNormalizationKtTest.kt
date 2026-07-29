@@ -1,10 +1,10 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.javalin.Javalin
-import io.javalin.http.HandlerType.GET
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -24,12 +24,8 @@ class JavalinSecurityPathNormalizationKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r ->
-                        r.add("/api/v1/admin", GET, r.deny)
-                        r.add("/api/v1/*", GET, r.allow)
-                    }
-                }
+                security.rules.get("/api/v1/admin", Rules.deny())
+                security.rules.get("/api/v1/*", Rules.allow())
             }
             cfg.routes.get("/api/v1/admin") { it.result("admin") }
             cfg.routes.get("/api/v1/public") { it.result("public") }
@@ -49,10 +45,8 @@ class JavalinSecurityPathNormalizationKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/v1/users/{id}", GET, r.deny) }
-                    http.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.get("/api/v1/users/{id}", Rules.deny())
+                security.http.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.get("/api/v1/users/{id}") { it.result("user-${it.pathParam("id")}") }
         }

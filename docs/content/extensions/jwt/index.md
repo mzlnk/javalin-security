@@ -51,32 +51,28 @@ By default the raw token is read from the `Authorization: Bearer …` header.
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.jwt.*
     import io.github.mzlnk.javalin.security.jwt.nimbus.NimbusJwtDecoder
     import io.github.mzlnk.javalin.security.security
     import io.javalin.Javalin
-    import io.javalin.http.HandlerType.GET
 
     Javalin.create { config ->
         config.security { security ->
-            security.http { http ->
-                http.authentication = jwt { jwt ->
-                    jwt.decoder = NimbusJwtDecoder
-                    jwt.keySource = JwtKeySource.jwks("https://issuer.example.com/.well-known/jwks.json")
-                    jwt.issuer = "https://issuer.example.com/"
-                    jwt.audiences = setOf("my-api")
-                    jwt.rolesMapper = JwtRolesMapper.fromClaim("roles") { name ->
-                        Role.entries.find { it.name == name }
-                    }
-                }
-                http.rules { r ->
-                    r.add("/api/*", GET, r.authenticated)
-                    r.add("/admin/*", GET, r.hasRole(Role.ADMIN))
-                    r.fallback = r.deny
+            security.rules.get("/api/*", Rules.authenticated())
+            security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
+            security.http.authentication = jwt { jwt ->
+                jwt.decoder = NimbusJwtDecoder
+                jwt.keySource = JwtKeySource.jwks("https://issuer.example.com/.well-known/jwks.json")
+                jwt.issuer = "https://issuer.example.com/"
+                jwt.audiences = setOf("my-api")
+                jwt.rolesMapper = JwtRolesMapper.fromClaim("roles") { name ->
+                    Role.entries.find { it.name == name }
                 }
             }
+            security.http.fallback = Rules.deny()
         }
-        config.routes.get("/api/me") { it.result(it.identity<JwtIdentity>()!!.name) }
+        config.routes.get("/api/me") { it.result(it.identity<JwtIdentity>().name) }
     }
     ```
 
@@ -91,11 +87,12 @@ By default the raw token is read from the `Authorization: Bearer …` header.
     import java.util.Set;
 
     import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
-    import static io.javalin.http.HandlerType.GET;
 
     Javalin.create(config -> {
-        config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-            http.authentication = JwtSecurity.jwt(jwt -> {
+        config.registerPlugin(new JavalinSecurityPlugin(security -> {
+            security.rules.get("/api/*", Rules.authenticated());
+            security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN));
+            security.http.authentication = JwtSecurity.jwt(jwt -> {
                 jwt.decoder = NimbusJwtDecoder.INSTANCE;
                 jwt.keySource = JwtKeySource.jwks("https://issuer.example.com/.well-known/jwks.json");
                 jwt.issuer = "https://issuer.example.com/";
@@ -104,12 +101,8 @@ By default the raw token is read from the `Authorization: Bearer …` header.
                     try { return Role.valueOf(name); } catch (IllegalArgumentException e) { return null; }
                 });
             });
-            http.rules(r -> {
-                r.add("/api/*", GET, Rules.authenticated());
-                r.add("/admin/*", GET, Rules.hasRole(Role.ADMIN));
-                r.fallback = Rules.deny();
-            });
-        })));
+            security.http.fallback = Rules.deny();
+        }));
         config.routes.get("/api/me", ctx -> ctx.result(identity(ctx, JwtIdentity.class).getName()));
     });
     ```
@@ -144,7 +137,7 @@ reason is logged, never returned to the client.
 
     ```kotlin
     config.routes.get("/api/me") { ctx ->
-        val jwt = ctx.identity<JwtIdentity>()!!.token
+        val jwt = ctx.identity<JwtIdentity>().token
         ctx.json(mapOf("sub" to jwt.subject, "email" to jwt.claim<String>("email")))
     }
     ```

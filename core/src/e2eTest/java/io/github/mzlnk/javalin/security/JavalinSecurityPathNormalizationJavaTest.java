@@ -9,7 +9,6 @@ import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
 
 import static io.github.mzlnk.javalin.security.E2EJavaTestSupport.authenticationStrategy;
-import static io.javalin.http.HandlerType.GET;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavalinSecurityPathNormalizationJavaTest {
@@ -25,11 +24,10 @@ class JavalinSecurityPathNormalizationJavaTest {
     void should_keep_denying_a_path_when_a_trailing_slash_is_added() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                    http.rules(rules -> {
-                        rules.add("/api/v1/admin", GET, Rules.deny());
-                        rules.add("/api/v1/*", GET, Rules.allow());
-                    }))));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/admin", Rules.deny());
+                security.rules.get("/api/v1/*", Rules.allow());
+            }));
             config.routes.get("/api/v1/admin", ctx -> ctx.result("admin"));
             config.routes.get("/api/v1/public", ctx -> ctx.result("public"));
         });
@@ -47,10 +45,10 @@ class JavalinSecurityPathNormalizationJavaTest {
     void should_authorize_a_parameterized_route_against_the_concrete_request_path() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/v1/users/{id}", GET, Rules.deny()));
-                http.authentication = authenticationStrategy(headerAuthenticator);
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/users/{id}", Rules.deny());
+                security.http.authentication = authenticationStrategy(headerAuthenticator);
+            }));
             config.routes.get("/api/v1/users/{id}", ctx -> ctx.result("user-" + ctx.pathParam("id")));
         });
 

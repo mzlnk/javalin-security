@@ -5,8 +5,7 @@ import io.javalin.security.RouteRole
 /**
  * Built-in [Rule] factories.
  *
- * Call from Java as `Rules.allow()`, `Rules.hasRole(...)`, etc. From Kotlin, the same rules are
- * available as unqualified DSL members inside `rules { }` via [RuleFactory].
+ * Call as `Rules.allow()`, `Rules.hasRole(...)`, etc. from both Java and Kotlin.
  */
 object Rules {
 

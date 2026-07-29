@@ -10,7 +10,7 @@ response headers — that is still Javalin's CORS plugin's job.
 | Concern                                                          | Handled by                                                            |
 |------------------------------------------------------------------|-----------------------------------------------------------------------|
 | Sending `Access-Control-Allow-*` **response headers**.           | Javalin's CORS plugin (`config.bundledPlugins.enableCors`).           |
-| Not **blocking** the preflight `OPTIONS` in the rule table.      | `allowCorsPreflight = true`.                                          |
+| Not **blocking** the preflight `OPTIONS` in the rule table.      | `http.allowCorsPreflight = true`.                                     |
 
 You typically need **both**.
 
@@ -19,6 +19,7 @@ You typically need **both**.
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.security
     import io.javalin.Javalin
 
@@ -30,14 +31,10 @@ You typically need **both**.
 
         // 2. Security: let the preflight through, protect the rest.
         config.security { security ->
-            security.http { http ->
-                http.authentication = myStrategy
-                http.rules { r ->
-                    r.allowCorsPreflight = true          // don't block CORS preflight OPTIONS
-                    r.add("/api/*", r.authenticated)
-                    r.fallback = r.deny
-                }
-            }
+            security.rules.any("/api/*", Rules.authenticated())
+            security.http.authentication = myStrategy
+            security.http.allowCorsPreflight = true          // don't block CORS preflight OPTIONS
+            security.http.fallback = Rules.deny()
         }
         config.routes.get("/api/data") { it.result("data") }
     }
@@ -56,14 +53,12 @@ You typically need **both**.
             cors.addRule(it -> it.allowHost("https://app.example.com")));
 
         // 2. Security: let the preflight through, protect the rest.
-        config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-            http.authentication = myStrategy;
-            http.rules(r -> {
-                r.allowCorsPreflight = true;             // don't block CORS preflight OPTIONS
-                r.add("/api/*", Rules.authenticated());
-                r.fallback = Rules.deny();
-            });
-        })));
+        config.registerPlugin(new JavalinSecurityPlugin(security -> {
+            security.rules.any("/api/*", Rules.authenticated());
+            security.http.authentication = myStrategy;
+            security.http.allowCorsPreflight = true;             // don't block CORS preflight OPTIONS
+            security.http.fallback = Rules.deny();
+        }));
         config.routes.get("/api/data", ctx -> ctx.result("data"));
     });
     ```

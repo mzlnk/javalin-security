@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CompletableFuture;
 
-import static io.javalin.http.HandlerType.*;
 import static org.assertj.core.api.Assertions.*;
 
 class JavaInteropTest {
@@ -33,14 +32,12 @@ class JavaInteropTest {
     void plugin_registers_without_unit_instance_or_kotlin_singleton_getters() {
         // No Unit.INSTANCE, no .INSTANCE.getX() — compiles cleanly from Java
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = authenticationStrategy(headerAuthenticator);
-                http.rules(rules -> {
-                    rules.add("/api/*", GET, Rules.allow());
-                    rules.add("/admin/*", POST, Rules.hasRole(Role.ADMIN));
-                    rules.fallback = Rules.deny();
-                });
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/*", Rules.allow());
+                security.rules.post("/admin/*", Rules.hasRole(Role.ADMIN));
+                security.http.authentication = authenticationStrategy(headerAuthenticator);
+                security.http.fallback = Rules.deny();
+            }));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
         });
 
@@ -62,8 +59,7 @@ class JavaInteropTest {
         Rule customRule = (auth, ctx) -> auth.isAuthenticated();
 
         Javalin app = Javalin.create(config ->
-                config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                        http.rules(rules -> rules.fallback = customRule)))));
+                config.registerPlugin(new JavalinSecurityPlugin(security -> security.http.fallback = customRule)));
 
         assertThat(app).isNotNull();
     }
@@ -75,10 +71,10 @@ class JavaInteropTest {
                         Authentication.authenticated(new TestIdentity("bob")));
 
         Javalin app = Javalin.create(config ->
-                config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                    http.rules(rules -> rules.fallback = Rules.authenticated());
-                    http.authentication = authenticationStrategy(alwaysBob);
-                }))));
+                config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                    security.http.fallback = Rules.authenticated();
+                    security.http.authentication = authenticationStrategy(alwaysBob);
+                })));
 
         assertThat(app).isNotNull();
     }
@@ -86,9 +82,9 @@ class JavaInteropTest {
     @Test
     void custom_unauthorized_and_forbidden_handlers() {
         Javalin app = Javalin.create(config ->
-                config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                    http.rules(rules -> rules.fallback = Rules.hasRole(Role.ADMIN));
-                    http.authentication = new AuthenticationStrategy.Sync() {
+                config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                    security.http.fallback = Rules.hasRole(Role.ADMIN);
+                    security.http.authentication = new AuthenticationStrategy.Sync() {
                         @Override
                         public Authenticator authenticator() {
                             return headerAuthenticator;
@@ -104,7 +100,7 @@ class JavaInteropTest {
                             return (ctx, auth) -> ctx.status(403).result("custom-403");
                         }
                     };
-                }))));
+                })));
 
         assertThat(app).isNotNull();
     }
@@ -132,10 +128,10 @@ class JavaInteropTest {
         };
 
         Javalin app = Javalin.create(config ->
-                config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                    http.rules(rules -> rules.fallback = Rules.allow());
-                    http.authentication = async;
-                }))));
+                config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                    security.http.fallback = Rules.allow();
+                    security.http.authentication = async;
+                })));
 
         assertThat(app).isNotNull();
     }

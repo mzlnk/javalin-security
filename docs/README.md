@@ -95,7 +95,7 @@ Install snippets and version tables in `content/` reference variables such as
 `{{ versions.library }}`, `{{ versions.javalin }}`, `{{ versions.nimbus_jose_jwt }}`, etc. The
 values are computed at build time by `main.py`:
 
-- **Project version** is parsed from the root `build.gradle.kts` (`version = "…"`).
+- **Project version** is parsed from the root `gradle.properties` (`version=…`).
 - **Dependency versions** are read from `gradle/libs.versions.toml`.
 - Convenience families such as `versions.javalin_family` (`7.2.x`) and `versions.kotlin_family`
   (`2.4`) are computed by trimming to `major.minor`.

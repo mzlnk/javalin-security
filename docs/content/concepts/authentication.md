@@ -59,9 +59,9 @@ provide concrete types (`BasicAuthIdentity`, `JwtIdentity`); a custom scheme imp
 
 ## Reading auth in handlers
 
-Use `ctx.authentication()` (never `null`) or `ctx.identity<T>()` (`null` when anonymous). The
-same accessors are available on `WsContext` after a successful upgrade, and auth is **not**
-re-checked per WebSocket message.
+Use `ctx.authentication()` (never `null`), `ctx.identity<T>()` (throws when anonymous), or
+`ctx.identityOrNull<T>()` (`null` when anonymous). The same accessors are available on
+`WsContext` after a successful upgrade, and auth is **not** re-checked per WebSocket message.
 
 See [Access caller identity](../getting-started/access-caller-identity.md) for full HTTP and
 WebSocket examples.

@@ -15,7 +15,7 @@ import java.util.function.Consumer
  * Configures JWT bearer-token authentication. [decoder] and [keySource] are required; other
  * settings have defaults. Builds a [JwtVerification] and [JwtAuthenticator] for the returned
  * strategy, and selects a [BearerChallengeUnauthorizedHandler] when [bearerChallenge] is `true`.
- * Does not configure authorization rules — set those via `http.rules { }` / `ws.rules { }`.
+ * Does not configure authorization rules — set those via `security.rules`.
  */
 class JwtConfig internal constructor() {
 

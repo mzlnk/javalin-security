@@ -15,8 +15,6 @@ import java.util.Base64;
 import java.util.Set;
 
 import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
-import static io.javalin.http.HandlerType.GET;
-import static io.javalin.http.HandlerType.POST;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class BasicAuthSecurityJavaTest {
@@ -153,10 +151,10 @@ class BasicAuthSecurityJavaTest {
     void should_expose_BasicAuthIdentity_on_the_context_when_the_caller_is_authenticated() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = BasicAuthSecurity.basicAuth(basic -> basic.userLookup = testUserLookup);
-                http.rules(rules -> rules.fallback = Rules.authenticated());
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.http.authentication = BasicAuthSecurity.basicAuth(basic -> basic.userLookup = testUserLookup);
+                security.http.fallback = Rules.authenticated();
+            }));
             config.routes.get("/me", ctx -> ctx.result(identity(ctx, BasicAuthIdentity.class).getName()));
         });
 
@@ -223,13 +221,13 @@ class BasicAuthSecurityJavaTest {
     void should_authenticate_from_a_custom_header_when_credentialsResolver_is_set_to_a_custom_header() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = BasicAuthSecurity.basicAuth(basic -> {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.http.authentication = BasicAuthSecurity.basicAuth(basic -> {
                     basic.userLookup = testUserLookup;
                     basic.credentialsResolver = BasicCredentialsResolver.basicHeader("X-Custom-Auth");
                 });
-                http.rules(rules -> rules.fallback = Rules.authenticated());
-            })));
+                security.http.fallback = Rules.authenticated();
+            }));
             config.routes.get("/me", ctx -> ctx.result(identity(ctx, BasicAuthIdentity.class).getName()));
         });
 
@@ -251,14 +249,12 @@ class BasicAuthSecurityJavaTest {
                 .passwordEncoder(PasswordEncoder.noOp())
                 .build();
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = authenticationStrategy(authenticator);
-                http.rules(rules -> {
-                    rules.add("/api/*", GET, Rules.allow());
-                    rules.add("/api/*", POST, Rules.authenticated());
-                    rules.fallback = Rules.deny();
-                });
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/*", Rules.allow());
+                security.rules.post("/api/*", Rules.authenticated());
+                security.http.authentication = authenticationStrategy(authenticator);
+                security.http.fallback = Rules.deny();
+            }));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
             config.routes.post("/api/resource", ctx -> ctx.result("created"));
         });
@@ -311,19 +307,17 @@ class BasicAuthSecurityJavaTest {
     private Javalin app(boolean basicChallenge) {
         BasicAuthenticator authenticator = BasicAuthenticator.builder(testUserLookup).build();
         return Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = BasicAuthSecurity.basicAuth(basic -> {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/public/*", Rules.allow());
+                security.rules.post("/protected/*", Rules.authenticated());
+                security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN));
+                security.http.authentication = BasicAuthSecurity.basicAuth(basic -> {
                     basic.userLookup = testUserLookup;
                     basic.basicChallenge = basicChallenge;
                     basic.realm = "TestAPI";
                 });
-                http.rules(rules -> {
-                    rules.add("/public/*", GET, Rules.allow());
-                    rules.add("/protected/*", POST, Rules.authenticated());
-                    rules.add("/admin/*", GET, Rules.hasRole(Role.ADMIN));
-                    rules.fallback = Rules.deny();
-                });
-            })));
+                security.http.fallback = Rules.deny();
+            }));
             config.routes.get("/public/info", ctx -> ctx.result("public"));
             config.routes.post("/protected/data", ctx -> ctx.result("created"));
             config.routes.get("/admin/dashboard", ctx -> ctx.result("dashboard"));

@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security.basicauth
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
@@ -13,12 +14,10 @@ class BasicAuthConfigurationTest {
         assertThatThrownBy {
             Javalin.create { cfg ->
                 cfg.security { security ->
-                    security.http { http ->
-                        http.authentication = basicAuth { basic ->
-                            // userLookup not set — should fail
-                        }
-                        http.rules { r -> r.fallback = r.allow }
+                    security.http.authentication = basicAuth { basic ->
+                        // userLookup not set — should fail
                     }
+                    security.http.fallback = Rules.allow()
                 }
             }
         }.isInstanceOf(SecurityConfigurationException::class.java)

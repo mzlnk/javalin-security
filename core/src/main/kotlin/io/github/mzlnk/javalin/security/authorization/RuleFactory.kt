@@ -3,10 +3,10 @@ package io.github.mzlnk.javalin.security.authorization
 import io.javalin.security.RouteRole
 
 /**
- * Built-in [Rule] factories exposed as unqualified members inside a rule-declaration block
- * (e.g. `rules { add("/x", GET, allow) }`) via Kotlin interface delegation.
+ * Built-in [Rule] factories exposed as unqualified members via Kotlin interface delegation.
  *
  * Logic lives in [Rules]; [DefaultRules] bridges this interface for delegation.
+ * Prefer calling [Rules] directly (`Rules.allow()`, `Rules.hasRole(...)`, etc.).
  */
 interface RuleFactory {
 

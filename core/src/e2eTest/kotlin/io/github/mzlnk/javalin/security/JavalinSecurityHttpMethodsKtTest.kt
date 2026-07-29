@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.javalin.Javalin
-import io.javalin.http.HandlerType.GET
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -17,7 +17,7 @@ class JavalinSecurityHttpMethodsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http -> http.rules { r -> r.add("/api/v1/*", GET, r.allow) } }
+                security.rules.get("/api/v1/*", Rules.allow())
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
         }

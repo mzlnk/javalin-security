@@ -1,10 +1,10 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.javalin.Javalin
-import io.javalin.http.HandlerType.GET
 import io.javalin.http.UnauthorizedResponse
 import io.javalin.security.RouteRole
 import io.javalin.testtools.JavalinTest
@@ -31,12 +31,10 @@ class JavalinSecurityCustomHandlersKtTest {
         }
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authentication = authenticationStrategy(alwaysBob)
-                }
+                security.rules.get("/api/v1/*", Rules.authenticated())
+                security.http.authentication = authenticationStrategy(alwaysBob)
             }
-            cfg.routes.get("/api/v1/me") { it.result(it.identity<TestIdentity>()!!.name) }
+            cfg.routes.get("/api/v1/me") { it.result(it.identity<TestIdentity>().name) }
         }
 
         JavalinTest.test(app) { _, client ->
@@ -54,15 +52,13 @@ class JavalinSecurityCustomHandlersKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authentication = authenticationStrategy(
-                        unauthorizedHandler = { ctx, _ ->
-                            ctx.header("WWW-Authenticate", "Bearer")
-                            throw UnauthorizedResponse()
-                        },
-                    )
-                }
+                security.rules.get("/api/v1/*", Rules.authenticated())
+                security.http.authentication = authenticationStrategy(
+                    unauthorizedHandler = { ctx, _ ->
+                        ctx.header("WWW-Authenticate", "Bearer")
+                        throw UnauthorizedResponse()
+                    },
+                )
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
         }
@@ -82,15 +78,13 @@ class JavalinSecurityCustomHandlersKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/v1/*", GET, r.hasRole(Role.ADMIN)) }
-                    http.authentication = authenticationStrategy(
-                        authenticator = headerAuthenticator,
-                        forbiddenHandler = { _, _ ->
-                            throw io.javalin.http.ForbiddenResponse("custom denied")
-                        },
-                    )
-                }
+                security.rules.get("/api/v1/*", Rules.hasRole(Role.ADMIN))
+                security.http.authentication = authenticationStrategy(
+                    authenticator = headerAuthenticator,
+                    forbiddenHandler = { _, _ ->
+                        throw io.javalin.http.ForbiddenResponse("custom denied")
+                    },
+                )
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
         }
@@ -110,10 +104,8 @@ class JavalinSecurityCustomHandlersKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/v1/*", GET, r.allow) }
-                    http.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.get("/api/v1/*", Rules.allow())
+                security.http.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
         }
@@ -133,12 +125,10 @@ class JavalinSecurityCustomHandlersKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authentication = authenticationStrategy(
-                        unauthorizedHandler = { ctx, _ -> ctx.status(401).result("denied-without-throwing") },
-                    )
-                }
+                security.rules.get("/api/v1/*", Rules.authenticated())
+                security.http.authentication = authenticationStrategy(
+                    unauthorizedHandler = { ctx, _ -> ctx.status(401).result("denied-without-throwing") },
+                )
             }
             cfg.routes.get("/api/v1/resource") { it.result("protected-content") }
         }
@@ -160,13 +150,11 @@ class JavalinSecurityCustomHandlersKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/v1/*", GET, r.hasRole(Role.ADMIN)) }
-                    http.authentication = authenticationStrategy(
-                        authenticator = headerAuthenticator,
-                        forbiddenHandler = { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") },
-                    )
-                }
+                security.rules.get("/api/v1/*", Rules.hasRole(Role.ADMIN))
+                security.http.authentication = authenticationStrategy(
+                    authenticator = headerAuthenticator,
+                    forbiddenHandler = { ctx, _ -> ctx.status(403).result("forbidden-without-throwing") },
+                )
             }
             cfg.routes.get("/api/v1/resource") { it.result("protected-content") }
         }
@@ -188,10 +176,8 @@ class JavalinSecurityCustomHandlersKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/v1/*", GET, r.authenticated) }
-                    http.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.get("/api/v1/*", Rules.authenticated())
+                security.http.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.get("/api/v1/resource") { ctx ->
                 // Route handler: only reachable when the security guard grants access

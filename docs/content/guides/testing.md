@@ -20,27 +20,25 @@ Keep your Javalin configuration in a reusable factory so tests and production sh
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authorization.Rules
+
     fun secureApp(): Javalin = Javalin.create { config ->
         config.security { security ->
-            security.http { http ->
-                http.authentication = object : AuthenticationStrategy.Sync {
-                    override fun authenticator() = Authenticator { ctx ->
-                        when (ctx.header("X-User")) {
-                            null -> AuthenticationResult.NotAuthenticated
-                            "invalid" -> AuthenticationResult.Failure("bad")
-                            else -> AuthenticationResult.Success(
-                                Authentication.authenticated(ApiIdentity(ctx.header("X-User")!!), setOf(Role.ADMIN)),
-                            )
-                        }
+            security.rules.get("/public/*", Rules.allow())
+            security.rules.post("/api/*", Rules.authenticated())
+            security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
+            security.http.authentication = object : AuthenticationStrategy.Sync {
+                override fun authenticator() = Authenticator { ctx ->
+                    when (ctx.header("X-User")) {
+                        null -> AuthenticationResult.NotAuthenticated
+                        "invalid" -> AuthenticationResult.Failure("bad")
+                        else -> AuthenticationResult.Success(
+                            Authentication.authenticated(ApiIdentity(ctx.header("X-User")!!), setOf(Role.ADMIN)),
+                        )
                     }
                 }
-                http.rules { r ->
-                    r.add("/public/*", GET, r.allow)
-                    r.add("/api/*", POST, r.authenticated)
-                    r.add("/admin/*", GET, r.hasRole(Role.ADMIN))
-                    r.fallback = r.deny
-                }
             }
+            security.http.fallback = Rules.deny()
         }
         config.routes.get("/public/info") { it.result("public") }
         config.routes.post("/api/data") { it.result("created") }
@@ -51,10 +49,15 @@ Keep your Javalin configuration in a reusable factory so tests and production sh
 === "Java"
 
     ```java
+    import io.github.mzlnk.javalin.security.authorization.Rules;
+
     static Javalin secureApp() {
         return Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = new AuthenticationStrategy.Sync() {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/public/*", Rules.allow());
+                security.rules.post("/api/*", Rules.authenticated());
+                security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN));
+                security.http.authentication = new AuthenticationStrategy.Sync() {
                     @Override public Authenticator authenticator() {
                         return ctx -> {
                             String user = ctx.header("X-User");
@@ -65,13 +68,8 @@ Keep your Javalin configuration in a reusable factory so tests and production sh
                         };
                     }
                 };
-                http.rules(r -> {
-                    r.add("/public/*", GET, Rules.allow());
-                    r.add("/api/*", POST, Rules.authenticated());
-                    r.add("/admin/*", GET, Rules.hasRole(Role.ADMIN));
-                    r.fallback = Rules.deny();
-                });
-            })));
+                security.http.fallback = Rules.deny();
+            }));
             config.routes.get("/public/info", ctx -> ctx.result("public"));
             config.routes.post("/api/data", ctx -> ctx.result("created"));
             config.routes.get("/admin/dashboard", ctx -> ctx.result("dashboard"));

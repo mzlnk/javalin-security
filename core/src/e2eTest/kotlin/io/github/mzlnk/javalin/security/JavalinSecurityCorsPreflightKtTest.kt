@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.javalin.Javalin
-import io.javalin.http.HandlerType.GET
 import io.javalin.plugin.bundled.CorsPlugin
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
@@ -21,13 +21,9 @@ class JavalinSecurityCorsPreflightKtTest {
                 cors.addRule { it.anyHost() }
             })
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r ->
-                        r.allowCorsPreflight = true
-                        r.add("/api/*", GET, r.allow)
-                        r.fallback = r.deny
-                    }
-                }
+                security.rules.get("/api/*", Rules.allow())
+                security.http.allowCorsPreflight = true
+                security.http.fallback = Rules.deny()
             }
             cfg.routes.get("/api/resource") { it.result("ok") }
         }
@@ -53,13 +49,9 @@ class JavalinSecurityCorsPreflightKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r ->
-                        r.allowCorsPreflight = true
-                        r.add("/api/*", GET, r.allow)
-                        r.fallback = r.deny
-                    }
-                }
+                security.rules.get("/api/*", Rules.allow())
+                security.http.allowCorsPreflight = true
+                security.http.fallback = Rules.deny()
             }
             cfg.routes.options("/api/resource") { it.result("options-ok") }
         }

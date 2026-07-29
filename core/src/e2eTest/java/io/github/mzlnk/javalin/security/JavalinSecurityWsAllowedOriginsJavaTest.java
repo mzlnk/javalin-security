@@ -28,10 +28,10 @@ class JavalinSecurityWsAllowedOriginsJavaTest {
     void should_reject_the_upgrade_with_403_when_the_Origin_is_not_in_the_allowedOrigins_list() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
-                ws.rules(rules -> rules.fallback = Rules.allow());
-                ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.ws.fallback = Rules.allow();
+                security.ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
+            }));
             config.routes.ws("/ws/chat", ws -> { });
         });
 
@@ -49,10 +49,10 @@ class JavalinSecurityWsAllowedOriginsJavaTest {
     void should_reject_the_upgrade_with_403_when_the_Origin_header_is_absent_and_allowedOrigins_is_set() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
-                ws.rules(rules -> rules.fallback = Rules.allow());
-                ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.ws.fallback = Rules.allow();
+                security.ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
+            }));
             config.routes.ws("/ws/chat", ws -> { });
         });
 
@@ -69,10 +69,10 @@ class JavalinSecurityWsAllowedOriginsJavaTest {
     void should_accept_the_upgrade_when_the_Origin_is_in_the_allowedOrigins_list() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
-                ws.rules(rules -> rules.fallback = Rules.allow());
-                ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.ws.fallback = Rules.allow();
+                security.ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
+            }));
             config.routes.ws("/ws/chat", ws -> { });
         });
 
@@ -90,8 +90,7 @@ class JavalinSecurityWsAllowedOriginsJavaTest {
     void should_accept_any_Origin_when_allowedOrigins_is_not_configured() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws ->
-                    ws.rules(rules -> rules.fallback = Rules.allow()))));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws.fallback = Rules.allow()));
             config.routes.ws("/ws/chat", ws -> { });
         });
 
@@ -108,11 +107,11 @@ class JavalinSecurityWsAllowedOriginsJavaTest {
     void should_reject_a_disallowed_Origin_before_authentication_is_even_attempted() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
-                ws.rules(rules -> rules.fallback = Rules.authenticated());
-                ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
-                ws.authentication = authenticationStrategy(headerAuthenticator);
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.ws.fallback = Rules.authenticated();
+                security.ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
+                security.ws.authentication = authenticationStrategy(headerAuthenticator);
+            }));
             config.routes.ws("/ws/chat", ws -> { });
         });
 
@@ -131,15 +130,15 @@ class JavalinSecurityWsAllowedOriginsJavaTest {
     void should_invoke_a_custom_forbiddenHandler_when_the_Origin_is_disallowed() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
-                ws.rules(rules -> rules.fallback = Rules.allow());
-                ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
-                ws.authentication = E2EJavaTestSupport.authenticationStrategy(
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.ws.fallback = Rules.allow();
+                security.ws.allowedOrigins = java.util.List.of("https://allowed.example.com");
+                security.ws.authentication = E2EJavaTestSupport.authenticationStrategy(
                         ctx -> AuthenticationResult.NotAuthenticated.INSTANCE,
                         io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler.getDEFAULT(),
                         (ctx, auth) -> ctx.status(403).result("custom-origin-denied")
                 );
-            })));
+            }));
             config.routes.ws("/ws/chat", ws -> { });
         });
 

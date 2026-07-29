@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.Authenticator
@@ -30,7 +31,7 @@ class JavalinSecurityWsPathNormalizationKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws -> ws.rules { r -> r.add("/ws/admin", r.deny) } }
+                security.rules.ws("/ws/admin", Rules.deny())
             }
             cfg.routes.ws("/ws/admin") { }
         }
@@ -50,7 +51,7 @@ class JavalinSecurityWsPathNormalizationKtTest {
         val app = Javalin.create { cfg ->
             cfg.router.treatMultipleSlashesAsSingleSlash = true
             cfg.security { security ->
-                security.ws { ws -> ws.rules { r -> r.add("/ws/admin", r.deny) } }
+                security.rules.ws("/ws/admin", Rules.deny())
             }
             cfg.routes.ws("/ws/admin") { }
         }
@@ -70,10 +71,8 @@ class JavalinSecurityWsPathNormalizationKtTest {
         val app = Javalin.create { cfg ->
             cfg.router.contextPath = "/ctx"
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.ws("/ws/*", Rules.authenticated())
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/chat") { }
         }

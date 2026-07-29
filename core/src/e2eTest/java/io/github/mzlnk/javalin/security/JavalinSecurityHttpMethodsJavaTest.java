@@ -10,7 +10,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-import static io.javalin.http.HandlerType.GET;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavalinSecurityHttpMethodsJavaTest {
@@ -19,8 +18,8 @@ class JavalinSecurityHttpMethodsJavaTest {
     void should_treat_head_like_get_when_the_route_is_guarded_by_an_allow_get_rule() throws Exception {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                    http.rules(rules -> rules.add("/api/v1/*", GET, Rules.allow())))));
+            config.registerPlugin(new JavalinSecurityPlugin(security ->
+                    security.rules.get("/api/v1/*", Rules.allow())));
             config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));
         });
 

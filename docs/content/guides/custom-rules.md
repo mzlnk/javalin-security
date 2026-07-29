@@ -4,8 +4,7 @@ The built-in rules (`allow`, `deny`, `authenticated`, `hasRole`, `hasAnyRole`) c
 cases, but real applications often need decisions that depend on the request itself — the
 caller's IP must be on an allowlist, the request must arrive during business hours, and so on.
 `javalin-security` exposes a small `Rule` interface for exactly these cases; you can plug custom
-rules into the same `http.rules { }` and `ws.rules { }` tables you already use for the
-built-ins.
+rules into the same `security.rules` table you already use for the built-ins.
 
 ## What a `Rule` is
 
@@ -51,7 +50,7 @@ inspects the client IP on the `Context`.
 === "Kotlin"
 
     ```kotlin
-    import io.github.mzlnk.javalin.security.authorization.Rule
+    import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.security
 
     val allowedIps = setOf("10.0.0.10", "10.0.0.11", "203.0.113.42")
@@ -59,13 +58,9 @@ inspects the client IP on the `Context`.
     val fromTrustedIp = Rule { _, ctx -> ctx.ip() in allowedIps }
 
     config.security { security ->
-        security.http { http ->
-            http.authentication = myStrategy
-            http.rules { r ->
-                r.add("/admin/*", fromTrustedIp)
-                r.fallback = r.deny
-            }
-        }
+        security.rules.any("/admin/*", fromTrustedIp)
+        security.http.authentication = myStrategy
+        security.http.fallback = Rules.deny()
     }
     ```
 
@@ -79,13 +74,11 @@ inspects the client IP on the `Context`.
 
     Rule fromTrustedIp = (auth, ctx) -> allowedIps.contains(ctx.ip());
 
-    config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-        http.authentication = myStrategy;
-        http.rules(r -> {
-            r.add("/admin/*", fromTrustedIp);
-            r.fallback = Rules.deny();
-        });
-    })));
+    config.registerPlugin(new JavalinSecurityPlugin(security -> {
+        security.rules.any("/admin/*", fromTrustedIp);
+        security.http.authentication = myStrategy;
+        security.http.fallback = Rules.deny();
+    }));
     ```
 
 Anonymous callers whose IP is not on the list get a **401**; authenticated callers from an
@@ -98,33 +91,26 @@ unlisted IP get a **403**. See [Denial status](../concepts/authorization.md#deni
 
 ## WebSocket rules
 
-`Rule` is the same type for HTTP and WebSocket authorization; you register it against
-`ws.rules { }` instead of `http.rules { }`. WebSocket rules match on path only (no method), and
-they run **once at upgrade time** — the resulting `Authentication` is then reused for every
+`Rule` is the same type for HTTP and WebSocket authorization; register WebSocket entries with
+`security.rules.ws(…)` instead of verb methods. WebSocket rules match on path only (no method),
+and they run **once at upgrade time** — the resulting `Authentication` is then reused for every
 message on that session.
 
 === "Kotlin"
 
     ```kotlin
-    security.ws { ws ->
-        ws.authentication = myWsStrategy
-        ws.rules { r ->
-            r.add("/ws/admin/*", fromTrustedIp)
-            r.fallback = r.deny
-        }
-    }
+import io.github.mzlnk.javalin.security.authorization.Rules
+    security.rules.ws("/ws/admin/*", fromTrustedIp)
+    security.ws.authentication = myWsStrategy
+    security.ws.fallback = Rules.deny()
     ```
 
 === "Java"
 
     ```java
-    security.ws(ws -> {
-        ws.authentication = myWsStrategy;
-        ws.rules(r -> {
-            r.add("/ws/admin/*", fromTrustedIp);
-            r.fallback = Rules.deny();
-        });
-    });
+    security.rules.ws("/ws/admin/*", fromTrustedIp);
+    security.ws.authentication = myWsStrategy;
+    security.ws.fallback = Rules.deny();
     ```
 
 ## Rules for well-behaved rules

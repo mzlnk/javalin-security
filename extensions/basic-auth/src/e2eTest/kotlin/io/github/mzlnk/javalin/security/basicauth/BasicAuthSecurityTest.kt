@@ -1,10 +1,9 @@
 package io.github.mzlnk.javalin.security.basicauth
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.identity
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
-import io.javalin.http.HandlerType.GET
-import io.javalin.http.HandlerType.POST
 import io.javalin.security.RouteRole
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
@@ -144,13 +143,11 @@ class BasicAuthSecurityTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.authentication = basicAuth { basic -> basic.userLookup = testUserLookup }
-                    http.rules { r -> r.fallback = r.authenticated }
-                }
+                security.http.authentication = basicAuth { basic -> basic.userLookup = testUserLookup }
+                security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<BasicAuthIdentity>()!!
+                val identity = ctx.identity<BasicAuthIdentity>()
                 ctx.result(identity.name)
             }
         }
@@ -219,16 +216,14 @@ class BasicAuthSecurityTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.authentication = basicAuth { basic ->
-                        basic.userLookup = testUserLookup
-                        basic.credentialsResolver = BasicCredentialsResolver.basicHeader("X-Custom-Auth")
-                    }
-                    http.rules { r -> r.fallback = r.authenticated }
+                security.http.authentication = basicAuth { basic ->
+                    basic.userLookup = testUserLookup
+                    basic.credentialsResolver = BasicCredentialsResolver.basicHeader("X-Custom-Auth")
                 }
+                security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<BasicAuthIdentity>()!!
+                val identity = ctx.identity<BasicAuthIdentity>()
                 ctx.result(identity.name)
             }
         }
@@ -248,19 +243,15 @@ class BasicAuthSecurityTest {
 
     private fun app(basicChallenge: Boolean = false): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
-            security.http { http ->
-                http.authentication = basicAuth { basic ->
-                    basic.userLookup = testUserLookup
-                    basic.basicChallenge = basicChallenge
-                    basic.realm = "TestAPI"
-                }
-                http.rules { r ->
-                    r.add("/public/*", GET, r.allow)
-                    r.add("/protected/*", POST, r.authenticated)
-                    r.add("/admin/*", GET, r.hasRole(Role.ADMIN))
-                    r.fallback = r.deny
-                }
+            security.rules.get("/public/*", Rules.allow())
+            security.rules.post("/protected/*", Rules.authenticated())
+            security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
+            security.http.authentication = basicAuth { basic ->
+                basic.userLookup = testUserLookup
+                basic.basicChallenge = basicChallenge
+                basic.realm = "TestAPI"
             }
+            security.http.fallback = Rules.deny()
         }
         cfg.routes.get("/public/info") { it.result("public") }
         cfg.routes.post("/protected/data") { it.result("created") }

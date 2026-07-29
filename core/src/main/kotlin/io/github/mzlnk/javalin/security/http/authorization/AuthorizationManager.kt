@@ -12,12 +12,11 @@ import io.javalin.http.HandlerType
  *
  * First match wins in declaration order. Patterns are compiled once at startup into a Javalin
  * [io.javalin.router.matcher.PathParser] and matched against the context-path-stripped request path.
- * Unmatched requests fall through to [fallback] (deny when unset). Returns a boolean; the guard
- * renders the response.
+ * Unmatched requests fall through to [fallback]. Returns a boolean; the guard renders the response.
  */
 internal class AuthorizationManager(
     private val entries: List<Entry>,
-    private val fallback: Rule?,
+    private val fallback: Rule,
     private val allowCorsPreflight: Boolean,
 ) {
 
@@ -58,7 +57,7 @@ internal class AuthorizationManager(
             return matched.rule.isGranted(authentication, context)
         }
 
-        return fallback?.isGranted(authentication, context) ?: false
+        return fallback.isGranted(authentication, context)
     }
 
 }

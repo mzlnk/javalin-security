@@ -1,12 +1,10 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.javalin.Javalin
-import io.javalin.http.HandlerType.DELETE
-import io.javalin.http.HandlerType.GET
-import io.javalin.http.HandlerType.POST
 import io.javalin.security.RouteRole
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
@@ -158,10 +156,8 @@ class JavalinSecurityHttpKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/v1/*", GET, r.allow) }
-                    http.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.get("/api/v1/*", Rules.allow())
+                security.http.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.get("/internal") { it.result("secret") }
         }
@@ -188,11 +184,11 @@ class JavalinSecurityHttpKtTest {
     }
 
     @Test
-    fun `should leave HTTP routes unguarded when only ws block is configured`() {
+    fun `should deny HTTP routes by default when only ws is configured`() {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws -> ws.rules { r -> r.fallback = r.deny } }
+                security.ws.fallback = Rules.deny()
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
         }
@@ -202,12 +198,12 @@ class JavalinSecurityHttpKtTest {
             val response = client.get("/api/v1/resource")
 
             // then
-            assertThat(response.code).isEqualTo(200)
+            assertThat(response.code).isEqualTo(401)
         }
     }
 
     @Test
-    fun `should leave HTTP routes unguarded when security block has no sub-blocks`() {
+    fun `should deny HTTP routes by default when security has no further configuration`() {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { }
@@ -219,7 +215,7 @@ class JavalinSecurityHttpKtTest {
             val response = client.get("/api/v1/resource")
 
             // then
-            assertThat(response.code).isEqualTo(200)
+            assertThat(response.code).isEqualTo(401)
         }
     }
 
@@ -228,7 +224,7 @@ class JavalinSecurityHttpKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http -> http.rules { r -> r.fallback = r.deny } }
+                security.http.fallback = Rules.deny()
             }
             cfg.routes.get("/public", { it.result("ok") }, Anyone)
         }
@@ -247,10 +243,8 @@ class JavalinSecurityHttpKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.authentication = authenticationStrategy(headerAuthenticator)
-                    http.rules { r -> r.fallback = r.deny } // rule table must NOT be consulted
-                }
+                security.http.authentication = authenticationStrategy(headerAuthenticator)
+                security.http.fallback = Rules.deny() // rule table must NOT be consulted
             }
             cfg.routes.get("/admin", { it.result("admin-ok") }, Role.ADMIN)
         }
@@ -273,10 +267,8 @@ class JavalinSecurityHttpKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.authentication = authenticationStrategy(headerAuthenticator)
-                    http.rules { r -> r.fallback = r.allow } // even a permissive fallback must not apply
-                }
+                security.http.authentication = authenticationStrategy(headerAuthenticator)
+                security.http.fallback = Rules.allow() // even a permissive fallback must not apply
             }
             cfg.routes.get("/admin", { it.result("admin-ok") }, Role.ADMIN)
         }
@@ -298,14 +290,12 @@ class JavalinSecurityHttpKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.authentication = authenticationStrategy(
-                        Authenticator {
-                            AuthenticationResult.Success(Authentication.authenticated(TestIdentity("alice"), Role.ADMIN))
-                        },
-                    )
-                    http.rules { r -> r.add("/plain", GET, r.deny) }
-                }
+                security.rules.get("/plain", Rules.deny())
+                security.http.authentication = authenticationStrategy(
+                    Authenticator {
+                        AuthenticationResult.Success(Authentication.authenticated(TestIdentity("alice"), Role.ADMIN))
+                    },
+                )
             }
             cfg.routes.get("/plain") { it.result("ok") } // no roles declared
         }
@@ -322,18 +312,84 @@ class JavalinSecurityHttpKtTest {
     private fun app(authenticator: Authenticator? = headerAuthenticator): Javalin =
         Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r ->
-                        r.add("/api/v1/*", GET, r.allow)
-                        r.add("/api/v1/*", POST, r.authenticated)
-                        r.add("/api/v1/*", DELETE, r.hasRole(Role.ADMIN))
-                    }
-                    authenticator?.let { http.authentication = authenticationStrategy(it) }
-                }
+                security.rules.get("/api/v1/*", Rules.allow())
+                security.rules.post("/api/v1/*", Rules.authenticated())
+                security.rules.delete("/api/v1/*", Rules.hasRole(Role.ADMIN))
+                authenticator?.let { security.http.authentication = authenticationStrategy(it) }
             }
             cfg.routes.get("/api/v1/resource") { it.result("ok") }
             cfg.routes.post("/api/v1/resource") { it.result("created") }
             cfg.routes.delete("/api/v1/resource") { it.result("deleted") }
-            cfg.routes.get("/api/v1/me") { it.result(it.identity<TestIdentity>()!!.name) }
+            cfg.routes.get("/api/v1/me") { it.result(it.identity<TestIdentity>().name) }
         }
+
+    @Test
+    fun `should throw when identity is read for an anonymous caller`() {
+        // given
+        val app = Javalin.create { cfg ->
+            cfg.security { security ->
+                security.rules.get("/api/v1/*", Rules.allow())
+                security.http.authentication = authenticationStrategy(headerAuthenticator)
+            }
+            cfg.routes.get("/api/v1/me") { ctx ->
+                ctx.result(ctx.identity<TestIdentity>().name)
+            }
+        }
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val response = client.get("/api/v1/me")
+
+            // then
+            assertThat(response.code).isEqualTo(500)
+        }
+    }
+
+    @Test
+    fun `should return null from identityOrNull when the caller is anonymous`() {
+        // given
+        val app = Javalin.create { cfg ->
+            cfg.security { security ->
+                security.rules.get("/api/v1/*", Rules.allow())
+                security.http.authentication = authenticationStrategy(headerAuthenticator)
+            }
+            cfg.routes.get("/api/v1/me") { ctx ->
+                val identity = ctx.identityOrNull<TestIdentity>()
+                ctx.result(identity?.name ?: "anonymous")
+            }
+        }
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val response = client.get("/api/v1/me")
+
+            // then
+            assertThat(response.code).isEqualTo(200)
+            assertThat(response.body.string()).isEqualTo("anonymous")
+        }
+    }
+
+    @Test
+    fun `should return the identity from identityOrNull when the caller is authenticated`() {
+        // given
+        val app = Javalin.create { cfg ->
+            cfg.security { security ->
+                security.rules.get("/api/v1/*", Rules.allow())
+                security.http.authentication = authenticationStrategy(headerAuthenticator)
+            }
+            cfg.routes.get("/api/v1/me") { ctx ->
+                val identity = ctx.identityOrNull<TestIdentity>()
+                ctx.result(identity?.name ?: "anonymous")
+            }
+        }
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val response = client.get("/api/v1/me") { it.header("X-User", "bob") }
+
+            // then
+            assertThat(response.code).isEqualTo(200)
+            assertThat(response.body.string()).isEqualTo("bob")
+        }
+    }
 }

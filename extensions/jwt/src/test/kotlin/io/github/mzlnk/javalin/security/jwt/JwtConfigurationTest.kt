@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security.jwt
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
@@ -22,13 +23,11 @@ class JwtConfigurationTest {
         assertThatThrownBy {
             Javalin.create { cfg ->
                 cfg.security { security ->
-                    security.http { http ->
-                        http.authentication = jwt { jwt ->
-                            jwt.keySource = JwtKeySource.secret("test-secret")
-                            // decoder not set — should fail
-                        }
-                        http.rules { r -> r.fallback = r.allow }
+                    security.http.authentication = jwt { jwt ->
+                        jwt.keySource = JwtKeySource.secret("test-secret")
+                        // decoder not set — should fail
                     }
+                    security.http.fallback = Rules.allow()
                 }
             }
         }.isInstanceOf(SecurityConfigurationException::class.java)
@@ -40,13 +39,11 @@ class JwtConfigurationTest {
         assertThatThrownBy {
             Javalin.create { cfg ->
                 cfg.security { security ->
-                    security.http { http ->
-                        http.authentication = jwt { jwt ->
-                            jwt.decoder = testDecoder
-                            // keySource not set — should fail
-                        }
-                        http.rules { r -> r.fallback = r.allow }
+                    security.http.authentication = jwt { jwt ->
+                        jwt.decoder = testDecoder
+                        // keySource not set — should fail
                     }
+                    security.http.fallback = Rules.allow()
                 }
             }
         }.isInstanceOf(SecurityConfigurationException::class.java)

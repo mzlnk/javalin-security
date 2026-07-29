@@ -26,7 +26,7 @@ class AuthorizationManagerTest {
                 entry("/api/*", HandlerType.GET, Rules.allow()),
                 entry("/api/*", HandlerType.GET, Rules.deny()),
             ),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -42,7 +42,7 @@ class AuthorizationManagerTest {
         // given
         val manager = AuthorizationManager(
             entries = listOf(entry("/public/*", HandlerType.GET, Rules.allow())),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -58,7 +58,7 @@ class AuthorizationManagerTest {
         // given
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/*", HandlerType.POST, Rules.allow())),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -74,7 +74,7 @@ class AuthorizationManagerTest {
         // given
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/*", null, Rules.allow())),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -90,7 +90,7 @@ class AuthorizationManagerTest {
         // given
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/*", HandlerType.GET, Rules.allow())),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -106,7 +106,7 @@ class AuthorizationManagerTest {
         // given
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/*", HandlerType.GET, Rules.hasRole(Role.ADMIN))),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -122,7 +122,7 @@ class AuthorizationManagerTest {
         // given
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/*", HandlerType.DELETE, Rules.hasRole(Role.ADMIN))),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -139,7 +139,7 @@ class AuthorizationManagerTest {
         // literal string, so it matches concrete path segments directly.
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/users/{id}", HandlerType.GET, Rules.allow())),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -156,7 +156,7 @@ class AuthorizationManagerTest {
         val caseInsensitiveRouter = RouterConfig().apply { caseInsensitiveRoutes = true }
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/admin/*", HandlerType.GET, Rules.allow(), caseInsensitiveRouter)),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -172,7 +172,7 @@ class AuthorizationManagerTest {
         // given
         val manager = AuthorizationManager(
             entries = listOf(entry("/api/admin/*", HandlerType.GET, Rules.allow())),
-            fallback = null,
+            fallback = Rules.deny(),
             allowCorsPreflight = false,
         )
 
@@ -202,7 +202,7 @@ class AuthorizationManagerTest {
     @Test
     fun `should deny when no entry matches and no fallback is configured`() {
         // given
-        val manager = AuthorizationManager(entries = emptyList(), fallback = null, allowCorsPreflight = false)
+        val manager = AuthorizationManager(entries = emptyList(), fallback = Rules.deny(), allowCorsPreflight = false)
 
         // when
         val granted = manager.isGranted(HandlerType.GET, "/anything", authenticated(), mockContext())
@@ -214,7 +214,7 @@ class AuthorizationManagerTest {
     @Test
     fun `should grant a CORS preflight OPTIONS request when allowCorsPreflight is enabled`() {
         // given
-        val manager = AuthorizationManager(entries = emptyList(), fallback = null, allowCorsPreflight = true)
+        val manager = AuthorizationManager(entries = emptyList(), fallback = Rules.deny(), allowCorsPreflight = true)
         val context = mockContext(method = HandlerType.OPTIONS, headers = mapOf("Access-Control-Request-Method" to "GET"))
 
         // when
@@ -227,7 +227,7 @@ class AuthorizationManagerTest {
     @Test
     fun `should not grant a plain OPTIONS request even when allowCorsPreflight is enabled`() {
         // given
-        val manager = AuthorizationManager(entries = emptyList(), fallback = null, allowCorsPreflight = true)
+        val manager = AuthorizationManager(entries = emptyList(), fallback = Rules.deny(), allowCorsPreflight = true)
         val context = mockContext(method = HandlerType.OPTIONS)
 
         // when
@@ -240,7 +240,7 @@ class AuthorizationManagerTest {
     @Test
     fun `should not exempt OPTIONS requests when allowCorsPreflight is disabled`() {
         // given
-        val manager = AuthorizationManager(entries = emptyList(), fallback = null, allowCorsPreflight = false)
+        val manager = AuthorizationManager(entries = emptyList(), fallback = Rules.deny(), allowCorsPreflight = false)
         val context = mockContext(method = HandlerType.OPTIONS, headers = mapOf("Access-Control-Request-Method" to "GET"))
 
         // when

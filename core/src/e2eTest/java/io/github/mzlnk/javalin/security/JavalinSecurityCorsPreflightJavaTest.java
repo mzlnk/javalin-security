@@ -11,7 +11,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-import static io.javalin.http.HandlerType.GET;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavalinSecurityCorsPreflightJavaTest {
@@ -21,12 +20,11 @@ class JavalinSecurityCorsPreflightJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new CorsPlugin(cors -> cors.addRule(it -> it.anyHost())));
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                    http.rules(rules -> {
-                        rules.allowCorsPreflight = true;
-                        rules.add("/api/*", GET, Rules.allow());
-                        rules.fallback = Rules.deny();
-                    }))));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/*", Rules.allow());
+                security.http.allowCorsPreflight = true;
+                security.http.fallback = Rules.deny();
+            }));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
         });
 
@@ -51,12 +49,11 @@ class JavalinSecurityCorsPreflightJavaTest {
     void should_deny_an_options_request_when_it_is_not_a_cors_preflight() throws Exception {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                    http.rules(rules -> {
-                        rules.allowCorsPreflight = true;
-                        rules.add("/api/*", GET, Rules.allow());
-                        rules.fallback = Rules.deny();
-                    }))));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/*", Rules.allow());
+                security.http.allowCorsPreflight = true;
+                security.http.fallback = Rules.deny();
+            }));
             config.routes.options("/api/resource", ctx -> ctx.result("options-ok"));
         });
 

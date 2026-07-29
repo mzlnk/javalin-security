@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.Authenticator
@@ -43,10 +44,8 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.ws("/ws/*", Rules.authenticated())
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -66,9 +65,7 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -88,10 +85,8 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/other/*", r.authenticated) }
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.ws("/ws/other/*", Rules.authenticated())
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -111,7 +106,7 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws -> ws.rules { r -> r.add("/ws/*", r.allow) } }
+                security.rules.ws("/ws/*", Rules.allow())
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -130,10 +125,8 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.ws("/ws/*", Rules.authenticated())
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -152,16 +145,14 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.hasRole(Role.ADMIN)) }
-                    ws.authentication = authenticationStrategy(
-                        Authenticator {
-                            AuthenticationResult.Success(
-                                Authentication.authenticated(TestIdentity("alice"), Role.ADMIN),
-                            )
-                        },
-                    )
-                }
+                security.rules.ws("/ws/*", Rules.hasRole(Role.ADMIN))
+                security.ws.authentication = authenticationStrategy(
+                    Authenticator {
+                        AuthenticationResult.Success(
+                            Authentication.authenticated(TestIdentity("alice"), Role.ADMIN),
+                        )
+                    },
+                )
             }
             cfg.routes.ws("/ws/admin") { }
         }
@@ -180,10 +171,8 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.hasRole(Role.ADMIN)) }
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.ws("/ws/*", Rules.hasRole(Role.ADMIN))
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/admin") { }
         }
@@ -204,7 +193,7 @@ class JavalinSecurityWsKtTest {
         val onConnectRan = AtomicBoolean(false)
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws -> ws.rules { r -> r.add("/ws/*", r.deny) } }
+                security.rules.ws("/ws/*", Rules.deny())
             }
             cfg.routes.ws("/ws/chat") { ws ->
                 ws.onConnect { onConnectRan.set(true) }
@@ -227,10 +216,8 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.ws("/ws/*", Rules.allow())
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -250,10 +237,8 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.ws("/ws/*", Rules.allow())
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -272,14 +257,12 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.authentication = authenticationStrategy(
-                        unauthorizedHandler = { ctx, _ ->
-                            ctx.status(401).result("custom-ws-401")
-                        },
-                    )
-                }
+                security.rules.ws("/ws/*", Rules.authenticated())
+                security.ws.authentication = authenticationStrategy(
+                    unauthorizedHandler = { ctx, _ ->
+                        ctx.status(401).result("custom-ws-401")
+                    },
+                )
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -299,15 +282,13 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.hasRole(Role.ADMIN)) }
-                    ws.authentication = authenticationStrategy(
-                        authenticator = headerAuthenticator,
-                        forbiddenHandler = { ctx, _ ->
-                            ctx.status(403).result("custom-ws-403")
-                        },
-                    )
-                }
+                security.rules.ws("/ws/*", Rules.hasRole(Role.ADMIN))
+                security.ws.authentication = authenticationStrategy(
+                    authenticator = headerAuthenticator,
+                    forbiddenHandler = { ctx, _ ->
+                        ctx.status(403).result("custom-ws-403")
+                    },
+                )
             }
             cfg.routes.ws("/ws/admin") { }
         }
@@ -327,12 +308,8 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r ->
-                        r.add("/ws/public/*", r.allow)
-                        r.fallback = r.deny
-                    }
-                }
+                security.rules.ws("/ws/public/*", Rules.allow())
+                security.ws.fallback = Rules.deny()
             }
             cfg.routes.ws("/ws/public/chat") { }
             cfg.routes.ws("/ws/secret") { }
@@ -355,21 +332,19 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.authentication = asyncAuthenticationStrategy(
-                        { ctx ->
-                            CompletableFuture.supplyAsync {
-                                val user = ctx.header("X-User")
-                                if (user != null) {
-                                    AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user)))
-                                } else {
-                                    AuthenticationResult.NotAuthenticated
-                                }
+                security.rules.ws("/ws/*", Rules.authenticated())
+                security.ws.authentication = asyncAuthenticationStrategy(
+                    { ctx ->
+                        CompletableFuture.supplyAsync {
+                            val user = ctx.header("X-User")
+                            if (user != null) {
+                                AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user)))
+                            } else {
+                                AuthenticationResult.NotAuthenticated
                             }
-                        },
-                    )
-                }
+                        }
+                    },
+                )
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -391,16 +366,14 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authentication = asyncAuthenticationStrategy(
-                        { _ ->
-                            CompletableFuture.completedFuture(
-                                AuthenticationResult.Failure("async credential failure"),
-                            )
-                        },
-                    )
-                }
+                security.rules.ws("/ws/*", Rules.allow())
+                security.ws.authentication = asyncAuthenticationStrategy(
+                    { _ ->
+                        CompletableFuture.completedFuture(
+                            AuthenticationResult.Failure("async credential failure"),
+                        )
+                    },
+                )
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -420,16 +393,14 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authentication = asyncAuthenticationStrategy(
-                        { _ ->
-                            CompletableFuture.completedFuture(
-                                AuthenticationResult.Failure("async credential failure"),
-                            )
-                        },
-                    )
-                }
+                security.rules.ws("/ws/*", Rules.allow())
+                security.ws.authentication = asyncAuthenticationStrategy(
+                    { _ ->
+                        CompletableFuture.completedFuture(
+                            AuthenticationResult.Failure("async credential failure"),
+                        )
+                    },
+                )
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -448,12 +419,10 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authentication = asyncAuthenticationStrategy(
-                        { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP crash")) },
-                    )
-                }
+                security.rules.ws("/ws/*", Rules.allow())
+                security.ws.authentication = asyncAuthenticationStrategy(
+                    { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP crash")) },
+                )
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -473,12 +442,10 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authentication = asyncAuthenticationStrategy(
-                        { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP crash")) },
-                    )
-                }
+                security.rules.ws("/ws/*", Rules.allow())
+                security.ws.authentication = asyncAuthenticationStrategy(
+                    { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP crash")) },
+                )
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -497,12 +464,10 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authentication = asyncAuthenticationStrategy(
-                        { _ -> throw IllegalStateException("sync crash in async ws authenticator") },
-                    )
-                }
+                security.rules.ws("/ws/*", Rules.allow())
+                security.ws.authentication = asyncAuthenticationStrategy(
+                    { _ -> throw IllegalStateException("sync crash in async ws authenticator") },
+                )
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -522,12 +487,10 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.allow) }
-                    ws.authentication = asyncAuthenticationStrategy(
-                        { _ -> throw IllegalStateException("sync crash in async ws authenticator") },
-                    )
-                }
+                security.rules.ws("/ws/*", Rules.allow())
+                security.ws.authentication = asyncAuthenticationStrategy(
+                    { _ -> throw IllegalStateException("sync crash in async ws authenticator") },
+                )
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -548,10 +511,8 @@ class JavalinSecurityWsKtTest {
         val connectLatch = CountDownLatch(1)
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.add("/ws/*", r.authenticated) }
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.rules.ws("/ws/*", Rules.authenticated())
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/chat") { ws ->
                 ws.onConnect { ctx ->
@@ -576,7 +537,7 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws -> ws.rules { r -> r.fallback = r.deny } }
+                security.ws.fallback = Rules.deny()
             }
             cfg.routes.ws("/ws/public", { }, Anyone)
         }
@@ -595,10 +556,8 @@ class JavalinSecurityWsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                    ws.rules { r -> r.fallback = r.deny } // rule table must NOT be consulted
-                }
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
+                security.ws.fallback = Rules.deny() // rule table must NOT be consulted
             }
             cfg.routes.ws("/ws/admin", { }, Role.ADMIN)
         }

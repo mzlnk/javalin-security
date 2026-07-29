@@ -6,7 +6,6 @@ import io.javalin.http.staticfiles.Location;
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
 
-import static io.javalin.http.HandlerType.GET;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavalinSecurityStaticFilesJavaTest {
@@ -16,8 +15,8 @@ class JavalinSecurityStaticFilesJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.staticFiles.add("/public", Location.CLASSPATH);
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                    http.rules(rules -> rules.add("/api/v1/*", GET, Rules.allow())))));
+            config.registerPlugin(new JavalinSecurityPlugin(security ->
+                    security.rules.get("/api/v1/*", Rules.allow())));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -35,8 +34,8 @@ class JavalinSecurityStaticFilesJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.staticFiles.add("/public", Location.CLASSPATH);
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                    http.rules(rules -> rules.add("/*", GET, Rules.allow())))));
+            config.registerPlugin(new JavalinSecurityPlugin(security ->
+                    security.rules.get("/*", Rules.allow())));
         });
 
         JavalinTest.test(app, (server, client) -> {

@@ -10,8 +10,9 @@ _Current version: `{{ versions.library }}`._
 
 ### Added
 
-- **Core** (`javalin-security`): opt-in HTTP and WebSocket guards, `security { }` configuration,
-  `authentication()` / `identity()` accessors.
+- **Core** (`javalin-security`): HTTP and WebSocket guards (installed with the plugin),
+  `security { }` configuration, `authentication()` / `identity()` / `identityOrNull()`
+  accessors.
 - **Authentication SPI**: sync and async strategies, `AuthenticationResult`, `Identity`,
   unauthorized handlers.
 - **Authorization**: built-in rules, rule tables, `Anyone`, deny-by-default fallback, path

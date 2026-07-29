@@ -1,30 +1,40 @@
 package io.github.mzlnk.javalin.security.http
 
 import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy
-import java.util.function.Consumer
+import io.github.mzlnk.javalin.security.authorization.Rule
+import io.github.mzlnk.javalin.security.authorization.Rules
 
 /**
- * HTTP security configuration: authentication strategy and pattern-based rule table.
+ * HTTP security configuration: authentication strategy, fallback rule, and CORS preflight policy.
  *
- * Mutable field-assignment config (last write wins). Route-declared [io.javalin.security.RouteRole]s
- * are checked first (including [io.github.mzlnk.javalin.security.Anyone]); otherwise [rules]
- * decides. Assign strategies such as `jwt { }` or `basicAuth { }` to [authentication].
+ * Mutable field-assignment config (last write wins). Pattern-based rules are declared on
+ * [io.github.mzlnk.javalin.security.JavalinSecurityPlugin.Config.rules]. Route-declared
+ * [io.javalin.security.RouteRole]s are checked first (including [io.github.mzlnk.javalin.security.Anyone]);
+ * otherwise the shared rule table decides. Assign strategies such as `jwt { }` or `basicAuth { }`
+ * to [authentication].
  */
 class HttpSecurityConfig internal constructor() {
 
     /**
-     * [AuthenticationStrategy] for this block.
-     * When `null` (default), every request is anonymous and [rules] alone decides access.
+     * [AuthenticationStrategy] for this channel.
+     * When `null` (default), every request is anonymous and the rule table alone decides access.
      */
     @JvmField
     var authentication: AuthenticationStrategy? = null
 
-    /** Pattern-based rule table for routes with no declared [io.javalin.security.RouteRole]s. */
-    internal val rules: SecurityRules = SecurityRules()
+    /**
+     * Rule applied when no HTTP entry matches. Last write wins.
+     * Defaults to [Rules.deny], so unmatched requests are denied.
+     */
+    @JvmField
+    var fallback: Rule = Rules.deny()
 
-    /** Configures the pattern-based rule table. Repeated calls accumulate entries in order. */
-    fun rules(configure: Consumer<SecurityRules>) {
-        configure.accept(rules)
-    }
+    /**
+     * When `true`, permits CORS preflight `OPTIONS` requests that carry
+     * `Access-Control-Request-Method`. Does not exempt other `OPTIONS` traffic. Checked before
+     * the rule table and [fallback]. CORS response headers still require Javalin's CORS plugin.
+     */
+    @JvmField
+    var allowCorsPreflight: Boolean = false
 
 }

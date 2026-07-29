@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.Authenticator
@@ -30,10 +31,8 @@ class JavalinSecurityWsAllowedOriginsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.fallback = r.allow }
-                    ws.allowedOrigins = listOf("https://allowed.example.com")
-                }
+                security.ws.fallback = Rules.allow()
+                security.ws.allowedOrigins = listOf("https://allowed.example.com")
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -55,10 +54,8 @@ class JavalinSecurityWsAllowedOriginsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.fallback = r.allow }
-                    ws.allowedOrigins = listOf("https://allowed.example.com")
-                }
+                security.ws.fallback = Rules.allow()
+                security.ws.allowedOrigins = listOf("https://allowed.example.com")
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -77,10 +74,8 @@ class JavalinSecurityWsAllowedOriginsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.fallback = r.allow }
-                    ws.allowedOrigins = listOf("https://allowed.example.com")
-                }
+                security.ws.fallback = Rules.allow()
+                security.ws.allowedOrigins = listOf("https://allowed.example.com")
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -102,9 +97,7 @@ class JavalinSecurityWsAllowedOriginsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.fallback = r.allow }
-                }
+                security.ws.fallback = Rules.allow()
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -123,11 +116,9 @@ class JavalinSecurityWsAllowedOriginsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.fallback = r.authenticated }
-                    ws.allowedOrigins = listOf("https://allowed.example.com")
-                    ws.authentication = authenticationStrategy(headerAuthenticator)
-                }
+                security.ws.fallback = Rules.authenticated()
+                security.ws.allowedOrigins = listOf("https://allowed.example.com")
+                security.ws.authentication = authenticationStrategy(headerAuthenticator)
             }
             cfg.routes.ws("/ws/chat") { }
         }
@@ -149,15 +140,13 @@ class JavalinSecurityWsAllowedOriginsKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.ws { ws ->
-                    ws.rules { r -> r.fallback = r.allow }
-                    ws.allowedOrigins = listOf("https://allowed.example.com")
-                    ws.authentication = authenticationStrategy(
-                        forbiddenHandler = { ctx, _ ->
-                            ctx.status(403).result("custom-origin-denied")
-                        },
-                    )
-                }
+                security.ws.fallback = Rules.allow()
+                security.ws.allowedOrigins = listOf("https://allowed.example.com")
+                security.ws.authentication = authenticationStrategy(
+                    forbiddenHandler = { ctx, _ ->
+                        ctx.status(403).result("custom-origin-denied")
+                    },
+                )
             }
             cfg.routes.ws("/ws/chat") { }
         }

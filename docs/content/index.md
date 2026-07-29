@@ -43,22 +43,17 @@ strategies; you can also [write your own](guides/custom-authentication.md).
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.security
     import io.javalin.Javalin
-    import io.javalin.http.HandlerType.GET
-    import io.javalin.http.HandlerType.POST
 
     val app = Javalin.create { config ->
         config.security { security ->
-            security.http { http ->
-                http.authentication = myAuthenticationStrategy
-                http.rules { r ->
-                    r.add("/public/*", GET, r.allow)
-                    r.add("/api/*", POST, r.authenticated)
-                    r.add("/admin/*", r.hasRole(Role.ADMIN))
-                    r.fallback = r.deny
-                }
-            }
+            security.rules.get("/public/*", Rules.allow())
+            security.rules.post("/api/*", Rules.authenticated())
+            security.rules.any("/admin/*", Rules.hasRole(Role.ADMIN))
+            security.http.authentication = myAuthenticationStrategy
+            security.http.fallback = Rules.deny()
         }
         config.routes.get("/public/info") { it.result("hello") }
     }.start(7070)
@@ -71,19 +66,14 @@ strategies; you can also [write your own](guides/custom-authentication.md).
     import io.github.mzlnk.javalin.security.authorization.Rules;
     import io.javalin.Javalin;
 
-    import static io.javalin.http.HandlerType.GET;
-    import static io.javalin.http.HandlerType.POST;
-
     Javalin app = Javalin.create(config -> {
-        config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-            http.authentication = myAuthenticationStrategy;
-            http.rules(r -> {
-                r.add("/public/*", GET, Rules.allow());
-                r.add("/api/*", POST, Rules.authenticated());
-                r.add("/admin/*", Rules.hasRole(Role.ADMIN));
-                r.fallback = Rules.deny();
-            });
-        })));
+        config.registerPlugin(new JavalinSecurityPlugin(security -> {
+            security.rules.get("/public/*", Rules.allow());
+            security.rules.post("/api/*", Rules.authenticated());
+            security.rules.any("/admin/*", Rules.hasRole(Role.ADMIN));
+            security.http.authentication = myAuthenticationStrategy;
+            security.http.fallback = Rules.deny();
+        }));
         config.routes.get("/public/info", ctx -> ctx.result("hello"));
     }).start(7070);
     ```
@@ -100,15 +90,14 @@ strategies; you can also [write your own](guides/custom-authentication.md).
 ## Where to start
 
 1. [Installation](getting-started/installation.md) — add the core artifact.
-2. [Secure HTTP endpoints](getting-started/secure-http-endpoints.md) — protect routes end to end.
-3. [Secure WebSocket endpoints](getting-started/secure-websocket-endpoints.md) — apply the same
-   model to WebSocket upgrades.
-4. [Access caller identity](getting-started/access-caller-identity.md) — read the authenticated
+2. [Secure endpoints](getting-started/secure-endpoints.md) — protect HTTP routes and WebSocket
+   upgrades end to end.
+3. [Access caller identity](getting-started/access-caller-identity.md) — read the authenticated
    user inside handlers.
-5. [Authentication](concepts/authentication.md) and [Authorization](concepts/authorization.md) —
+4. [Authentication](concepts/authentication.md) and [Authorization](concepts/authorization.md) —
    the two concepts in depth.
-6. Extensions — [Basic Auth](extensions/basic-auth.md), [JWT](extensions/jwt/index.md).
-7. Guides — [Custom authentication](guides/custom-authentication.md), [CORS](guides/cors.md),
+5. Extensions — [Basic Auth](extensions/basic-auth.md), [JWT](extensions/jwt/index.md).
+6. Guides — [Custom authentication](guides/custom-authentication.md), [CORS](guides/cors.md),
    [Testing](guides/testing.md).
 
 For the generated KDoc, see the [API reference](https://mzlnk.github.io/javalin-security/api/).

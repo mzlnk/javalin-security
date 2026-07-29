@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 
 import static io.github.mzlnk.javalin.security.E2EJavaTestSupport.authenticationStrategy;
 import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
-import static io.javalin.http.HandlerType.GET;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavalinSecurityCustomHandlersJavaTest {
@@ -33,10 +32,10 @@ class JavalinSecurityCustomHandlersJavaTest {
         Authenticator alwaysBob = ctx ->
                 new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity("bob")));
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/v1/*", GET, Rules.authenticated()));
-                http.authentication = authenticationStrategy(alwaysBob);
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.authenticated());
+                security.http.authentication = authenticationStrategy(alwaysBob);
+            }));
             config.routes.get("/api/v1/me", ctx -> ctx.result(identity(ctx, TestIdentity.class).getName()));
         });
 
@@ -54,13 +53,13 @@ class JavalinSecurityCustomHandlersJavaTest {
     void should_emit_a_custom_challenge_when_a_custom_unauthorizedHandler_is_configured() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/v1/*", GET, Rules.authenticated()));
-                http.authentication = E2EJavaTestSupport.authenticationStrategy(headerAuthenticator, (ctx, failure) -> {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.authenticated());
+                security.http.authentication = E2EJavaTestSupport.authenticationStrategy(headerAuthenticator, (ctx, failure) -> {
                     ctx.header("WWW-Authenticate", "Bearer");
                     throw new UnauthorizedResponse();
                 }, io.github.mzlnk.javalin.security.authorization.ForbiddenHandler.getDEFAULT());
-            })));
+            }));
             config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));
         });
 
@@ -78,14 +77,14 @@ class JavalinSecurityCustomHandlersJavaTest {
     void should_render_a_custom_response_when_a_custom_forbiddenHandler_is_configured() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/v1/*", GET, Rules.hasRole(Role.ADMIN)));
-                http.authentication = E2EJavaTestSupport.authenticationStrategy(
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.hasRole(Role.ADMIN));
+                security.http.authentication = E2EJavaTestSupport.authenticationStrategy(
                         headerAuthenticator,
                         io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler.getDEFAULT(),
                         (ctx, auth) -> { throw new ForbiddenResponse("custom denied"); }
                 );
-            })));
+            }));
             config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));
         });
 
@@ -103,10 +102,10 @@ class JavalinSecurityCustomHandlersJavaTest {
     void should_not_leak_the_authenticator_failure_message_when_authentication_fails() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/v1/*", GET, Rules.allow()));
-                http.authentication = authenticationStrategy(headerAuthenticator);
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.allow());
+                security.http.authentication = authenticationStrategy(headerAuthenticator);
+            }));
             config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));
         });
 
@@ -124,14 +123,14 @@ class JavalinSecurityCustomHandlersJavaTest {
     void should_not_run_the_route_handler_when_a_custom_unauthorizedHandler_renders_without_throwing() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/v1/*", GET, Rules.authenticated()));
-                http.authentication = E2EJavaTestSupport.authenticationStrategy(
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.authenticated());
+                security.http.authentication = E2EJavaTestSupport.authenticationStrategy(
                         ctx -> AuthenticationResult.NotAuthenticated.INSTANCE,
                         (ctx, failure) -> ctx.status(401).result("denied-without-throwing"),
                         io.github.mzlnk.javalin.security.authorization.ForbiddenHandler.getDEFAULT()
                 );
-            })));
+            }));
             config.routes.get("/api/v1/resource", ctx -> ctx.result("protected-content"));
         });
 
@@ -151,14 +150,14 @@ class JavalinSecurityCustomHandlersJavaTest {
     void should_not_run_the_route_handler_when_a_custom_forbiddenHandler_renders_without_throwing() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/v1/*", GET, Rules.hasRole(Role.ADMIN)));
-                http.authentication = E2EJavaTestSupport.authenticationStrategy(
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.hasRole(Role.ADMIN));
+                security.http.authentication = E2EJavaTestSupport.authenticationStrategy(
                         headerAuthenticator,
                         io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler.getDEFAULT(),
                         (ctx, auth) -> ctx.status(403).result("forbidden-without-throwing")
                 );
-            })));
+            }));
             config.routes.get("/api/v1/resource", ctx -> ctx.result("protected-content"));
         });
 
@@ -178,10 +177,10 @@ class JavalinSecurityCustomHandlersJavaTest {
     void should_run_the_route_handler_after_the_guard_grants_access_to_an_authenticated_caller() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/v1/*", GET, Rules.authenticated()));
-                http.authentication = authenticationStrategy(headerAuthenticator);
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.authenticated());
+                security.http.authentication = authenticationStrategy(headerAuthenticator);
+            }));
             config.routes.get("/api/v1/resource", ctx -> {
                 // Route handler: only reachable when the security guard grants access
                 Authentication authentication = ctx.with(JavalinSecurityPlugin.class).authentication();

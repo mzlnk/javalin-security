@@ -1,9 +1,9 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.javalin.Javalin
-import io.javalin.http.HandlerType.GET
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -16,22 +16,20 @@ class JavalinSecurityAsyncAuthKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/*", GET, r.authenticated) }
-                    http.authentication = asyncAuthenticationStrategy(
-                        { ctx ->
-                            // Simulate I/O without blocking the request thread
-                            CompletableFuture.supplyAsync {
-                                val user = ctx.header("X-User")
-                                if (user != null) {
-                                    AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user)))
-                                } else {
-                                    AuthenticationResult.NotAuthenticated
-                                }
+                security.rules.get("/api/*", Rules.authenticated())
+                security.http.authentication = asyncAuthenticationStrategy(
+                    { ctx ->
+                        // Simulate I/O without blocking the request thread
+                        CompletableFuture.supplyAsync {
+                            val user = ctx.header("X-User")
+                            if (user != null) {
+                                AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user)))
+                            } else {
+                                AuthenticationResult.NotAuthenticated
                             }
-                        },
-                    )
-                }
+                        }
+                    },
+                )
             }
             cfg.routes.get("/api/resource") { it.result("ok") }
         }
@@ -48,16 +46,14 @@ class JavalinSecurityAsyncAuthKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/*", GET, r.allow) }
-                    http.authentication = asyncAuthenticationStrategy(
-                        { _ ->
-                            CompletableFuture.completedFuture(
-                                AuthenticationResult.Failure("async credential failure"),
-                            )
-                        },
-                    )
-                }
+                security.rules.get("/api/*", Rules.allow())
+                security.http.authentication = asyncAuthenticationStrategy(
+                    { _ ->
+                        CompletableFuture.completedFuture(
+                            AuthenticationResult.Failure("async credential failure"),
+                        )
+                    },
+                )
             }
             cfg.routes.get("/api/resource") { it.result("ok") }
         }
@@ -77,12 +73,10 @@ class JavalinSecurityAsyncAuthKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/*", GET, r.authenticated) }
-                    http.authentication = asyncAuthenticationStrategy(
-                        { _ -> CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) },
-                    )
-                }
+                security.rules.get("/api/*", Rules.authenticated())
+                security.http.authentication = asyncAuthenticationStrategy(
+                    { _ -> CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) },
+                )
             }
             cfg.routes.get("/api/resource") { it.result("protected-content") }
         }
@@ -102,12 +96,10 @@ class JavalinSecurityAsyncAuthKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/*", GET, r.allow) }
-                    http.authentication = asyncAuthenticationStrategy(
-                        { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP error")) },
-                    )
-                }
+                security.rules.get("/api/*", Rules.allow())
+                security.http.authentication = asyncAuthenticationStrategy(
+                    { _ -> CompletableFuture.failedFuture(RuntimeException("internal IdP error")) },
+                )
             }
             cfg.routes.get("/api/resource") { it.result("protected-content") }
         }
@@ -128,12 +120,10 @@ class JavalinSecurityAsyncAuthKtTest {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/*", GET, r.allow) }
-                    http.authentication = asyncAuthenticationStrategy(
-                        { _ -> throw IllegalStateException("sync crash in authenticator") },
-                    )
-                }
+                security.rules.get("/api/*", Rules.allow())
+                security.http.authentication = asyncAuthenticationStrategy(
+                    { _ -> throw IllegalStateException("sync crash in authenticator") },
+                )
             }
             cfg.routes.get("/api/resource") { it.result("protected-content") }
         }

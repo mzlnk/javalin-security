@@ -1,7 +1,7 @@
 package io.github.mzlnk.javalin.security
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.javalin.Javalin
-import io.javalin.http.HandlerType.GET
 import io.javalin.http.staticfiles.Location
 import io.javalin.testtools.JavalinTest
 import org.assertj.core.api.Assertions.assertThat
@@ -15,7 +15,7 @@ class JavalinSecurityStaticFilesKtTest {
         val app = Javalin.create { cfg ->
             cfg.staticFiles.add("/public", Location.CLASSPATH)
             cfg.security { security ->
-                security.http { http -> http.rules { r -> r.add("/api/v1/*", GET, r.allow) } }
+                security.rules.get("/api/v1/*", Rules.allow())
             }
         }
 
@@ -35,7 +35,7 @@ class JavalinSecurityStaticFilesKtTest {
         val app = Javalin.create { cfg ->
             cfg.staticFiles.add("/public", Location.CLASSPATH)
             cfg.security { security ->
-                security.http { http -> http.rules { r -> r.add("/*", GET, r.allow) } }
+                security.rules.get("/*", Rules.allow())
             }
         }
 

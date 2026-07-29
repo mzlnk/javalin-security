@@ -15,9 +15,7 @@ import java.util.stream.Collectors;
 
 import static io.github.mzlnk.javalin.security.E2EJavaTestSupport.authenticationStrategy;
 import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
-import static io.javalin.http.HandlerType.DELETE;
-import static io.javalin.http.HandlerType.GET;
-import static io.javalin.http.HandlerType.POST;
+import static io.github.mzlnk.javalin.security.SecurityExtensions.identityOrNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavalinSecurityHttpJavaTest {
@@ -161,10 +159,10 @@ class JavalinSecurityHttpJavaTest {
     void should_deny_by_default_when_no_rule_matches_the_route() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> rules.add("/api/v1/*", GET, Rules.allow()));
-                http.authentication = authenticationStrategy(headerAuthenticator);
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.allow());
+                security.http.authentication = authenticationStrategy(headerAuthenticator);
+            }));
             config.routes.get("/internal", ctx -> ctx.result("secret"));
         });
 
@@ -190,11 +188,10 @@ class JavalinSecurityHttpJavaTest {
     }
 
     @Test
-    void should_leave_http_routes_unguarded_when_only_ws_block_is_configured() {
+    void should_deny_http_routes_by_default_when_only_ws_is_configured() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws ->
-                    ws.rules(rules -> rules.fallback = Rules.deny()))));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws.fallback = Rules.deny()));
             config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));
         });
 
@@ -203,12 +200,12 @@ class JavalinSecurityHttpJavaTest {
             var response = client.get("/api/v1/resource");
 
             // then
-            assertThat(response.code()).isEqualTo(200);
+            assertThat(response.code()).isEqualTo(401);
         });
     }
 
     @Test
-    void should_leave_http_routes_unguarded_when_security_block_has_no_sub_blocks() {
+    void should_deny_http_routes_by_default_when_security_has_no_further_configuration() {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> { }));
@@ -220,7 +217,7 @@ class JavalinSecurityHttpJavaTest {
             var response = client.get("/api/v1/resource");
 
             // then
-            assertThat(response.code()).isEqualTo(200);
+            assertThat(response.code()).isEqualTo(401);
         });
     }
 
@@ -228,8 +225,7 @@ class JavalinSecurityHttpJavaTest {
     void should_grant_access_to_anonymous_callers_when_route_declares_the_anyone_role() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http ->
-                    http.rules(rules -> rules.fallback = Rules.deny()))));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http.fallback = Rules.deny()));
             config.routes.get("/public", ctx -> ctx.result("ok"), Anyone.INSTANCE);
         });
 
@@ -246,10 +242,10 @@ class JavalinSecurityHttpJavaTest {
     void should_grant_access_when_route_declares_roles_and_the_caller_holds_a_matching_role() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = authenticationStrategy(headerAuthenticator);
-                http.rules(rules -> rules.fallback = Rules.deny()); // rule table must NOT be consulted
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.http.authentication = authenticationStrategy(headerAuthenticator);
+                security.http.fallback = Rules.deny(); // rule table must NOT be consulted
+            }));
             config.routes.get("/admin", ctx -> ctx.result("admin-ok"), Role.ADMIN);
         });
 
@@ -270,10 +266,10 @@ class JavalinSecurityHttpJavaTest {
     void should_deny_access_when_route_declares_roles_and_the_caller_holds_no_matching_role() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = authenticationStrategy(headerAuthenticator);
-                http.rules(rules -> rules.fallback = Rules.allow()); // even a permissive fallback must not apply
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.http.authentication = authenticationStrategy(headerAuthenticator);
+                security.http.fallback = Rules.allow(); // even a permissive fallback must not apply
+            }));
             config.routes.get("/admin", ctx -> ctx.result("admin-ok"), Role.ADMIN);
         });
 
@@ -293,11 +289,11 @@ class JavalinSecurityHttpJavaTest {
     void should_fall_through_to_the_pattern_rule_table_when_route_declares_no_roles() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.authentication = authenticationStrategy(ctx -> new AuthenticationResult.Success(
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/plain", Rules.deny());
+                security.http.authentication = authenticationStrategy(ctx -> new AuthenticationResult.Success(
                         Authentication.authenticated(new TestIdentity("alice"), Role.ADMIN)));
-                http.rules(rules -> rules.add("/plain", GET, Rules.deny()));
-            })));
+            }));
             config.routes.get("/plain", ctx -> ctx.result("ok")); // no roles declared
         });
 
@@ -310,18 +306,64 @@ class JavalinSecurityHttpJavaTest {
         });
     }
 
+    @Test
+    void should_return_null_from_identityOrNull_when_the_caller_is_anonymous() {
+        // given
+        Javalin app = Javalin.create(config -> {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.allow());
+                security.http.authentication = authenticationStrategy(headerAuthenticator);
+            }));
+            config.routes.get("/api/v1/me", ctx -> {
+                TestIdentity caller = identityOrNull(ctx, TestIdentity.class);
+                ctx.result(caller != null ? caller.getName() : "anonymous");
+            });
+        });
+
+        JavalinTest.test(app, (server, client) -> {
+            // when
+            var response = client.get("/api/v1/me");
+
+            // then
+            assertThat(response.code()).isEqualTo(200);
+            assertThat(response.body().string()).isEqualTo("anonymous");
+        });
+    }
+
+    @Test
+    void should_return_the_identity_from_identityOrNull_when_the_caller_is_authenticated() {
+        // given
+        Javalin app = Javalin.create(config -> {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.allow());
+                security.http.authentication = authenticationStrategy(headerAuthenticator);
+            }));
+            config.routes.get("/api/v1/me", ctx -> {
+                TestIdentity caller = identityOrNull(ctx, TestIdentity.class);
+                ctx.result(caller != null ? caller.getName() : "anonymous");
+            });
+        });
+
+        JavalinTest.test(app, (server, client) -> {
+            // when
+            var response = client.get("/api/v1/me", req -> req.header("X-User", "bob"));
+
+            // then
+            assertThat(response.code()).isEqualTo(200);
+            assertThat(response.body().string()).isEqualTo("bob");
+        });
+    }
+
     private Javalin app(Authenticator authenticator) {
         return Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-                http.rules(rules -> {
-                    rules.add("/api/v1/*", GET, Rules.allow());
-                    rules.add("/api/v1/*", POST, Rules.authenticated());
-                    rules.add("/api/v1/*", DELETE, Rules.hasRole(Role.ADMIN));
-                });
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.allow());
+                security.rules.post("/api/v1/*", Rules.authenticated());
+                security.rules.delete("/api/v1/*", Rules.hasRole(Role.ADMIN));
                 if (authenticator != null) {
-                    http.authentication = authenticationStrategy(authenticator);
+                    security.http.authentication = authenticationStrategy(authenticator);
                 }
-            })));
+            }));
             config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));
             config.routes.post("/api/v1/resource", ctx -> ctx.result("created"));
             config.routes.delete("/api/v1/resource", ctx -> ctx.result("deleted"));

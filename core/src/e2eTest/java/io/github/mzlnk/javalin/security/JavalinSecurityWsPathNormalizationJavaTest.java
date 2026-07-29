@@ -28,8 +28,8 @@ class JavalinSecurityWsPathNormalizationJavaTest {
     void should_keep_denying_an_upgrade_when_a_trailing_slash_is_added_to_the_path() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws ->
-                    ws.rules(rules -> rules.add("/ws/admin", Rules.deny())))));
+            config.registerPlugin(new JavalinSecurityPlugin(security ->
+                    security.rules.ws("/ws/admin", Rules.deny())));
             config.routes.ws("/ws/admin", ws -> { });
         });
 
@@ -47,8 +47,8 @@ class JavalinSecurityWsPathNormalizationJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.router.treatMultipleSlashesAsSingleSlash = true;
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws ->
-                    ws.rules(rules -> rules.add("/ws/admin", Rules.deny())))));
+            config.registerPlugin(new JavalinSecurityPlugin(security ->
+                    security.rules.ws("/ws/admin", Rules.deny())));
             config.routes.ws("/ws/admin", ws -> { });
         });
 
@@ -66,10 +66,10 @@ class JavalinSecurityWsPathNormalizationJavaTest {
         // given
         Javalin app = Javalin.create(config -> {
             config.router.contextPath = "/ctx";
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
-                ws.rules(rules -> rules.add("/ws/*", Rules.authenticated()));
-                ws.authentication = authenticationStrategy(headerAuthenticator);
-            })));
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.ws("/ws/*", Rules.authenticated());
+                security.ws.authentication = authenticationStrategy(headerAuthenticator);
+            }));
             config.routes.ws("/ws/chat", ws -> { });
         });
 

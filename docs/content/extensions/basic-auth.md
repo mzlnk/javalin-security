@@ -36,10 +36,10 @@ Add the extension on top of [core](../getting-started/installation.md):
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.basicauth.*
     import io.github.mzlnk.javalin.security.security
     import io.javalin.Javalin
-    import io.javalin.http.HandlerType.GET
     import io.javalin.security.RouteRole
 
     enum class Role : RouteRole { USER, ADMIN }
@@ -51,17 +51,13 @@ Add the extension on top of [core](../getting-started/installation.md):
 
     Javalin.create { config ->
         config.security { security ->
-            security.http { http ->
-                http.authentication = basicAuth { basic ->
-                    basic.userLookup = UserLookup { username -> users[username] }
-                    basic.passwordEncoder = myBcryptEncoder
-                }
-                http.rules { r ->
-                    r.add("/public/*", GET, r.allow)
-                    r.add("/admin/*", GET, r.hasRole(Role.ADMIN))
-                    r.fallback = r.authenticated
-                }
+            security.rules.get("/public/*", Rules.allow())
+            security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
+            security.http.authentication = basicAuth { basic ->
+                basic.userLookup = UserLookup { username -> users[username] }
+                basic.passwordEncoder = myBcryptEncoder
             }
+            security.http.fallback = Rules.authenticated()
         }
     }
     ```
@@ -76,24 +72,20 @@ Add the extension on top of [core](../getting-started/installation.md):
     import java.util.Map;
     import java.util.Set;
 
-    import static io.javalin.http.HandlerType.GET;
-
     Map<String, BasicUser> users = Map.of(
         "alice", new BasicUser("alice", "alice-hash", Set.of(Role.USER)),
         "admin", new BasicUser("admin", "admin-hash", Set.of(Role.ADMIN)));
 
     Javalin.create(config -> {
-        config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-            http.authentication = BasicAuthSecurity.basicAuth(basic -> {
+        config.registerPlugin(new JavalinSecurityPlugin(security -> {
+            security.rules.get("/public/*", Rules.allow());
+            security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN));
+            security.http.authentication = BasicAuthSecurity.basicAuth(basic -> {
                 basic.userLookup = users::get;
                 basic.passwordEncoder = myBcryptEncoder;
             });
-            http.rules(r -> {
-                r.add("/public/*", GET, Rules.allow());
-                r.add("/admin/*", GET, Rules.hasRole(Role.ADMIN));
-                r.fallback = Rules.authenticated();
-            });
-        })));
+            security.http.fallback = Rules.authenticated();
+        }));
     });
     ```
 
@@ -145,7 +137,7 @@ basicAuth { basic ->
     basic.realm = "My App"
 }
 
-config.routes.get("/me") { ctx -> ctx.result(ctx.identity<BasicAuthIdentity>()!!.name) }
+config.routes.get("/me") { ctx -> ctx.result(ctx.identity<BasicAuthIdentity>().name) }
 ```
 
 ## Next steps

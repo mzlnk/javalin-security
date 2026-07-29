@@ -12,7 +12,7 @@ Thanks for helping improve `javalin-security`.
 | Build   | Gradle (wrapper included)           |
 
 Dependency versions live in `gradle/libs.versions.toml`; the documentation site reads from
-there (and from `build.gradle.kts`) via `docs/main.py`, so bumping a version in Gradle updates
+there (and from `gradle.properties`) via `docs/main.py`, so bumping a version in Gradle updates
 the docs automatically.
 
 ## Building and testing

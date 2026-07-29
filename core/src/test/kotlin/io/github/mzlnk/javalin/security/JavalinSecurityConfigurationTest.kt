@@ -5,7 +5,6 @@ import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.Rules
 import io.javalin.config.JavalinState
-import io.javalin.http.HandlerType.GET
 import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -16,9 +15,7 @@ class JavalinSecurityConfigurationTest {
     fun `should allow a sync authentication strategy on its own`() {
         assertThatCode {
             start { security ->
-                security.http { http ->
-                    http.authentication = authenticationStrategy(Authenticator { AuthenticationResult.NotAuthenticated })
-                }
+                security.http.authentication = authenticationStrategy(Authenticator { AuthenticationResult.NotAuthenticated })
             }
         }.doesNotThrowAnyException()
     }
@@ -27,11 +24,9 @@ class JavalinSecurityConfigurationTest {
     fun `should allow an async authentication strategy on its own`() {
         assertThatCode {
             start { security ->
-                security.http { http ->
-                    http.authentication = asyncAuthenticationStrategy(
-                        { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) },
-                    )
-                }
+                security.http.authentication = asyncAuthenticationStrategy(
+                    { CompletableFuture.completedFuture(AuthenticationResult.NotAuthenticated) },
+                )
             }
         }.doesNotThrowAnyException()
     }
@@ -41,20 +36,18 @@ class JavalinSecurityConfigurationTest {
         var lastAuthenticatorInvoked: String? = null
         assertThatCode {
             start { security ->
-                security.http { http ->
-                    http.authentication = authenticationStrategy(
-                        Authenticator {
-                            lastAuthenticatorInvoked = "first"
-                            AuthenticationResult.NotAuthenticated
-                        },
-                    )
-                    http.authentication = authenticationStrategy(
-                        Authenticator {
-                            lastAuthenticatorInvoked = "second"
-                            AuthenticationResult.NotAuthenticated
-                        },
-                    )
-                }
+                security.http.authentication = authenticationStrategy(
+                    Authenticator {
+                        lastAuthenticatorInvoked = "first"
+                        AuthenticationResult.NotAuthenticated
+                    },
+                )
+                security.http.authentication = authenticationStrategy(
+                    Authenticator {
+                        lastAuthenticatorInvoked = "second"
+                        AuthenticationResult.NotAuthenticated
+                    },
+                )
             }
         }.doesNotThrowAnyException()
     }
@@ -65,10 +58,8 @@ class JavalinSecurityConfigurationTest {
         val second = UnauthorizedHandler { _, _ -> }
         assertThatCode {
             start { security ->
-                security.http { http ->
-                    http.authentication = authenticationStrategy(unauthorizedHandler = first)
-                    http.authentication = authenticationStrategy(unauthorizedHandler = second)
-                }
+                security.http.authentication = authenticationStrategy(unauthorizedHandler = first)
+                security.http.authentication = authenticationStrategy(unauthorizedHandler = second)
             }
         }.doesNotThrowAnyException()
     }
@@ -77,12 +68,8 @@ class JavalinSecurityConfigurationTest {
     fun `should keep only the last assigned fallback rule, with no exception`() {
         assertThatCode {
             start { security ->
-                security.http { http ->
-                    http.rules { r ->
-                        r.fallback = Rules.allow()
-                        r.fallback = Rules.deny()
-                    }
-                }
+                security.http.fallback = Rules.allow()
+                security.http.fallback = Rules.deny()
             }
         }.doesNotThrowAnyException()
     }
@@ -91,20 +78,8 @@ class JavalinSecurityConfigurationTest {
     fun `should accumulate rule entries across repeated rules calls`() {
         assertThatCode {
             start { security ->
-                security.http { http ->
-                    http.rules { r -> r.add("/api/one", GET, Rules.allow()) }
-                    http.rules { r -> r.add("/api/two", GET, Rules.allow()) }
-                }
-            }
-        }.doesNotThrowAnyException()
-    }
-
-    @Test
-    fun `should accumulate configuration across repeated calls to the top-level http block`() {
-        assertThatCode {
-            start { security ->
-                security.http { http -> http.rules { r -> r.add("/api/one", GET, Rules.allow()) } }
-                security.http { http -> http.rules { r -> r.add("/api/two", GET, Rules.allow()) } }
+                security.rules.get("/api/one", Rules.allow())
+                security.rules.get("/api/two", Rules.allow())
             }
         }.doesNotThrowAnyException()
     }
@@ -113,7 +88,7 @@ class JavalinSecurityConfigurationTest {
     fun `should reject an empty allowedOrigins collection at startup`() {
         assertThatThrownBy {
             start { security ->
-                security.ws { ws -> ws.allowedOrigins = emptyList() }
+                security.ws.allowedOrigins = emptyList()
             }
         }
             .isInstanceOf(SecurityConfigurationException::class.java)
@@ -124,7 +99,7 @@ class JavalinSecurityConfigurationTest {
     fun `should reject an allowedOrigins collection containing blank entries at startup`() {
         assertThatThrownBy {
             start { security ->
-                security.ws { ws -> ws.allowedOrigins = listOf("https://ok.example.com", "  ") }
+                security.ws.allowedOrigins = listOf("https://ok.example.com", "  ")
             }
         }
             .isInstanceOf(SecurityConfigurationException::class.java)
@@ -135,10 +110,8 @@ class JavalinSecurityConfigurationTest {
     fun `should keep only the last assigned allowedOrigins value, with no exception`() {
         assertThatCode {
             start { security ->
-                security.ws { ws ->
-                    ws.allowedOrigins = listOf("https://first.example.com")
-                    ws.allowedOrigins = listOf("https://second.example.com")
-                }
+                security.ws.allowedOrigins = listOf("https://first.example.com")
+                security.ws.allowedOrigins = listOf("https://second.example.com")
             }
         }.doesNotThrowAnyException()
     }

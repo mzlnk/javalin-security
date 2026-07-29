@@ -16,8 +16,8 @@ class JavalinSecurityWsPathPatternsJavaTest {
     void should_match_a_concrete_request_path_when_the_rule_pattern_declares_a_path_parameter() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws ->
-                    ws.rules(rules -> rules.add("/ws/room/{id}", Rules.allow())))));
+            config.registerPlugin(new JavalinSecurityPlugin(security ->
+                    security.rules.ws("/ws/room/{id}", Rules.allow())));
             config.routes.ws("/ws/room/{id}", ws -> { });
         });
 
@@ -34,8 +34,8 @@ class JavalinSecurityWsPathPatternsJavaTest {
     void should_match_a_concrete_request_path_when_the_rule_pattern_declares_a_wildcard() {
         // given
         Javalin app = Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws ->
-                    ws.rules(rules -> rules.add("/ws/room/*", Rules.allow())))));
+            config.registerPlugin(new JavalinSecurityPlugin(security ->
+                    security.rules.ws("/ws/room/*", Rules.allow())));
             config.routes.ws("/ws/room/{id}", ws -> { });
         });
 

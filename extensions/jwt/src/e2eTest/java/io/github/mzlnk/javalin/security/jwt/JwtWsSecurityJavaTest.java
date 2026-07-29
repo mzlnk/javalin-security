@@ -155,17 +155,15 @@ class JwtWsSecurityJavaTest {
 
     private Javalin bearerApp() {
         return Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
-                ws.authentication = JwtSecurity.jwt(jwt -> {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.ws("/ws/chat", Rules.authenticated());
+                security.rules.ws("/ws/admin", Rules.hasRole(Role.ADMIN));
+                security.ws.authentication = JwtSecurity.jwt(jwt -> {
                     jwt.decoder = testDecoder;
                     jwt.keySource = JwtKeySource.secret("test-secret");
                     jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", JwtWsSecurityJavaTest::roleOf);
                 });
-                ws.rules(rules -> {
-                    rules.add("/ws/chat", Rules.authenticated());
-                    rules.add("/ws/admin", Rules.hasRole(Role.ADMIN));
-                });
-            })));
+            }));
             config.routes.ws("/ws/chat", ws -> { });
             config.routes.ws("/ws/admin", ws -> { });
         });
@@ -173,14 +171,14 @@ class JwtWsSecurityJavaTest {
 
     private Javalin cookieApp() {
         return Javalin.create(config -> {
-            config.registerPlugin(new JavalinSecurityPlugin(security -> security.ws(ws -> {
-                ws.authentication = JwtSecurity.jwt(jwt -> {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.ws("/ws/chat", Rules.authenticated());
+                security.ws.authentication = JwtSecurity.jwt(jwt -> {
                     jwt.decoder = testDecoder;
                     jwt.keySource = JwtKeySource.secret("test-secret");
                     jwt.tokenResolver = TokenResolver.cookie("access_token");
                 });
-                ws.rules(rules -> rules.add("/ws/chat", Rules.authenticated()));
-            })));
+            }));
             config.routes.ws("/ws/chat", ws -> { });
         });
     }

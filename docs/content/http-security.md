@@ -1,51 +1,41 @@
 # HTTP security
 
-Configuration cheatsheet for the `http { }` block. If you followed
-[Secure HTTP endpoints](getting-started/secure-http-endpoints.md), you already know the
+Configuration cheatsheet for `security.http`. If you followed
+[Secure endpoints](getting-started/secure-endpoints.md), you already know the
 essentials — this page lists the fields and common recipes.
 
-Calling `http { }` at least once installs the HTTP guard (`beforeMatched`).
+Pattern-based rules are declared on [`security.rules`](rules.md). Both HTTP and WebSocket
+guards are installed as soon as the plugin is registered; declare rules on `security.rules` or
+set `http.fallback` / `ws.fallback` to control access (default fallback is deny). The HTTP
+guard runs as `beforeMatched`.
 
 ## `HttpSecurityConfig`
 
-| Field / method   | Type                      | Default | Effect                                              |
-|------------------|---------------------------|---------|-----------------------------------------------------|
-| `authentication` | `AuthenticationStrategy?` | `null`  | Resolves the caller; `null` → anonymous.            |
-| `rules { … }`    | `SecurityRules`           | empty   | Pattern rule table (entries accumulate).            |
+| Field / method       | Type                      | Default | Effect                                              |
+|----------------------|---------------------------|---------|-----------------------------------------------------|
+| `authentication`     | `AuthenticationStrategy?` | `null`  | Resolves the caller; `null` → anonymous.            |
+| `fallback`           | `Rule?`                   | `null`  | When no HTTP rule matches (`null` = **deny**).      |
+| `allowCorsPreflight` | `Boolean`                 | `false` | Bypass CORS preflight `OPTIONS`.                    |
 
-## `SecurityRules`
-
-| Field / method                | Effect                                                                          |
-|-------------------------------|---------------------------------------------------------------------------------|
-| `add(pattern, method, rule)`  | Rule for path + HTTP method.                                                    |
-| `add(pattern, rule)`          | Rule for path, any method.                                                      |
-| `fallback`                    | When no entry matches (`null` = **deny**).                                      |
-| `allowCorsPreflight`          | Bypass CORS preflight `OPTIONS` (`false` by default).                           |
-| Built-in rules                | `allow` / `deny` / `authenticated` / `hasRole` / `hasAnyRole` (`Rules.*` in Java). |
-
-First match wins; route-declared roles override the table. See
-[Authorization](concepts/authorization.md).
+See [Rules DSL](rules.md) for verb methods, `apiBuilder`, and built-in rules. First match wins;
+route-declared roles override the table. See [Authorization](concepts/authorization.md).
 
 ## Example
 
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.security
     import io.javalin.Javalin
-    import io.javalin.http.HandlerType.*
 
     Javalin.create { config ->
         config.security { security ->
-            security.http { http ->
-                http.authentication = myStrategy
-                http.rules { r ->
-                    r.add("/health", GET, r.allow)
-                    r.add("/api/*", GET, r.authenticated)
-                    r.add("/admin/*", r.hasRole(Role.ADMIN))
-                    r.fallback = r.deny
-                }
-            }
+            security.rules.get("/health", Rules.allow())
+            security.rules.get("/api/*", Rules.authenticated())
+            security.rules.any("/admin/*", Rules.hasRole(Role.ADMIN))
+            security.http.authentication = myStrategy
+            security.http.fallback = Rules.deny()
         }
         config.routes.get("/health") { it.result("UP") }
     }
@@ -58,18 +48,14 @@ First match wins; route-declared roles override the table. See
     import io.github.mzlnk.javalin.security.authorization.Rules;
     import io.javalin.Javalin;
 
-    import static io.javalin.http.HandlerType.*;
-
     Javalin.create(config -> {
-        config.registerPlugin(new JavalinSecurityPlugin(security -> security.http(http -> {
-            http.authentication = myStrategy;
-            http.rules(r -> {
-                r.add("/health", GET, Rules.allow());
-                r.add("/api/*", GET, Rules.authenticated());
-                r.add("/admin/*", Rules.hasRole(Role.ADMIN));
-                r.fallback = Rules.deny();
-            });
-        })));
+        config.registerPlugin(new JavalinSecurityPlugin(security -> {
+            security.rules.get("/health", Rules.allow());
+            security.rules.get("/api/*", Rules.authenticated());
+            security.rules.any("/admin/*", Rules.hasRole(Role.ADMIN));
+            security.http.authentication = myStrategy;
+            security.http.fallback = Rules.deny();
+        }));
         config.routes.get("/health", ctx -> ctx.result("UP"));
     });
     ```
@@ -77,18 +63,15 @@ First match wins; route-declared roles override the table. See
 ## Recipes
 
 ```kotlin
+import io.github.mzlnk.javalin.security.authorization.Rules
 // Public health, everything else authenticated
-http.rules { r ->
-    r.add("/health", GET, r.allow)
-    r.fallback = r.authenticated
-}
+security.rules.get("/health", Rules.allow())
+security.http.fallback = Rules.authenticated()
 
 // Reads open, writes authenticated
-http.rules { r ->
-    r.add("/api/*", GET, r.allow)   // also governs HEAD
-    r.add("/api/*", POST, r.authenticated)
-    r.fallback = r.deny
-}
+security.rules.get("/api/*", Rules.allow())   // also governs HEAD
+security.rules.post("/api/*", Rules.authenticated())
+security.http.fallback = Rules.deny()
 ```
 
 ## CORS preflight
@@ -99,6 +82,7 @@ bypasses the rule table. You still need Javalin's CORS plugin for response heade
 
 ## Related
 
+- [Rules DSL](rules.md).
 - [Authorization](concepts/authorization.md).
 - [Error handling](concepts/error-handling.md).
 - [WebSocket security](websocket-security.md).

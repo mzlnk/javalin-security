@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security.jwt
 
+import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
@@ -147,16 +148,12 @@ class JwtWsSecurityTest {
 
     private fun bearerApp(): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
-            security.ws { ws ->
-                ws.authentication = jwt { jwt ->
-                    jwt.decoder = testDecoder
-                    jwt.keySource = JwtKeySource.secret("test-secret")
-                    jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
-                }
-                ws.rules { r ->
-                    r.add("/ws/chat", r.authenticated)
-                    r.add("/ws/admin", r.hasRole(Role.ADMIN))
-                }
+            security.rules.ws("/ws/chat", Rules.authenticated())
+            security.rules.ws("/ws/admin", Rules.hasRole(Role.ADMIN))
+            security.ws.authentication = jwt { jwt ->
+                jwt.decoder = testDecoder
+                jwt.keySource = JwtKeySource.secret("test-secret")
+                jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", roleOf)
             }
         }
         cfg.routes.ws("/ws/chat") { }
@@ -165,13 +162,11 @@ class JwtWsSecurityTest {
 
     private fun cookieApp(): Javalin = Javalin.create { cfg ->
         cfg.security { security ->
-            security.ws { ws ->
-                ws.authentication = jwt { jwt ->
-                    jwt.decoder = testDecoder
-                    jwt.keySource = JwtKeySource.secret("test-secret")
-                    jwt.tokenResolver = TokenResolver.cookie("access_token")
-                }
-                ws.rules { r -> r.add("/ws/chat", r.authenticated) }
+            security.rules.ws("/ws/chat", Rules.authenticated())
+            security.ws.authentication = jwt { jwt ->
+                jwt.decoder = testDecoder
+                jwt.keySource = JwtKeySource.secret("test-secret")
+                jwt.tokenResolver = TokenResolver.cookie("access_token")
             }
         }
         cfg.routes.ws("/ws/chat") { }

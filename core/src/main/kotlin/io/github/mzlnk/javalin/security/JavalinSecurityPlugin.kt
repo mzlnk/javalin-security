@@ -19,10 +19,12 @@ import java.util.function.Consumer
 /**
  * Javalin plugin that installs HTTP and WebSocket security guards.
  *
- * Register via `config.registerPlugin(JavalinSecurityPlugin { ... })` or [security]. Each guard is
- * installed only when its block (`http` / `ws`) is configured. Wiring runs in [onStart]. Resolved
- * authentication is available via `ctx.with(JavalinSecurityPlugin::class)` and the package extensions.
- * HTTP uses `beforeMatched` at [PluginPriority.EARLY]; WebSocket uses `wsBeforeUpgrade`.
+ * Register via `config.registerPlugin(JavalinSecurityPlugin { ... })` or [security]. Both guards
+ * are installed on start. Configure authentication, fallback, and related options on [Config.http]
+ * and [Config.ws]; declare pattern-based rules on [Config.rules]. Wiring runs in [onStart].
+ * Resolved authentication is available via `ctx.with(JavalinSecurityPlugin::class)` and the
+ * package extensions. HTTP uses `beforeMatched` at [PluginPriority.EARLY]; WebSocket uses
+ * `wsBeforeUpgrade`.
  */
 class JavalinSecurityPlugin(userConfig: Consumer<Config>) :
     ContextPlugin<JavalinSecurityPlugin.Config, SecurityContext>(userConfig, Config()) {
@@ -33,101 +35,91 @@ class JavalinSecurityPlugin(userConfig: Consumer<Config>) :
     /** Creates the per-request [SecurityContext] extension. */
     override fun createExtension(context: Context): SecurityContext = SecurityContext(context)
 
-    /** Validates config and registers the HTTP and/or WebSocket guards. */
+    /** Validates config and registers the HTTP and WebSocket guards. */
     override fun onStart(state: JavalinState) {
         val http = pluginConfig.http
         val ws = pluginConfig.ws
+        val rules = pluginConfig.rules
         val router = state.router
 
-        ws?.validate()
+        ws.validate()
 
         val pathNormalizer = PathNormalizer(contextPath = router.contextPath)
 
         // ── WebSocket guard ───────────────────────────────────────────────
 
-        if (ws != null) {
-            val wsAuthorizationManager = WsAuthorizationManager(
-                entries = ws.rules.entries.map { entry ->
-                    WsAuthorizationManager.Entry(pattern = entry.pattern, rule = entry.rule, routerConfig = router)
-                },
-                fallback = ws.rules.fallback,
-            )
+        val wsAuthorizationManager = WsAuthorizationManager(
+            entries = rules.wsEntries().map { entry ->
+                WsAuthorizationManager.Entry(pattern = entry.pattern, rule = entry.rule, routerConfig = router)
+            },
+            fallback = ws.fallback,
+        )
 
-            val strategy = ws.authentication
-            val wsGuard = WsSecurityGuard(
-                authenticator = strategy.resolvedAuthenticator(),
-                asyncAuthenticator = strategy.resolvedAsyncAuthenticator(),
-                authorizationManager = wsAuthorizationManager,
-                pathNormalizer = pathNormalizer,
-                unauthorizedHandler = strategy.resolvedUnauthorizedHandler(),
-                forbiddenHandler = strategy.resolvedForbiddenHandler(),
-                allowedOrigins = ws.allowedOrigins?.toSet(),
-            )
+        val wsStrategy = ws.authentication
+        val wsGuard = WsSecurityGuard(
+            authenticator = wsStrategy.resolvedAuthenticator(),
+            asyncAuthenticator = wsStrategy.resolvedAsyncAuthenticator(),
+            authorizationManager = wsAuthorizationManager,
+            pathNormalizer = pathNormalizer,
+            unauthorizedHandler = wsStrategy.resolvedUnauthorizedHandler(),
+            forbiddenHandler = wsStrategy.resolvedForbiddenHandler(),
+            allowedOrigins = ws.allowedOrigins?.toSet(),
+        )
 
-            state.routes.wsBeforeUpgrade(wsGuard::handle)
-        }
+        state.routes.wsBeforeUpgrade(wsGuard::handle)
 
         // ── HTTP guard ────────────────────────────────────────────────────
 
-        if (http != null) {
-            val authorizationManager = AuthorizationManager(
-                entries = http.rules.entries.map { entry ->
-                    AuthorizationManager.Entry(
-                        pattern = entry.pattern,
-                        method = entry.method,
-                        rule = entry.rule,
-                        routerConfig = router,
-                    )
-                },
-                fallback = http.rules.fallback,
-                allowCorsPreflight = http.rules.allowCorsPreflight,
-            )
+        val authorizationManager = AuthorizationManager(
+            entries = rules.httpEntries().map { entry ->
+                AuthorizationManager.Entry(
+                    pattern = entry.pattern,
+                    method = entry.method,
+                    rule = entry.rule,
+                    routerConfig = router,
+                )
+            },
+            fallback = http.fallback,
+            allowCorsPreflight = http.allowCorsPreflight,
+        )
 
-            val strategy = http.authentication
-            val guard = SecurityGuard(
-                authenticator = strategy.resolvedAuthenticator(),
-                asyncAuthenticator = strategy.resolvedAsyncAuthenticator(),
-                authorizationManager = authorizationManager,
-                pathNormalizer = pathNormalizer,
-                unauthorizedHandler = strategy.resolvedUnauthorizedHandler(),
-                forbiddenHandler = strategy.resolvedForbiddenHandler(),
-            )
+        val httpStrategy = http.authentication
+        val guard = SecurityGuard(
+            authenticator = httpStrategy.resolvedAuthenticator(),
+            asyncAuthenticator = httpStrategy.resolvedAsyncAuthenticator(),
+            authorizationManager = authorizationManager,
+            pathNormalizer = pathNormalizer,
+            unauthorizedHandler = httpStrategy.resolvedUnauthorizedHandler(),
+            forbiddenHandler = httpStrategy.resolvedForbiddenHandler(),
+        )
 
-            state.routes.beforeMatched(guard::handle)
-        }
+        state.routes.beforeMatched(guard::handle)
     }
 
     /**
      * Mutable security configuration for [JavalinSecurityPlugin].
      *
-     * The HTTP guard is installed only when [http] is called at least once; the WS guard only when
-     * [ws] is called at least once. If neither is called, no guards are installed.
+     * Pattern-based rules for both HTTP and WebSocket are declared on [rules]. Channel-specific
+     * options live on [http] and [ws]. Both guards are always installed when the plugin starts;
+     * with no further configuration, unmatched traffic is denied via each channel's default
+     * [io.github.mzlnk.javalin.security.authorization.Rules.deny] fallback.
      */
     class Config internal constructor() {
 
-        private var httpConfig: HttpSecurityConfig? = null
-        private var wsConfig: WsSecurityConfig? = null
+        /** HTTP authentication, fallback rule, and CORS preflight policy. */
+        @JvmField
+        val http: HttpSecurityConfig = HttpSecurityConfig()
 
-        internal val http: HttpSecurityConfig? get() = httpConfig
-        internal val ws: WsSecurityConfig? get() = wsConfig
-
-        /**
-         * Configures the HTTP security block. Repeated calls reuse the same [HttpSecurityConfig]
-         * (fields are last-write-wins; rule entries accumulate).
-         */
-        fun http(configure: Consumer<HttpSecurityConfig>) {
-            val config = httpConfig ?: HttpSecurityConfig().also { httpConfig = it }
-            configure.accept(config)
-        }
+        /** WebSocket authentication, Origin protection, and fallback rule. */
+        @JvmField
+        val ws: WsSecurityConfig = WsSecurityConfig()
 
         /**
-         * Configures the WebSocket security block. Repeated calls reuse the same [WsSecurityConfig]
-         * (fields are last-write-wins; rule entries accumulate).
+         * Unified pattern-based rule table for HTTP and WebSocket.
+         * Verb methods (`get`, `post`, …, `ws`) and [SecurityRules.apiBuilder] accumulate entries.
          */
-        fun ws(configure: Consumer<WsSecurityConfig>) {
-            val config = wsConfig ?: WsSecurityConfig().also { wsConfig = it }
-            configure.accept(config)
-        }
+        @JvmField
+        val rules: SecurityRules = SecurityRules()
 
     }
 
