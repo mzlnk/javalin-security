@@ -26,8 +26,14 @@ jobs:
       - name: Build
         run: ./gradlew assemble --stacktrace
 
-      - name: Tests + coverage
-        run: ./gradlew test e2eTest koverXmlReport --stacktrace
+      - name: Unit tests
+        run: ./gradlew test --stacktrace
+
+      - name: E2E tests
+        run: ./gradlew e2eTest --stacktrace
+
+      - name: Coverage report
+        run: ./gradlew koverXmlReport --stacktrace
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7

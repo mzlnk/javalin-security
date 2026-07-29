@@ -1,4 +1,5 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
+import kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension
 import org.gradle.plugins.ide.idea.model.IdeaModel
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
@@ -35,6 +36,14 @@ subprojects {
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "idea")
     apply(plugin = "org.jetbrains.kotlinx.kover")
+
+    configure<KoverProjectExtension> {
+        currentProject {
+            sources {
+                includedSourceSets.add("main")
+            }
+        }
+    }
 
     rootProject.dependencies {
         add("kover", this@subprojects)
