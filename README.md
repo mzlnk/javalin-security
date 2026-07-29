@@ -37,7 +37,7 @@
 
 ---
 
-`javalin-security` is a lightweight, open-source security plugin for Javalin applications. It
+`javalin-security` is a simple and lightweight community plugin for securing Javalin applications. It
 gives you a batteries-included way to add authentication and authorization to your app without
 pulling in a heavyweight framework or learning a large new configuration surface — just register
 the plugin inside `Javalin.create { … }` and you are ready to go. The plugin is designed to be
