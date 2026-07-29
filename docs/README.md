@@ -1,10 +1,5 @@
 # javalin-security — Documentation site
 
-Everything MkDocs-related for [`javalin-security`](https://github.com/mzlnk/javalin-security)
-lives under this directory. This file is a quick developer guide; the user-facing docs live in
-[`content/`](content/) and are published at
-<https://mzlnk.github.io/javalin-security/>.
-
 ## Layout
 
 ```
