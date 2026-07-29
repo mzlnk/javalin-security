@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build, unit tests, E2E tests
+    name: Build status
     runs-on: ubuntu-latest
 
     steps:

@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   guard:
-    name: Actor check
+    name: User validation
     runs-on: ubuntu-latest
     steps:
       - name: Ensure dispatcher is mzlnk
@@ -23,7 +23,7 @@ jobs:
           fi
 
   release:
-    name: Build, test, publish
+    name: Release
     needs: guard
     runs-on: ubuntu-latest
     environment: maven-central
