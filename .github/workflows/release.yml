@@ -27,8 +27,12 @@ jobs:
     needs: guard
     runs-on: ubuntu-latest
     environment: maven-central
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
@@ -40,8 +44,45 @@ jobs:
           distribution: "temurin"
           cache: gradle
 
-      - name: Print resolved version
-        run: ./gradlew -q properties | grep '^version:'
+      - name: Resolve release version
+        id: version
+        run: |
+          set -euo pipefail
+          version="$(./gradlew -q properties | awk -F': ' '/^version: /{print $2; exit}' | tr -d '[:space:]')"
+          if [ -z "$version" ]; then
+            echo "::error::Failed to read 'version' from Gradle properties"
+            exit 1
+          fi
+          if [[ "$version" == *-SNAPSHOT ]]; then
+            echo "::error::Refusing to release a SNAPSHOT version (got: $version)"
+            exit 1
+          fi
+          tag="v${version}"
+          # Anything with a pre-release qualifier (e.g. 1.0.0-rc.1, 1.0.0-beta1) is marked as a pre-release.
+          prerelease="false"
+          if [[ "$version" == *-* ]]; then
+            prerelease="true"
+          fi
+          {
+            echo "version=${version}"
+            echo "tag=${tag}"
+            echo "prerelease=${prerelease}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved version: ${version} (tag: ${tag}, prerelease: ${prerelease})"
+
+      - name: Ensure release tag does not already exist
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "::error::Tag ${TAG} already exists locally"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} already exists on origin"
+            exit 1
+          fi
 
       - name: Assemble
         run: ./gradlew clean assemble --stacktrace
@@ -67,3 +108,50 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
         run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache --stacktrace
+
+      - name: Collect release artifacts
+        id: assets
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          # Grab every jar produced for the released version (main + -sources + -javadoc)
+          # from each published subproject's build/libs directory.
+          while IFS= read -r -d '' jar; do
+            cp -v "$jar" release-assets/
+          done < <(find . -type f -name "*-${VERSION}*.jar" -path "*/build/libs/*" -print0)
+          # Include the generated POM for each published module so consumers can inspect
+          # the exact metadata that was released.
+          while IFS= read -r -d '' pom; do
+            module="$(basename "$(dirname "$(dirname "$(dirname "$pom")")")")"
+            cp -v "$pom" "release-assets/${module}-${VERSION}.pom"
+          done < <(find . -type f -name "pom-default.xml" -path "*/build/publications/maven/*" -print0)
+          count="$(find release-assets -type f | wc -l | tr -d ' ')"
+          if [ "$count" = "0" ]; then
+            echo "::error::No release artifacts found to attach to the GitHub Release"
+            exit 1
+          fi
+          echo "Collected ${count} asset(s):"
+          ls -la release-assets
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          IS_PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          args=(
+            "$TAG"
+            --target "$TARGET_SHA"
+            --title  "$TAG"
+            --generate-notes
+          )
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${args[@]}" release-assets/*
+          echo "Created GitHub Release ${TAG} on commit ${TARGET_SHA}"
