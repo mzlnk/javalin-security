@@ -24,3 +24,6 @@ project(":extensions/api-key").name = "javalin-security-api-key"
 
 include("extensions/opaque-token")
 project(":extensions/opaque-token").name = "javalin-security-opaque-token"
+
+include("extensions/session")
+project(":extensions/session").name = "javalin-security-session"

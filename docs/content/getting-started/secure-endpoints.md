@@ -10,7 +10,8 @@ plugs in the same way.
 !!! tip "Authentication is pluggable"
     Core provides the plugin and the rule table, not a login mechanism. Use a built-in strategy
     like [Basic Auth](../extensions/basic-auth.md), [API Key](../extensions/api-key.md),
-    [Opaque Token](../extensions/opaque-token.md), [JWT](../extensions/jwt/index.md), or create a
+    [Opaque Token](../extensions/opaque-token.md), [Session](../extensions/session.md),
+    [JWT](../extensions/jwt/index.md), or create a
     [custom authenticator](../guides/custom-authentication.md) that fit your needs.
 
 Install [core](installation.md) plus the

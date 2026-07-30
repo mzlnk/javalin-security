@@ -22,6 +22,7 @@ _Current version: `{{ versions.library }}`._
   encoder, optional `WWW-Authenticate` challenge.
 - **API Key** (`javalin-security-api-key`): `apiKey { }`, key lookup, header/query/cookie resolvers.
 - **Opaque Token** (`javalin-security-opaque-token`): `opaqueToken { }`, token lookup, expiry validation, optional `WWW-Authenticate: Bearer` challenge.
+- **Session** (`javalin-security-session`): `session { }`, HTTP-session principal storage, `login` / `logout` helpers, session-id rotation on login.
 - **JWT** (`javalin-security-jwt`): `jwt { }`, decoder SPI, key sources, roles mapping, optional
   bearer challenge.
 - **Decoder adapters**: Nimbus and Auth0 (JWKS caching, RSA / EC / HMAC).

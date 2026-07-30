@@ -27,6 +27,7 @@ dependencies {
     dokka(project(":javalin-security-basic-auth"))
     dokka(project(":javalin-security-api-key"))
     dokka(project(":javalin-security-opaque-token"))
+    dokka(project(":javalin-security-session"))
 }
 
 dokka {
@@ -98,6 +99,7 @@ val publishedProjects = setOf(
     "javalin-security-basic-auth",
     "javalin-security-api-key",
     "javalin-security-opaque-token",
+    "javalin-security-session",
 )
 
 configure(subprojects.filter { it.name in publishedProjects }) {
