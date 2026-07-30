@@ -1,5 +1,7 @@
 package io.github.mzlnk.javalin.security.jwt
 
+import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.security
@@ -92,6 +94,54 @@ class JwtConfigurationTest {
         assertThat(verification.issuer).isNull()
         assertThat(verification.audiences).isEmpty()
         assertThat(verification.clockSkewSeconds).isEqualTo(60)
+    }
+
+    private data class Principal(override val name: String) : Identity
+
+    @Test
+    fun `should map the verified token to a user-defined identity via identityMapper`() {
+        val strategy = jwt { jwt ->
+            jwt.decoder = testDecoder
+            jwt.keySource = JwtKeySource.secret("test-secret")
+            jwt.identityMapper = JwtIdentityMapper { token -> Principal(name = "user-${token.subject}") }
+        }
+
+        val result = strategy.authenticator().authenticate(ctx)
+
+        assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
+        val success = result as AuthenticationResult.Success
+        assertThat(success.authentication.identity).isEqualTo(Principal(name = "user-some.jwt.token"))
+    }
+
+    @Test
+    fun `should fail authentication when identityMapper returns null for a verified token`() {
+        val strategy = jwt { jwt ->
+            jwt.decoder = testDecoder
+            jwt.keySource = JwtKeySource.secret("test-secret")
+            jwt.identityMapper = JwtIdentityMapper { null }
+        }
+
+        val result = strategy.authenticator().authenticate(ctx)
+
+        assertThat(result).isInstanceOf(AuthenticationResult.Failure::class.java)
+    }
+
+    @Test
+    fun `should throw SecurityConfigurationException when identityMapper and a non-default rolesMapper are both configured`() {
+        assertThatThrownBy {
+            Javalin.create { cfg ->
+                cfg.security { security ->
+                    security.http.authentication = jwt { jwt ->
+                        jwt.decoder = testDecoder
+                        jwt.keySource = JwtKeySource.secret("test-secret")
+                        jwt.identityMapper = JwtIdentityMapper { token -> Principal(name = token.subject) }
+                        jwt.rolesMapper = JwtRolesMapper.fromScope { null }
+                    }
+                    security.http.fallback = Rules.allow()
+                }
+            }
+        }.isInstanceOf(SecurityConfigurationException::class.java)
+            .hasMessageContaining("mutually exclusive")
     }
 
 }

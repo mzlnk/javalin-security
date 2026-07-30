@@ -10,18 +10,18 @@ import org.junit.jupiter.api.Test
 class ApiKeyConfigurationTest {
 
     @Test
-    fun `should throw SecurityConfigurationException when apiKeyLookup is not configured`() {
+    fun `should throw SecurityConfigurationException when lookup is not configured`() {
         assertThatThrownBy {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http.authentication = apiKey { api ->
-                        // apiKeyLookup not set — should fail
+                        // lookup not set — should fail
                     }
                     security.http.fallback = Rules.allow()
                 }
             }
         }.isInstanceOf(SecurityConfigurationException::class.java)
-            .hasMessageContaining("apiKeyLookup")
+            .hasMessageContaining("lookup")
     }
 
 }

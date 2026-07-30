@@ -47,14 +47,21 @@ An authenticator returns one of three results:
 
 ## Identity
 
-`Authentication` wraps an optional `Identity` (the caller) and a set of `RouteRole`s. Extensions
-provide concrete types (`BasicAuthIdentity`, `JwtIdentity`); a custom scheme implements
-`Identity` in the same way.
+`Authentication` wraps an optional `Identity` (the caller) and a set of `RouteRole`s. `Identity`
+itself declares `name` and `roles`. Every extension attaches whichever `Identity` your lookup /
+mapper returns — Basic Auth, API Key, Opaque Token, and Session take yours directly. JWT
+defaults to its own `Jwt` identity (wrapping the verified token and its `rolesMapper`-derived
+roles), or your own type when you configure an `identityMapper`. A custom scheme implements
+`Identity` — including `roles` — in the same way. Cast with `ctx.identity<YourType>()` (checked
+at runtime, like `ctx.attribute<T>()`).
+
+`Authentication.authenticated(identity)` takes a single `Identity` argument and derives
+`Authentication.roles` from `identity.roles`; there is no separate roles parameter.
 
 | Member            | Meaning                                    |
 |-------------------|--------------------------------------------|
 | `identity`        | Who is calling (`null` when anonymous).    |
-| `roles`           | Granted roles (empty when anonymous).      |
+| `roles`           | Granted roles (empty when anonymous), taken from `identity.roles`. |
 | `isAuthenticated` | `true` when `identity != null`.            |
 
 ## Reading auth in handlers

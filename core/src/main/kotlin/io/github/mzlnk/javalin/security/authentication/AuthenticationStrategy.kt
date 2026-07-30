@@ -45,4 +45,54 @@ sealed interface AuthenticationStrategy {
 
     }
 
+    companion object {
+
+        /**
+         * Builds a [Sync] strategy backed by [authenticator].
+         *
+         * Convenience for extension authors and custom schemes that would otherwise repeat an
+         * anonymous `object : Sync { ... }` around a single [Authenticator].
+         */
+        @JvmStatic
+        @JvmOverloads
+        fun sync(
+            authenticator: Authenticator,
+            unauthorizedHandler: UnauthorizedHandler = UnauthorizedHandler.DEFAULT,
+            forbiddenHandler: ForbiddenHandler = ForbiddenHandler.DEFAULT,
+        ): Sync {
+            val authenticatorValue = authenticator
+            val unauthorizedHandlerValue = unauthorizedHandler
+            val forbiddenHandlerValue = forbiddenHandler
+            return object : Sync {
+                override val unauthorizedHandler: UnauthorizedHandler get() = unauthorizedHandlerValue
+                override val forbiddenHandler: ForbiddenHandler get() = forbiddenHandlerValue
+                override fun authenticator(): Authenticator = authenticatorValue
+            }
+        }
+
+        /**
+         * Builds an [Async] strategy backed by [authenticator].
+         *
+         * Convenience for extension authors and custom schemes that would otherwise repeat an
+         * anonymous `object : Async { ... }` around a single [AsyncAuthenticator].
+         */
+        @JvmStatic
+        @JvmOverloads
+        fun async(
+            authenticator: AsyncAuthenticator,
+            unauthorizedHandler: UnauthorizedHandler = UnauthorizedHandler.DEFAULT,
+            forbiddenHandler: ForbiddenHandler = ForbiddenHandler.DEFAULT,
+        ): Async {
+            val authenticatorValue = authenticator
+            val unauthorizedHandlerValue = unauthorizedHandler
+            val forbiddenHandlerValue = forbiddenHandler
+            return object : Async {
+                override val unauthorizedHandler: UnauthorizedHandler get() = unauthorizedHandlerValue
+                override val forbiddenHandler: ForbiddenHandler get() = forbiddenHandlerValue
+                override fun authenticator(): AsyncAuthenticator = authenticatorValue
+            }
+        }
+
+    }
+
 }

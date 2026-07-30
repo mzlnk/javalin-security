@@ -27,15 +27,19 @@ the plugin is registered; declare rules on `security.rules` or set `http.fallbac
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authentication.Identity
+    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
     import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.basicauth.*
     import io.javalin.security.RouteRole
 
     enum class Role : RouteRole { USER, ADMIN }
 
+    data class User(override val name: String, override val roles: Set<RouteRole>) : Identity
+
     val users = mapOf(
-        "alice" to BasicUser("alice", "secret", setOf(Role.USER)),
-        "admin" to BasicUser("admin", "secret", setOf(Role.ADMIN)),
+        "alice" to PasswordCredentials(User("alice", setOf(Role.USER)), "secret"),
+        "admin" to PasswordCredentials(User("admin", setOf(Role.ADMIN)), "secret"),
     )
 
     // inside Javalin.create { config ->
@@ -51,6 +55,8 @@ the plugin is registered; declare rules on `security.rules` or set `http.fallbac
 === "Java"
 
     ```java
+    import io.github.mzlnk.javalin.security.authentication.Identity;
+    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials;
     import io.github.mzlnk.javalin.security.basicauth.*;
     import io.github.mzlnk.javalin.security.authorization.Rules;
     import io.javalin.security.RouteRole;
@@ -59,9 +65,14 @@ the plugin is registered; declare rules on `security.rules` or set `http.fallbac
 
     enum Role implements RouteRole { USER, ADMIN }
 
-    Map<String, BasicUser> users = Map.of(
-        "alice", new BasicUser("alice", "secret", Set.of(Role.USER)),
-        "admin", new BasicUser("admin", "secret", Set.of(Role.ADMIN)));
+    record User(String name, Set<RouteRole> roles) implements Identity {
+        @Override public String getName() { return name; }
+        @Override public Set<RouteRole> getRoles() { return roles; }
+    }
+
+    Map<String, PasswordCredentials> users = Map.of(
+        "alice", new PasswordCredentials(new User("alice", Set.of(Role.USER)), "secret"),
+        "admin", new PasswordCredentials(new User("admin", Set.of(Role.ADMIN)), "secret"));
 
     // inside Javalin.create(config -> {
     config.registerPlugin(new JavalinSecurityPlugin(security -> {
@@ -164,7 +175,7 @@ When paths share a prefix, nest rules under `apiBuilder` — analogous to Javali
         config.routes.get("/api/v1/resource") { it.result("ok") }
         config.routes.post("/api/v1/resource") { it.result("created") }
         config.routes.delete("/api/v1/resource") { it.result("deleted") }
-        config.routes.get("/api/v1/me") { it.result(it.identity<BasicAuthIdentity>().name) }
+        config.routes.get("/api/v1/me") { it.result(it.identity<User>().name) }
     }.start(7070)
     ```
 
@@ -191,7 +202,7 @@ When paths share a prefix, nest rules under `apiBuilder` — analogous to Javali
         config.routes.post("/api/v1/resource", ctx -> ctx.result("created"));
         config.routes.delete("/api/v1/resource", ctx -> ctx.result("deleted"));
         config.routes.get("/api/v1/me", ctx ->
-            ctx.result(identity(ctx, BasicAuthIdentity.class).getName()));
+            ctx.result(identity(ctx, User.class).getName()));
     }).start(7070);
     ```
 

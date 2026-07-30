@@ -1,10 +1,9 @@
 package io.github.mzlnk.javalin.security.basicauth;
 
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
-import io.github.mzlnk.javalin.security.authentication.Authenticator;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy;
-import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler;
-import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler;
+import io.github.mzlnk.javalin.security.authentication.Identity;
+import io.github.mzlnk.javalin.security.authentication.PasswordCredentials;
 import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.javalin.Javalin;
 import io.javalin.security.RouteRole;
@@ -20,9 +19,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BasicAuthSecurityJavaTest {
     private enum Role implements RouteRole { USER, ADMIN }
 
+    static class TestUser implements Identity {
+        private final String name;
+        private final Set<RouteRole> roles;
+
+        TestUser(String name, Set<RouteRole> roles) {
+            this.name = name;
+            this.roles = roles;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Set<RouteRole> getRoles() {
+            return roles;
+        }
+    }
+
     private final UserLookup testUserLookup = username -> switch (username) {
-        case "alice" -> new BasicUser("alice", "alice-pw", Set.of(Role.USER));
-        case "admin" -> new BasicUser("admin", "admin-pw", Set.of(Role.ADMIN));
+        case "alice" -> new PasswordCredentials(new TestUser("alice", Set.of(Role.USER)), "alice-pw");
+        case "admin" -> new PasswordCredentials(new TestUser("admin", Set.of(Role.ADMIN)), "admin-pw");
         default -> null;
     };
 
@@ -148,14 +167,14 @@ class BasicAuthSecurityJavaTest {
     }
 
     @Test
-    void should_expose_BasicAuthIdentity_on_the_context_when_the_caller_is_authenticated() {
+    void should_expose_the_user_defined_identity_on_the_context_when_the_caller_is_authenticated() {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.http.authentication = BasicAuthSecurity.basicAuth(basic -> basic.userLookup = testUserLookup);
                 security.http.fallback = Rules.authenticated();
             }));
-            config.routes.get("/me", ctx -> ctx.result(identity(ctx, BasicAuthIdentity.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, TestUser.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -228,7 +247,7 @@ class BasicAuthSecurityJavaTest {
                 });
                 security.http.fallback = Rules.authenticated();
             }));
-            config.routes.get("/me", ctx -> ctx.result(identity(ctx, BasicAuthIdentity.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, TestUser.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -252,7 +271,7 @@ class BasicAuthSecurityJavaTest {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.rules.get("/api/*", Rules.allow());
                 security.rules.post("/api/*", Rules.authenticated());
-                security.http.authentication = authenticationStrategy(authenticator);
+                security.http.authentication = AuthenticationStrategy.sync(authenticator);
                 security.http.fallback = Rules.deny();
             }));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
@@ -277,35 +296,7 @@ class BasicAuthSecurityJavaTest {
         return "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
     }
 
-    private static AuthenticationStrategy.Sync authenticationStrategy(Authenticator authenticator) {
-        return authenticationStrategy(authenticator, UnauthorizedHandler.getDEFAULT(), ForbiddenHandler.getDEFAULT());
-    }
-
-    private static AuthenticationStrategy.Sync authenticationStrategy(
-            Authenticator authenticator,
-            UnauthorizedHandler unauthorizedHandler,
-            ForbiddenHandler forbiddenHandler
-    ) {
-        return new AuthenticationStrategy.Sync() {
-            @Override
-            public Authenticator authenticator() {
-                return authenticator;
-            }
-
-            @Override
-            public UnauthorizedHandler getUnauthorizedHandler() {
-                return unauthorizedHandler;
-            }
-
-            @Override
-            public ForbiddenHandler getForbiddenHandler() {
-                return forbiddenHandler;
-            }
-        };
-    }
-
     private Javalin app(boolean basicChallenge) {
-        BasicAuthenticator authenticator = BasicAuthenticator.builder(testUserLookup).build();
         return Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.rules.get("/public/*", Rules.allow());

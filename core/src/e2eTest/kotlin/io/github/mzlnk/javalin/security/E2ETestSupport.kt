@@ -7,9 +7,13 @@ import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
+import io.javalin.security.RouteRole
 
 /** Minimal [Identity] for e2e tests. */
-data class TestIdentity(override val name: String) : Identity
+data class TestIdentity @JvmOverloads constructor(
+    override val name: String,
+    override val roles: Set<RouteRole> = emptySet(),
+) : Identity
 
 /**
  * Builds an [AuthenticationStrategy.Sync] for e2e tests.

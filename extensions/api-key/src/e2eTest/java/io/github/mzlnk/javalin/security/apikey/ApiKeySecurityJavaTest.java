@@ -1,10 +1,8 @@
 package io.github.mzlnk.javalin.security.apikey;
 
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
-import io.github.mzlnk.javalin.security.authentication.Authenticator;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy;
-import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler;
-import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler;
+import io.github.mzlnk.javalin.security.authentication.Identity;
 import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.javalin.Javalin;
 import io.javalin.security.RouteRole;
@@ -19,9 +17,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ApiKeySecurityJavaTest {
     private enum Role implements RouteRole { USER, ADMIN }
 
+    static class Client implements Identity {
+        private final String name;
+        private final Set<RouteRole> roles;
+
+        Client(String name, Set<RouteRole> roles) {
+            this.name = name;
+            this.roles = roles;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Set<RouteRole> getRoles() {
+            return roles;
+        }
+    }
+
     private final ApiKeyLookup testApiKeyLookup = rawKey -> switch (rawKey) {
-        case "k-alice" -> new ApiKeyPrincipal("alice-svc", Set.of(Role.USER));
-        case "k-admin" -> new ApiKeyPrincipal("admin-svc", Set.of(Role.ADMIN));
+        case "k-alice" -> new Client("alice-svc", Set.of(Role.USER));
+        case "k-admin" -> new Client("admin-svc", Set.of(Role.ADMIN));
         default -> null;
     };
 
@@ -117,14 +135,14 @@ class ApiKeySecurityJavaTest {
     }
 
     @Test
-    void should_expose_ApiKeyIdentity_on_the_context_when_the_caller_is_authenticated() {
+    void should_expose_the_user_defined_identity_on_the_context_when_the_caller_is_authenticated() {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
-                security.http.authentication = ApiKeySecurity.apiKey(api -> api.apiKeyLookup = testApiKeyLookup);
+                security.http.authentication = ApiKeySecurity.apiKey(api -> api.lookup = testApiKeyLookup);
                 security.http.fallback = Rules.authenticated();
             }));
-            config.routes.get("/me", ctx -> ctx.result(identity(ctx, ApiKeyIdentity.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, Client.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -143,12 +161,12 @@ class ApiKeySecurityJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.http.authentication = ApiKeySecurity.apiKey(api -> {
-                    api.apiKeyLookup = testApiKeyLookup;
+                    api.lookup = testApiKeyLookup;
                     api.resolver = ApiKeyResolver.header("X-App-Key");
                 });
                 security.http.fallback = Rules.authenticated();
             }));
-            config.routes.get("/me", ctx -> ctx.result(identity(ctx, ApiKeyIdentity.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, Client.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -167,12 +185,12 @@ class ApiKeySecurityJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.http.authentication = ApiKeySecurity.apiKey(api -> {
-                    api.apiKeyLookup = testApiKeyLookup;
+                    api.lookup = testApiKeyLookup;
                     api.resolver = ApiKeyResolver.query("api_key");
                 });
                 security.http.fallback = Rules.authenticated();
             }));
-            config.routes.get("/me", ctx -> ctx.result(identity(ctx, ApiKeyIdentity.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, Client.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -191,7 +209,7 @@ class ApiKeySecurityJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.http.authentication = ApiKeySecurity.apiKey(api -> {
-                    api.apiKeyLookup = testApiKeyLookup;
+                    api.lookup = testApiKeyLookup;
                     api.unauthorizedHandler = (ctx, failure) ->
                             ctx.status(401).result("{\"error\":\"invalid_api_key\"}");
                 });
@@ -214,14 +232,12 @@ class ApiKeySecurityJavaTest {
     void should_enforce_rules_end_to_end_when_a_plugin_is_registered_with_a_built_ApiKeyAuthenticator() {
         // given
         // a custom AuthenticationStrategy rather than the apiKey( ) one-stop factory
-        ApiKeyAuthenticator authenticator = ApiKeyAuthenticator.builder(testApiKeyLookup)
-                .resolver(ApiKeyResolver.getDEFAULT())
-                .build();
+        ApiKeyAuthenticator authenticator = new ApiKeyAuthenticator(testApiKeyLookup, ApiKeyResolver.getDEFAULT());
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.rules.get("/api/*", Rules.allow());
                 security.rules.post("/api/*", Rules.authenticated());
-                security.http.authentication = authenticationStrategy(authenticator);
+                security.http.authentication = AuthenticationStrategy.sync(authenticator);
                 security.http.fallback = Rules.deny();
             }));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
@@ -242,33 +258,6 @@ class ApiKeySecurityJavaTest {
         });
     }
 
-    private static AuthenticationStrategy.Sync authenticationStrategy(Authenticator authenticator) {
-        return authenticationStrategy(authenticator, UnauthorizedHandler.getDEFAULT(), ForbiddenHandler.getDEFAULT());
-    }
-
-    private static AuthenticationStrategy.Sync authenticationStrategy(
-            Authenticator authenticator,
-            UnauthorizedHandler unauthorizedHandler,
-            ForbiddenHandler forbiddenHandler
-    ) {
-        return new AuthenticationStrategy.Sync() {
-            @Override
-            public Authenticator authenticator() {
-                return authenticator;
-            }
-
-            @Override
-            public UnauthorizedHandler getUnauthorizedHandler() {
-                return unauthorizedHandler;
-            }
-
-            @Override
-            public ForbiddenHandler getForbiddenHandler() {
-                return forbiddenHandler;
-            }
-        };
-    }
-
     private Javalin app() {
         return Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
@@ -276,7 +265,7 @@ class ApiKeySecurityJavaTest {
                 security.rules.post("/protected/*", Rules.authenticated());
                 security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN));
                 security.http.authentication = ApiKeySecurity.apiKey(api -> {
-                    api.apiKeyLookup = testApiKeyLookup;
+                    api.lookup = testApiKeyLookup;
                 });
                 security.http.fallback = Rules.deny();
             }));

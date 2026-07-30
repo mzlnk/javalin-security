@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security.session
 
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.identity
@@ -12,9 +13,15 @@ import io.javalin.testtools.JavalinTest
 import io.javalin.testtools.Response
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.io.Serializable
 
 class SessionSecurityTest {
     private enum class Role : RouteRole { USER, ADMIN }
+
+    private data class Principal(
+        override val name: String,
+        override val roles: Set<RouteRole> = emptySet(),
+    ) : Identity, Serializable
 
     @Test
     fun `should allow anonymous access when route is allow`() {
@@ -108,20 +115,20 @@ class SessionSecurityTest {
     }
 
     @Test
-    fun `should expose SessionIdentity on the context when the caller is authenticated`() {
-        val manager: SessionManager = HttpSessionManager.of()
+    fun `should expose the user-defined identity on the context when the caller is authenticated`() {
+        val sessions = HttpSessionManager.of()
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http.authentication = session { it.sessionManager = manager }
+                security.http.authentication = session { it.sessionManager = sessions }
                 security.rules.post("/login", Rules.allow())
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.post("/login") { ctx ->
-                manager.create(ctx, SessionPrincipal("alice", setOf(Role.USER)))
+                sessions.create(ctx, Principal(name = "alice", roles = setOf(Role.USER)))
                 ctx.result("ok")
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<SessionIdentity>()
+                val identity = ctx.identity<Principal>()
                 ctx.result(identity.name)
             }
         }
@@ -138,19 +145,19 @@ class SessionSecurityTest {
 
     @Test
     fun `should authenticate with an HttpSessionManager using a custom attributeKey`() {
-        val manager: SessionManager = HttpSessionManager.of("custom.principal")
+        val sessions = HttpSessionManager.of("custom.principal")
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http.authentication = session { it.sessionManager = manager }
+                security.http.authentication = session { it.sessionManager = sessions }
                 security.rules.post("/login", Rules.allow())
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.post("/login") { ctx ->
-                manager.create(ctx, SessionPrincipal("carol", setOf(Role.USER)))
+                sessions.create(ctx, Principal(name = "carol", roles = setOf(Role.USER)))
                 ctx.result("ok")
             }
             cfg.routes.get("/me") { ctx ->
-                ctx.result(ctx.identity<SessionIdentity>().name)
+                ctx.result(ctx.identity<Principal>().name)
             }
         }
 
@@ -164,12 +171,12 @@ class SessionSecurityTest {
 
     @Test
     fun `should rotate session id on create when HttpSessionManager rotateSessionIdOnCreate is enabled`() {
-        val manager: SessionManager = HttpSessionManager.builder()
+        val sessions = HttpSessionManager.builder()
             .rotateSessionIdOnCreate(true)
             .build()
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http.authentication = session { it.sessionManager = manager }
+                security.http.authentication = session { it.sessionManager = sessions }
                 security.rules.get("/touch", Rules.allow())
                 security.rules.post("/login", Rules.allow())
                 security.http.fallback = Rules.authenticated()
@@ -179,7 +186,7 @@ class SessionSecurityTest {
                 ctx.result(session.id)
             }
             cfg.routes.post("/login") { ctx ->
-                manager.create(ctx, SessionPrincipal("alice", setOf(Role.USER)))
+                sessions.create(ctx, Principal(name = "alice", roles = setOf(Role.USER)))
                 ctx.result(ctx.req().session.id)
             }
         }
@@ -203,15 +210,15 @@ class SessionSecurityTest {
 
     @Test
     fun `should authenticate via a custom SessionManager plugged in through composition`() {
-        val store = mutableMapOf<String, SessionPrincipal>()
+        val store = mutableMapOf<String, Principal>()
         val customManager = object : SessionManager {
-            override fun create(context: Context, principal: SessionPrincipal) {
+            override fun create(context: Context, identity: Identity) {
                 val token = "sid-${store.size + 1}"
-                store[token] = principal
+                store[token] = identity as Principal
                 context.cookie("APPSESSION", token)
             }
 
-            override fun validate(context: Context): SessionPrincipal? {
+            override fun validate(context: Context): Identity? {
                 val token = context.cookie("APPSESSION") ?: return null
                 return store[token]
             }
@@ -231,7 +238,7 @@ class SessionSecurityTest {
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.post("/login") { ctx ->
-                customManager.create(ctx, SessionPrincipal("alice", setOf(Role.USER)))
+                customManager.create(ctx, Principal(name = "alice", roles = setOf(Role.USER)))
                 ctx.result("ok")
             }
             cfg.routes.post("/logout") { ctx ->
@@ -239,7 +246,7 @@ class SessionSecurityTest {
                 ctx.result("ok")
             }
             cfg.routes.get("/me") { ctx ->
-                ctx.result(ctx.identity<SessionIdentity>().name)
+                ctx.result(ctx.identity<Principal>().name)
             }
         }
 
@@ -270,7 +277,6 @@ class SessionSecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http.authentication = session { s ->
-                    s.sessionManager = HttpSessionManager.of()
                     s.unauthorizedHandler = UnauthorizedHandler { ctx, _ ->
                         ctx.status(401).result("""{"error":"login_required"}""")
                     }
@@ -289,7 +295,7 @@ class SessionSecurityTest {
     }
 
     private fun app(): Javalin {
-        val manager: SessionManager = HttpSessionManager.of()
+        val sessions = HttpSessionManager.of()
         return Javalin.create { cfg ->
             cfg.security { security ->
                 security.rules.get("/public/*", Rules.allow())
@@ -297,7 +303,7 @@ class SessionSecurityTest {
                 security.rules.post("/logout", Rules.allow())
                 security.rules.post("/protected/*", Rules.authenticated())
                 security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
-                security.http.authentication = session { it.sessionManager = manager }
+                security.http.authentication = session { it.sessionManager = sessions }
                 security.http.fallback = Rules.deny()
             }
             cfg.routes.get("/public/info") { it.result("public") }
@@ -307,11 +313,11 @@ class SessionSecurityTest {
                     "ADMIN" -> Role.ADMIN
                     else -> Role.USER
                 }
-                manager.create(ctx, SessionPrincipal(username, setOf(role)))
+                sessions.create(ctx, Principal(name = username, roles = setOf(role)))
                 ctx.result("ok")
             }
             cfg.routes.post("/logout") { ctx ->
-                manager.invalidate(ctx)
+                sessions.invalidate(ctx)
                 ctx.result("ok")
             }
             cfg.routes.post("/protected/data") { it.result("created") }

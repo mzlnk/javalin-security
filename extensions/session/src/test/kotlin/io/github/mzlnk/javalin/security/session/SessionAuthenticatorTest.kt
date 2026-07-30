@@ -1,6 +1,7 @@
 package io.github.mzlnk.javalin.security.session
 
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.javalin.http.Context
 import io.javalin.security.RouteRole
 import io.mockk.every
@@ -11,6 +12,11 @@ import org.junit.jupiter.api.Test
 
 class SessionAuthenticatorTest {
     private enum class Role : RouteRole { USER, ADMIN }
+
+    private data class Principal(
+        override val name: String,
+        override val roles: Set<RouteRole> = emptySet(),
+    ) : Identity
 
     @Test
     fun `should return NotAuthenticated when SessionManager returns null`() {
@@ -27,8 +33,8 @@ class SessionAuthenticatorTest {
     }
 
     @Test
-    fun `should return Success with SessionIdentity when SessionManager returns a principal`() {
-        val principal = SessionPrincipal(subject = "alice", roles = setOf(Role.USER, Role.ADMIN))
+    fun `should return Success with the session identity when SessionManager returns one`() {
+        val principal = Principal(name = "alice", roles = setOf(Role.USER, Role.ADMIN))
         val context: Context = mockk()
         val manager: SessionManager = mockk {
             every { validate(context) } returns principal
@@ -40,18 +46,18 @@ class SessionAuthenticatorTest {
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
         val success = result as AuthenticationResult.Success
         assertThat(success.authentication.isAuthenticated).isTrue()
-        assertThat(success.authentication.identity).isInstanceOf(SessionIdentity::class.java)
+        assertThat(success.authentication.identity).isInstanceOf(Principal::class.java)
 
-        val identity = success.authentication.identity as SessionIdentity
+        val identity = success.authentication.identity as Principal
         assertThat(identity.name).isEqualTo("alice")
         assertThat(success.authentication.roles).containsExactlyInAnyOrder(Role.USER, Role.ADMIN)
     }
 
     @Test
-    fun `should return empty roles when the principal has none`() {
+    fun `should return empty roles when the session has none`() {
         val context: Context = mockk()
         val manager: SessionManager = mockk {
-            every { validate(context) } returns SessionPrincipal(subject = "anon")
+            every { validate(context) } returns Principal(name = "anon")
         }
 
         val authenticator = SessionAuthenticator.of(manager)
@@ -62,7 +68,7 @@ class SessionAuthenticatorTest {
 
     @Test
     fun `builder produces a functional authenticator that delegates to the given SessionManager`() {
-        val principal = SessionPrincipal(subject = "alice", roles = setOf(Role.USER))
+        val principal = Principal(name = "alice", roles = setOf(Role.USER))
         val context: Context = mockk()
         val manager: SessionManager = mockk {
             every { validate(context) } returns principal
@@ -79,11 +85,5 @@ class SessionAuthenticatorTest {
         val manager: SessionManager = mockk()
         val authenticator = SessionAuthenticator.of(manager)
         assertThat(authenticator.sessionManager).isSameAs(manager)
-    }
-
-    @Test
-    fun `SessionIdentity name is the principal subject`() {
-        val identity = SessionIdentity("billing")
-        assertThat(identity.name).isEqualTo("billing")
     }
 }

@@ -1,15 +1,36 @@
 package io.github.mzlnk.javalin.security.jwt;
 
+import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy;
+import io.github.mzlnk.javalin.security.authentication.Identity;
 import io.javalin.security.RouteRole;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtJavaInteropTest {
     private enum Role implements RouteRole { ADMIN, USER }
+
+    static class Principal implements Identity {
+        private final String name;
+
+        Principal(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Set<RouteRole> getRoles() {
+            return Set.of();
+        }
+    }
 
     private final JwtDecoder testDecoder = (token, verification) ->
             new SimpleDecodedJwt(token, Map.of("sub", token, "roles", List.of("USER")));
@@ -75,6 +96,17 @@ class JwtJavaInteropTest {
     void roles_mapper_can_be_expressed_as_java_lambda() {
         JwtRolesMapper mapper = token -> java.util.Set.of(Role.USER);
         assertThat(mapper.map(new SimpleDecodedJwt("sub", Map.of()))).containsExactly(Role.USER);
+    }
+
+    @Test
+    void jwt_factory_with_identityMapper_is_accessible_as_a_static_method_from_java() {
+        AuthenticationStrategy.Sync strategy = JwtSecurity.jwt(jwt -> {
+            jwt.decoder = testDecoder;
+            jwt.keySource = testVerification.getKeySource();
+            jwt.identityMapper = token -> new Principal(token.getSubject());
+        });
+
+        assertThat(strategy).isNotNull();
     }
 
     private static Role roleOf(String name) {

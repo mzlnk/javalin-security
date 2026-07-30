@@ -34,7 +34,7 @@ class JavalinSecurityWsKtTest {
                     ?.mapNotNull { name -> Role.entries.find { it.name == name } }
                     ?.toSet()
                     ?: emptySet()
-                AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user), roles))
+                AuthenticationResult.Success(Authentication.authenticated(TestIdentity(user, roles)))
             }
         }
     }
@@ -149,7 +149,7 @@ class JavalinSecurityWsKtTest {
                 security.ws.authentication = authenticationStrategy(
                     Authenticator {
                         AuthenticationResult.Success(
-                            Authentication.authenticated(TestIdentity("alice"), Role.ADMIN),
+                            Authentication.authenticated(TestIdentity("alice", setOf(Role.ADMIN))),
                         )
                     },
                 )

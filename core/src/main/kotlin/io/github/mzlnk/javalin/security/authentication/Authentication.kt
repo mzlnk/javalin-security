@@ -23,16 +23,10 @@ class Authentication private constructor(
 
     companion object {
 
-        /** Builds an authenticated [Authentication] for [identity] and [roles]. */
+        /** Builds an authenticated [Authentication] for [identity], deriving [roles] from [Identity.roles]. */
         @JvmStatic
-        @JvmOverloads
-        fun authenticated(identity: Identity, roles: Set<RouteRole> = emptySet()): Authentication =
-            Authentication(identity = identity, roles = roles)
-
-        /** Builds an authenticated [Authentication] for [identity] and [roles]. */
-        @JvmStatic
-        fun authenticated(identity: Identity, vararg roles: RouteRole): Authentication =
-            Authentication(identity = identity, roles = roles.toSet())
+        fun authenticated(identity: Identity): Authentication =
+            Authentication(identity = identity, roles = identity.roles)
 
         /** Returns the shared unauthenticated [Authentication]. */
         @JvmStatic

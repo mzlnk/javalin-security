@@ -1,10 +1,8 @@
 package io.github.mzlnk.javalin.security.opaquetoken;
 
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
-import io.github.mzlnk.javalin.security.authentication.Authenticator;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy;
-import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler;
-import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler;
+import io.github.mzlnk.javalin.security.authentication.Identity;
 import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.github.mzlnk.javalin.security.common.token.TokenResolver;
 import io.javalin.Javalin;
@@ -21,11 +19,31 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OpaqueTokenSecurityJavaTest {
     private enum Role implements RouteRole { USER, ADMIN }
 
+    static class Principal implements Identity {
+        private final String name;
+        private final Set<RouteRole> roles;
+
+        Principal(String name, Set<RouteRole> roles) {
+            this.name = name;
+            this.roles = roles;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Set<RouteRole> getRoles() {
+            return roles;
+        }
+    }
+
     private final OpaqueTokenLookup testTokenLookup = rawToken -> switch (rawToken) {
-        case "t-alice" -> new OpaqueTokenDetails("alice", Set.of(Role.USER));
-        case "t-admin" -> new OpaqueTokenDetails("admin", Set.of(Role.ADMIN));
-        case "t-expired" -> new OpaqueTokenDetails(
-                "expired-user", Set.of(Role.USER), Instant.now().minusSeconds(60));
+        case "t-alice" -> new TokenRecord(new Principal("alice", Set.of(Role.USER)));
+        case "t-admin" -> new TokenRecord(new Principal("admin", Set.of(Role.ADMIN)));
+        case "t-expired" -> new TokenRecord(
+                new Principal("expired-user", Set.of(Role.USER)), Instant.now().minusSeconds(60));
         default -> null;
     };
 
@@ -117,15 +135,15 @@ class OpaqueTokenSecurityJavaTest {
     }
 
     @Test
-    void should_expose_OpaqueTokenIdentity_on_the_context_when_the_caller_is_authenticated() {
+    void should_expose_the_user_defined_identity_on_the_context_when_the_caller_is_authenticated() {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.http.authentication = OpaqueTokenSecurity.opaqueToken(
-                        ot -> ot.tokenLookup = testTokenLookup);
+                        ot -> ot.lookup = testTokenLookup);
                 security.http.fallback = Rules.authenticated();
             }));
             config.routes.get("/me", ctx ->
-                    ctx.result(identity(ctx, OpaqueTokenIdentity.class).getName()));
+                    ctx.result(identity(ctx, Principal.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -141,13 +159,13 @@ class OpaqueTokenSecurityJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.http.authentication = OpaqueTokenSecurity.opaqueToken(ot -> {
-                    ot.tokenLookup = testTokenLookup;
+                    ot.lookup = testTokenLookup;
                     ot.resolver = TokenResolver.cookie("session");
                 });
                 security.http.fallback = Rules.authenticated();
             }));
             config.routes.get("/me", ctx ->
-                    ctx.result(identity(ctx, OpaqueTokenIdentity.class).getName()));
+                    ctx.result(identity(ctx, Principal.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -192,7 +210,7 @@ class OpaqueTokenSecurityJavaTest {
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.http.authentication = OpaqueTokenSecurity.opaqueToken(ot -> {
-                    ot.tokenLookup = testTokenLookup;
+                    ot.lookup = testTokenLookup;
                     ot.unauthorizedHandler = (ctx, failure) ->
                             ctx.status(401).result("{\"error\":\"invalid_token\"}");
                 });
@@ -218,7 +236,7 @@ class OpaqueTokenSecurityJavaTest {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.rules.get("/api/*", Rules.allow());
                 security.rules.post("/api/*", Rules.authenticated());
-                security.http.authentication = authenticationStrategy(authenticator);
+                security.http.authentication = AuthenticationStrategy.sync(authenticator);
                 security.http.fallback = Rules.deny();
             }));
             config.routes.get("/api/resource", ctx -> ctx.result("ok"));
@@ -235,33 +253,6 @@ class OpaqueTokenSecurityJavaTest {
         });
     }
 
-    private static AuthenticationStrategy.Sync authenticationStrategy(Authenticator authenticator) {
-        return authenticationStrategy(authenticator, UnauthorizedHandler.getDEFAULT(), ForbiddenHandler.getDEFAULT());
-    }
-
-    private static AuthenticationStrategy.Sync authenticationStrategy(
-            Authenticator authenticator,
-            UnauthorizedHandler unauthorizedHandler,
-            ForbiddenHandler forbiddenHandler
-    ) {
-        return new AuthenticationStrategy.Sync() {
-            @Override
-            public Authenticator authenticator() {
-                return authenticator;
-            }
-
-            @Override
-            public UnauthorizedHandler getUnauthorizedHandler() {
-                return unauthorizedHandler;
-            }
-
-            @Override
-            public ForbiddenHandler getForbiddenHandler() {
-                return forbiddenHandler;
-            }
-        };
-    }
-
     private Javalin app() {
         return app(false);
     }
@@ -273,7 +264,7 @@ class OpaqueTokenSecurityJavaTest {
                 security.rules.post("/protected/*", Rules.authenticated());
                 security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN));
                 security.http.authentication = OpaqueTokenSecurity.opaqueToken(ot -> {
-                    ot.tokenLookup = testTokenLookup;
+                    ot.lookup = testTokenLookup;
                     ot.bearerChallenge = bearerChallenge;
                 });
                 security.http.fallback = Rules.deny();

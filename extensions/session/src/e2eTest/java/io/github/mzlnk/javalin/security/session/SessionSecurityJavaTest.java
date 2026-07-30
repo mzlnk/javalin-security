@@ -1,6 +1,7 @@
 package io.github.mzlnk.javalin.security.session;
 
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
+import io.github.mzlnk.javalin.security.authentication.Identity;
 import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.javalin.Javalin;
 import io.javalin.security.RouteRole;
@@ -9,6 +10,7 @@ import io.javalin.testtools.JavalinTest;
 import io.javalin.testtools.Response;
 import org.junit.jupiter.api.Test;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Set;
 
@@ -17,6 +19,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SessionSecurityJavaTest {
     private enum Role implements RouteRole { USER, ADMIN }
+
+    static class Principal implements Identity, Serializable {
+        private static final long serialVersionUID = 1L;
+
+        private final String name;
+        private final Set<RouteRole> roles;
+
+        Principal(String name, Set<RouteRole> roles) {
+            this.name = name;
+            this.roles = roles;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Set<RouteRole> getRoles() {
+            return roles;
+        }
+    }
 
     @Test
     void should_allow_anonymous_access_when_route_is_allow() {
@@ -91,20 +115,20 @@ class SessionSecurityJavaTest {
     }
 
     @Test
-    void should_expose_SessionIdentity_on_the_context_when_the_caller_is_authenticated() {
-        SessionManager manager = HttpSessionManager.of();
+    void should_expose_the_user_defined_identity_on_the_context_when_the_caller_is_authenticated() {
+        SessionManager sessions = HttpSessionManager.of();
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
-                security.http.authentication = SessionSecurity.session(cfg -> cfg.sessionManager = manager);
+                security.http.authentication = SessionSecurity.session(cfg -> cfg.sessionManager = sessions);
                 security.rules.post("/login", Rules.allow());
                 security.http.fallback = Rules.authenticated();
             }));
             config.routes.post("/login", ctx -> {
-                manager.create(ctx, new SessionPrincipal("alice", Set.of(Role.USER)));
+                sessions.create(ctx, new Principal("alice", Set.of(Role.USER)));
                 ctx.result("ok");
             });
             config.routes.get("/me", ctx ->
-                    ctx.result(identity(ctx, SessionIdentity.class).getName()));
+                    ctx.result(identity(ctx, Principal.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -119,7 +143,7 @@ class SessionSecurityJavaTest {
     }
 
     private Javalin app() {
-        SessionManager manager = HttpSessionManager.of();
+        SessionManager sessions = HttpSessionManager.of();
         return Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.rules.get("/public/*", Rules.allow());
@@ -127,18 +151,18 @@ class SessionSecurityJavaTest {
                 security.rules.post("/logout", Rules.allow());
                 security.rules.post("/protected/*", Rules.authenticated());
                 security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN));
-                security.http.authentication = SessionSecurity.session(cfg -> cfg.sessionManager = manager);
+                security.http.authentication = SessionSecurity.session(cfg -> cfg.sessionManager = sessions);
                 security.http.fallback = Rules.deny();
             }));
             config.routes.get("/public/info", ctx -> ctx.result("public"));
             config.routes.post("/login", ctx -> {
                 String username = ctx.queryParam("user") != null ? ctx.queryParam("user") : "alice";
                 Role role = "ADMIN".equals(ctx.queryParam("role")) ? Role.ADMIN : Role.USER;
-                manager.create(ctx, new SessionPrincipal(username, Set.of(role)));
+                sessions.create(ctx, new Principal(username, Set.of(role)));
                 ctx.result("ok");
             });
             config.routes.post("/logout", ctx -> {
-                manager.invalidate(ctx);
+                sessions.invalidate(ctx);
                 ctx.result("ok");
             });
             config.routes.post("/protected/data", ctx -> ctx.result("created"));

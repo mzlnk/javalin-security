@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security.apikey
 
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.identity
@@ -13,10 +14,15 @@ import org.junit.jupiter.api.Test
 class ApiKeySecurityTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
+    private data class Client(
+        override val name: String,
+        override val roles: Set<RouteRole> = emptySet(),
+    ) : Identity
+
     private val testApiKeyLookup = ApiKeyLookup { rawKey ->
         when (rawKey) {
-            "k-alice" -> ApiKeyPrincipal(name = "alice-svc", roles = setOf(Role.USER))
-            "k-admin" -> ApiKeyPrincipal(name = "admin-svc", roles = setOf(Role.ADMIN))
+            "k-alice" -> Client(name = "alice-svc", roles = setOf(Role.USER))
+            "k-admin" -> Client(name = "admin-svc", roles = setOf(Role.ADMIN))
             else -> null
         }
     }
@@ -111,15 +117,15 @@ class ApiKeySecurityTest {
     }
 
     @Test
-    fun `should expose ApiKeyIdentity on the context when the caller is authenticated`() {
+    fun `should expose the user-defined identity on the context when the caller is authenticated`() {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http.authentication = apiKey { api -> api.apiKeyLookup = testApiKeyLookup }
+                security.http.authentication = apiKey { api -> api.lookup = testApiKeyLookup }
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<ApiKeyIdentity>()
+                val identity = ctx.identity<Client>()
                 ctx.result(identity.name)
             }
         }
@@ -140,13 +146,13 @@ class ApiKeySecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http.authentication = apiKey { api ->
-                    api.apiKeyLookup = testApiKeyLookup
+                    api.lookup = testApiKeyLookup
                     api.resolver = ApiKeyResolver.header("X-App-Key")
                 }
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<ApiKeyIdentity>()
+                val identity = ctx.identity<Client>()
                 ctx.result(identity.name)
             }
         }
@@ -167,13 +173,13 @@ class ApiKeySecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http.authentication = apiKey { api ->
-                    api.apiKeyLookup = testApiKeyLookup
+                    api.lookup = testApiKeyLookup
                     api.resolver = ApiKeyResolver.query("api_key")
                 }
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<ApiKeyIdentity>()
+                val identity = ctx.identity<Client>()
                 ctx.result(identity.name)
             }
         }
@@ -194,7 +200,7 @@ class ApiKeySecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http.authentication = apiKey { api ->
-                    api.apiKeyLookup = testApiKeyLookup
+                    api.lookup = testApiKeyLookup
                     api.unauthorizedHandler = UnauthorizedHandler { ctx, _ ->
                         ctx.status(401).result("""{"error":"invalid_api_key"}""")
                     }
@@ -220,7 +226,7 @@ class ApiKeySecurityTest {
             security.rules.post("/protected/*", Rules.authenticated())
             security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
             security.http.authentication = apiKey { api ->
-                api.apiKeyLookup = testApiKeyLookup
+                api.lookup = testApiKeyLookup
             }
             security.http.fallback = Rules.deny()
         }

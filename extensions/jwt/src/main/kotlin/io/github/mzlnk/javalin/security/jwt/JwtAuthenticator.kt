@@ -3,6 +3,7 @@ package io.github.mzlnk.javalin.security.jwt
 import io.github.mzlnk.javalin.security.authentication.Authentication
 import io.github.mzlnk.javalin.security.authentication.Authenticator
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.javalin.http.Context
 import org.slf4j.LoggerFactory
@@ -12,14 +13,19 @@ import org.slf4j.LoggerFactory
  *
  * Extracts the raw token via [TokenResolver]: missing token yields
  * [AuthenticationResult.NotAuthenticated]. Calls [JwtDecoder.decode] with the configured
- * [JwtVerification]; any thrown exception yields [AuthenticationResult.Failure]. On success, maps
- * the [DecodedJwt] to a [JwtIdentity], resolves roles via [JwtRolesMapper], and returns
- * [AuthenticationResult.Success]. Construct via `jwt { }` or [Builder].
+ * [JwtVerification]; any thrown exception yields [AuthenticationResult.Failure]. On success,
+ * resolves the identity:
+ * - when [identityMapper] is set, maps the [DecodedJwt] to it directly (`null` yields
+ *   [AuthenticationResult.Failure]);
+ * - otherwise falls back to the default [Jwt] identity, with roles from [rolesMapper].
+ *
+ * Construct via `jwt { }` or [Builder].
  */
 class JwtAuthenticator private constructor(
     private val decoder: JwtDecoder,
     private val verification: JwtVerification,
     private val rolesMapper: JwtRolesMapper,
+    private val identityMapper: JwtIdentityMapper?,
     private val tokenResolver: TokenResolver,
 ) : Authenticator {
 
@@ -34,9 +40,18 @@ class JwtAuthenticator private constructor(
             return AuthenticationResult.Failure(message = ex.message, cause = ex)
         }
 
-        val identity = JwtIdentity(decoded)
-        val roles = rolesMapper.map(decoded)
-        return AuthenticationResult.Success(Authentication.authenticated(identity, roles))
+        val mapper = identityMapper
+        val identity: Identity? = if (mapper != null) {
+            mapper.map(decoded)
+        } else {
+            Jwt(decoded, rolesMapper.map(decoded))
+        }
+
+        if (identity == null) {
+            return AuthenticationResult.Failure(message = "jwt.identityMapper returned null for a verified token")
+        }
+
+        return AuthenticationResult.Success(Authentication.authenticated(identity))
     }
 
     /** Fluent builder for constructing a [JwtAuthenticator]. */
@@ -46,11 +61,24 @@ class JwtAuthenticator private constructor(
     ) {
 
         private var rolesMapper: JwtRolesMapper = JwtRolesMapper.noRoles()
+        private var identityMapper: JwtIdentityMapper? = null
         private var tokenResolver: TokenResolver = TokenResolver.DEFAULT
 
-        /** Sets the [JwtRolesMapper] used to resolve roles from a verified token. Defaults to [JwtRolesMapper.noRoles]. */
+        /**
+         * Sets the [JwtRolesMapper] used to resolve roles from a verified token when no
+         * [identityMapper] is configured. Defaults to [JwtRolesMapper.noRoles].
+         */
         fun rolesMapper(mapper: JwtRolesMapper): Builder {
             this.rolesMapper = mapper
+            return this
+        }
+
+        /**
+         * Sets the [JwtIdentityMapper] used to resolve the [Identity] from a verified token.
+         * Defaults to `null` (falls back to the built-in [Jwt] identity).
+         */
+        fun identityMapper(mapper: JwtIdentityMapper?): Builder {
+            this.identityMapper = mapper
             return this
         }
 
@@ -69,6 +97,7 @@ class JwtAuthenticator private constructor(
             decoder = decoder,
             verification = verification,
             rolesMapper = rolesMapper,
+            identityMapper = identityMapper,
             tokenResolver = tokenResolver,
         )
 

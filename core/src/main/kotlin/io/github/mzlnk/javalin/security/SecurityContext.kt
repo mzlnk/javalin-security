@@ -9,7 +9,9 @@ import io.javalin.http.Context
  *
  * Obtain via `ctx.with(JavalinSecurityPlugin::class)` (Kotlin) or `ctx.with(JavalinSecurityPlugin.class)` (Java). The `Context.authentication()` / `Context.identity()` / `Context.identityOrNull()` extensions in this package delegate here.
  */
-class SecurityContext internal constructor(private val context: Context) {
+class SecurityContext internal constructor(
+    private val context: Context,
+) {
 
     /**
      * Returns the [Authentication] resolved for the current request.

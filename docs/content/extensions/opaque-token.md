@@ -1,9 +1,9 @@
 # Opaque Token
 
-Opaque bearer-token authentication via `javalin-security-opaque-token`. You supply an
-`OpaqueTokenLookup`; the extension resolves the token from the request (default:
-`Authorization: Bearer …`), validates optional expiry, and produces an `OpaqueTokenIdentity`
-with roles.
+Opaque bearer-token authentication via `javalin-security-opaque-token`. You bring your own
+`Identity` type; `OpaqueTokenLookup` resolves a raw token to a `TokenRecord` (your identity plus
+an optional expiry). The extension resolves the token from the request (default:
+`Authorization: Bearer …`), validates the optional expiry, and attaches your identity.
 
 Use this for **server-issued opaque tokens** — session tokens, personal access tokens (PATs),
 or any non-JWT bearer scheme where the application owns a token store. This is **not** OAuth2:
@@ -46,6 +46,7 @@ Add the extension on top of [core](../getting-started/installation.md):
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authentication.Identity
     import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.opaquetoken.*
     import io.github.mzlnk.javalin.security.security
@@ -54,9 +55,11 @@ Add the extension on top of [core](../getting-started/installation.md):
 
     enum class Role : RouteRole { USER, ADMIN }
 
+    data class User(override val name: String, override val roles: Set<RouteRole>) : Identity
+
     val tokens = mapOf(
-        "t-alice" to OpaqueTokenDetails(subject = "alice", roles = setOf(Role.USER)),
-        "t-admin" to OpaqueTokenDetails(subject = "admin", roles = setOf(Role.ADMIN)),
+        "t-alice" to TokenRecord(User("alice", setOf(Role.USER))),
+        "t-admin" to TokenRecord(User("admin", setOf(Role.ADMIN))),
     )
 
     Javalin.create { config ->
@@ -64,7 +67,7 @@ Add the extension on top of [core](../getting-started/installation.md):
             security.rules.get("/public/*", Rules.allow())
             security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
             security.http.authentication = opaqueToken { ot ->
-                ot.tokenLookup = OpaqueTokenLookup { raw -> tokens[raw] }
+                ot.lookup = OpaqueTokenLookup { raw -> tokens[raw] }
             }
             security.http.fallback = Rules.authenticated()
         }
@@ -75,22 +78,28 @@ Add the extension on top of [core](../getting-started/installation.md):
 
     ```java
     import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
+    import io.github.mzlnk.javalin.security.authentication.Identity;
     import io.github.mzlnk.javalin.security.opaquetoken.*;
     import io.github.mzlnk.javalin.security.authorization.Rules;
     import io.javalin.Javalin;
     import java.util.Map;
     import java.util.Set;
 
-    Map<String, OpaqueTokenDetails> tokens = Map.of(
-        "t-alice", new OpaqueTokenDetails("alice", Set.of(Role.USER)),
-        "t-admin", new OpaqueTokenDetails("admin", Set.of(Role.ADMIN)));
+    record User(String name, Set<RouteRole> roles) implements Identity {
+        @Override public String getName() { return name; }
+        @Override public Set<RouteRole> getRoles() { return roles; }
+    }
+
+    Map<String, TokenRecord> tokens = Map.of(
+        "t-alice", new TokenRecord(new User("alice", Set.of(Role.USER))),
+        "t-admin", new TokenRecord(new User("admin", Set.of(Role.ADMIN))));
 
     Javalin.create(config -> {
         config.registerPlugin(new JavalinSecurityPlugin(security -> {
             security.rules.get("/public/*", Rules.allow());
             security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN));
             security.http.authentication = OpaqueTokenSecurity.opaqueToken(ot -> {
-                ot.tokenLookup = tokens::get;
+                ot.lookup = tokens::get;
             });
             security.http.fallback = Rules.authenticated();
         }));
@@ -100,10 +109,10 @@ Add the extension on top of [core](../getting-started/installation.md):
 ## Configuration
 
 | Field                  | Default                          | Effect                                                              |
-|------------------------|----------------------------------|---------------------------------------------------------------------|
-| `tokenLookup`          | *required*                       | Raw token → `OpaqueTokenDetails` (or `null`).                       |
+|------------------------|-----------------------------------|---------------------------------------------------------------------|
+| `lookup`               | *required*                       | Raw token → `TokenRecord` (or `null`).                              |
 | `resolver`             | `Authorization: Bearer …`        | Where the token is read from (`TokenResolver`).                     |
-| `clock`                | `Clock.systemUTC()`              | Used to validate `OpaqueTokenDetails.expiresAt`.                    |
+| `clock`                | `Clock.systemUTC()`              | Used to validate `TokenRecord.expiresAt`.                           |
 | `bearerChallenge`      | `false`                          | When `true`, 401 responses include `WWW-Authenticate: Bearer`.      |
 | `realm`                | `"API"`                          | Realm attribute for the bearer challenge.                           |
 | `forbiddenHandler`     | bare HTTP 403                    | Renders access denied for authenticated callers.                    |
@@ -121,7 +130,7 @@ Override via `resolver`:
 
     ```kotlin
     opaqueToken { ot ->
-        ot.tokenLookup = myLookup
+        ot.lookup = myLookup
         ot.resolver = TokenResolver.cookie("session")   // cookie
         // ot.resolver = TokenResolver.bearerHeader()   // default Authorization Bearer
     }
@@ -131,7 +140,7 @@ Override via `resolver`:
 
     ```java
     OpaqueTokenSecurity.opaqueToken(ot -> {
-        ot.tokenLookup = myLookup;
+        ot.lookup = myLookup;
         ot.resolver = TokenResolver.cookie("session");   // cookie
         // ot.resolver = TokenResolver.bearerHeader();   // default Authorization Bearer
     });
@@ -141,22 +150,21 @@ Override via `resolver`:
     Query parameters commonly appear in access logs, browser history, and `Referer` headers.
     Prefer `TokenResolver.bearerHeader(...)` or `TokenResolver.cookie(...)`.
 
-## Expiry
+## Expiry and revocation
 
-When `OpaqueTokenDetails.expiresAt` is non-null, the authenticator rejects the token if
-`expiresAt` is at-or-before the configured `clock`'s instant (`Failure("token expired")`).
-Leave `expiresAt` as `null` for non-expiring tokens.
+When `TokenRecord.expiresAt` is non-null, the authenticator rejects the token if `expiresAt` is
+at-or-before the configured `clock`'s instant (`Failure("token expired")`). Leave `expiresAt` as
+`null` for non-expiring tokens.
 
 To **revoke** a token early, return `null` from the lookup (same as an unknown token).
 
 ## Identity
 
-On success the strategy attaches an `OpaqueTokenIdentity` whose `name` is the
-`OpaqueTokenDetails.subject` from the lookup:
+On success the strategy attaches the resolved `TokenRecord.identity` as the request's identity:
 
 ```kotlin
 config.routes.get("/me") { ctx ->
-    ctx.result(ctx.identity<OpaqueTokenIdentity>().name)
+    ctx.result(ctx.identity<User>().name)
 }
 ```
 
@@ -168,7 +176,7 @@ Enable a RFC 6750-style `WWW-Authenticate: Bearer` challenge on 401 responses:
 
     ```kotlin
     opaqueToken { ot ->
-        ot.tokenLookup = myLookup
+        ot.lookup = myLookup
         ot.bearerChallenge = true
         ot.realm = "API"
     }
@@ -178,7 +186,7 @@ Enable a RFC 6750-style `WWW-Authenticate: Bearer` challenge on 401 responses:
 
     ```java
     OpaqueTokenSecurity.opaqueToken(ot -> {
-        ot.tokenLookup = myLookup;
+        ot.lookup = myLookup;
         ot.bearerChallenge = true;
         ot.realm = "API";
     });
@@ -197,7 +205,7 @@ and override `unauthorizedHandler`:
 
     ```kotlin
     opaqueToken { ot ->
-        ot.tokenLookup = myLookup
+        ot.lookup = myLookup
         ot.unauthorizedHandler = UnauthorizedHandler { ctx, _ ->
             ctx.status(401).result("""{"error":"invalid_token"}""")
         }
@@ -208,7 +216,7 @@ and override `unauthorizedHandler`:
 
     ```java
     OpaqueTokenSecurity.opaqueToken(ot -> {
-        ot.tokenLookup = myLookup;
+        ot.lookup = myLookup;
         ot.unauthorizedHandler = (ctx, failure) ->
             ctx.status(401).result("{\"error\":\"invalid_token\"}");
     });
@@ -216,8 +224,8 @@ and override `unauthorizedHandler`:
 
 ## Next steps
 
-- [Access caller identity](../getting-started/access-caller-identity.md) — read
-  `OpaqueTokenIdentity` in handlers.
+- [Access caller identity](../getting-started/access-caller-identity.md) — read your
+  `Identity` in handlers.
 - [Authorization](../concepts/authorization.md) — pair opaque tokens with the rule table.
 - [Error handling](../concepts/error-handling.md) — customize 401 / 403 responses.
 - [Custom authentication](../guides/custom-authentication.md) — async / remote lookup

@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security.opaquetoken
 
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
@@ -15,19 +16,17 @@ import java.time.Instant
 class OpaqueTokenSecurityTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
+    private data class Principal(
+        override val name: String,
+        override val roles: Set<RouteRole> = emptySet(),
+    ) : Identity
+
     private val testTokenLookup = OpaqueTokenLookup { rawToken ->
         when (rawToken) {
-            "t-alice" -> OpaqueTokenDetails(
-                subject = "alice",
-                roles = setOf(Role.USER),
-            )
-            "t-admin" -> OpaqueTokenDetails(
-                subject = "admin",
-                roles = setOf(Role.ADMIN),
-            )
-            "t-expired" -> OpaqueTokenDetails(
-                subject = "expired-user",
-                roles = setOf(Role.USER),
+            "t-alice" -> TokenRecord(Principal(name = "alice", roles = setOf(Role.USER)))
+            "t-admin" -> TokenRecord(Principal(name = "admin", roles = setOf(Role.ADMIN)))
+            "t-expired" -> TokenRecord(
+                Principal(name = "expired-user", roles = setOf(Role.USER)),
                 expiresAt = Instant.now().minusSeconds(60),
             )
             else -> null
@@ -127,14 +126,14 @@ class OpaqueTokenSecurityTest {
     }
 
     @Test
-    fun `should expose OpaqueTokenIdentity on the context when the caller is authenticated`() {
+    fun `should expose the user-defined identity on the context when the caller is authenticated`() {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
-                security.http.authentication = opaqueToken { ot -> ot.tokenLookup = testTokenLookup }
+                security.http.authentication = opaqueToken { ot -> ot.lookup = testTokenLookup }
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<OpaqueTokenIdentity>()
+                val identity = ctx.identity<Principal>()
                 ctx.result(identity.name)
             }
         }
@@ -152,13 +151,13 @@ class OpaqueTokenSecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http.authentication = opaqueToken { ot ->
-                    ot.tokenLookup = testTokenLookup
+                    ot.lookup = testTokenLookup
                     ot.resolver = TokenResolver.cookie("session")
                 }
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<OpaqueTokenIdentity>()
+                val identity = ctx.identity<Principal>()
                 ctx.result(identity.name)
             }
         }
@@ -204,7 +203,7 @@ class OpaqueTokenSecurityTest {
         val app = Javalin.create { cfg ->
             cfg.security { security ->
                 security.http.authentication = opaqueToken { ot ->
-                    ot.tokenLookup = testTokenLookup
+                    ot.lookup = testTokenLookup
                     ot.unauthorizedHandler = UnauthorizedHandler { ctx, _ ->
                         ctx.status(401).result("""{"error":"invalid_token"}""")
                     }
@@ -228,7 +227,7 @@ class OpaqueTokenSecurityTest {
             security.rules.post("/protected/*", Rules.authenticated())
             security.rules.get("/admin/*", Rules.hasRole(Role.ADMIN))
             security.http.authentication = opaqueToken { ot ->
-                ot.tokenLookup = testTokenLookup
+                ot.lookup = testTokenLookup
                 ot.bearerChallenge = bearerChallenge
             }
             security.http.fallback = Rules.deny()

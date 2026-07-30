@@ -1,5 +1,7 @@
 package io.github.mzlnk.javalin.security.basicauth
 
+import io.github.mzlnk.javalin.security.authentication.Identity
+import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
 import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.identity
 import io.github.mzlnk.javalin.security.security
@@ -13,10 +15,15 @@ import java.util.Base64
 class BasicAuthSecurityTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
+    private data class TestUser(
+        override val name: String,
+        override val roles: Set<RouteRole> = emptySet(),
+    ) : Identity
+
     private val testUserLookup = UserLookup { username ->
         when (username) {
-            "alice" -> BasicUser(username = "alice", password = "alice-pw", roles = setOf(Role.USER))
-            "admin" -> BasicUser(username = "admin", password = "admin-pw", roles = setOf(Role.ADMIN))
+            "alice" -> PasswordCredentials(TestUser(name = "alice", roles = setOf(Role.USER)), encodedPassword = "alice-pw")
+            "admin" -> PasswordCredentials(TestUser(name = "admin", roles = setOf(Role.ADMIN)), encodedPassword = "admin-pw")
             else -> null
         }
     }
@@ -139,7 +146,7 @@ class BasicAuthSecurityTest {
     }
 
     @Test
-    fun `should expose BasicAuthIdentity on the context when the caller is authenticated`() {
+    fun `should expose the user-defined identity on the context when the caller is authenticated`() {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
@@ -147,7 +154,7 @@ class BasicAuthSecurityTest {
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<BasicAuthIdentity>()
+                val identity = ctx.identity<TestUser>()
                 ctx.result(identity.name)
             }
         }
@@ -223,7 +230,7 @@ class BasicAuthSecurityTest {
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<BasicAuthIdentity>()
+                val identity = ctx.identity<TestUser>()
                 ctx.result(identity.name)
             }
         }

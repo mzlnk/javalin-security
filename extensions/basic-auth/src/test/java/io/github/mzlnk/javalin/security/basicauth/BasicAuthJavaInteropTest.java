@@ -1,5 +1,8 @@
 package io.github.mzlnk.javalin.security.basicauth;
 
+import io.github.mzlnk.javalin.security.authentication.Identity;
+import io.github.mzlnk.javalin.security.authentication.PasswordCredentials;
+import io.javalin.security.RouteRole;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -8,10 +11,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class BasicAuthJavaInteropTest {
 
+    static class TestUser implements Identity {
+        private final String name;
+        private final Set<RouteRole> roles;
+
+        TestUser(String name) {
+            this(name, Set.of());
+        }
+
+        TestUser(String name, Set<RouteRole> roles) {
+            this.name = name;
+            this.roles = roles;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Set<RouteRole> getRoles() {
+            return roles;
+        }
+    }
+
     @Test
     void authenticator_builder_is_fluent_from_java() {
         UserLookup testUserLookup = username ->
-                "alice".equals(username) ? new BasicUser("alice", "alice-pw", Set.of()) : null;
+                "alice".equals(username) ? new PasswordCredentials(new TestUser("alice"), "alice-pw") : null;
 
         BasicAuthenticator authenticator = BasicAuthenticator.builder(testUserLookup)
                 .passwordEncoder(PasswordEncoder.noOp())
@@ -23,7 +50,7 @@ class BasicAuthJavaInteropTest {
     @Test
     void authenticator_of_factory_works_from_java() {
         UserLookup testUserLookup = username ->
-                "alice".equals(username) ? new BasicUser("alice", "alice-pw", Set.of()) : null;
+                "alice".equals(username) ? new PasswordCredentials(new TestUser("alice"), "alice-pw") : null;
 
         BasicAuthenticator authenticator = BasicAuthenticator.of(testUserLookup);
         assertThat(authenticator).isNotNull();
@@ -44,9 +71,9 @@ class BasicAuthJavaInteropTest {
 
     @Test
     void user_lookup_can_be_expressed_as_java_lambda() {
-        UserLookup lookup = username -> new BasicUser(username, "pw", Set.of());
-        BasicUser user = lookup.lookup("bob");
-        assertThat(user.getUsername()).isEqualTo("bob");
+        UserLookup lookup = username -> new PasswordCredentials(new TestUser(username), "pw");
+        PasswordCredentials credentials = lookup.lookup("bob");
+        assertThat(credentials.getIdentity().getName()).isEqualTo("bob");
     }
 
     @Test

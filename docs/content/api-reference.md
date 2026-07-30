@@ -8,11 +8,15 @@ Full generated KDoc for every public module:
 
 | Module                          | Key entry points                                                                                                       |
 |---------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `javalin-security`              | `JavalinSecurityPlugin`, `security` / `authentication` / `identity` / `identityOrNull`, `Authenticator`, `AuthenticationStrategy`, `Authentication`, `Rule`, `Rules`, `Anyone`. |
-| `javalin-security-jwt`          | `jwt`, `JwtConfig`, `JwtDecoder`, `JwtVerification`, `JwtKeySource`, `JwtRolesMapper`, `JwtIdentity`, `DecodedJwt`.   |
+| `javalin-security`              | `JavalinSecurityPlugin`, `security` / `authentication` / `identity` / `identityOrNull`, `Authenticator`, `AuthenticationStrategy`, `Authentication`, `Identity`, `PasswordCredentials`, `Rule`, `Rules`, `Anyone`. |
+| `javalin-security-jwt`          | `jwt`, `JwtConfig`, `JwtDecoder`, `JwtVerification`, `JwtKeySource`, `JwtRolesMapper`, `JwtIdentityMapper`, `Jwt`, `DecodedJwt`. |
 | `javalin-security-jwt-nimbus`   | `NimbusJwtDecoder`.                                                                                                    |
 | `javalin-security-jwt-auth0`    | `Auth0JwtDecoder`.                                                                                                     |
-| `javalin-security-basic-auth`   | `basicAuth`, `BasicAuthConfig`, `BasicAuthenticator`, `UserLookup`, `BasicUser`, `PasswordEncoder`.                    |
+| `javalin-security-basic-auth`   | `basicAuth`, `BasicAuthConfig`, `BasicAuthenticator`, `UserLookup`, `PasswordEncoder`.                                |
+| `javalin-security-api-key`      | `apiKey`, `ApiKeyConfig`, `ApiKeyAuthenticator`, `ApiKeyLookup`, `ApiKeyResolver`.                                     |
+| `javalin-security-opaque-token` | `opaqueToken`, `OpaqueTokenConfig`, `OpaqueTokenAuthenticator`, `OpaqueTokenLookup`, `TokenRecord`.                    |
+| `javalin-security-session`      | `session`, `SessionManager`, `HttpSessionManager`, `SessionAuthenticator`. |
+
 
 ## Kotlin → Java equivalents
 
@@ -22,6 +26,8 @@ Full generated KDoc for every public module:
 | `ctx.identity<T>()`             | `SecurityExtensions.identity(ctx, Type.class)` (throws when anonymous). |
 | `ctx.identityOrNull<T>()`       | `SecurityExtensions.identityOrNull(ctx, Type.class)`.                  |
 | `jwt { }` / `basicAuth { }`      | `JwtSecurity.jwt(…)` / `BasicAuthSecurity.basicAuth(…)`.                |
+| `apiKey { }` / `opaqueToken { }` | `ApiKeySecurity.apiKey(…)` / `OpaqueTokenSecurity.opaqueToken(…)`.      |
+| `session { }`                    | `SessionSecurity.session(…)`.                                           |
 | `NimbusJwtDecoder` / `Anyone`    | `NimbusJwtDecoder.INSTANCE` / `Anyone.INSTANCE`.                        |
 | `Rules.allow()` etc.             | Static `Rules.allow()` etc.                                             |
 

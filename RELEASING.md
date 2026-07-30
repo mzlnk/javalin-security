@@ -36,15 +36,18 @@ Release versions (for example `1.0.0`) are published to Maven Central.
 
 ## Release steps
 
-1. Update `version` in `gradle.properties` to the release version (for example `1.0.0`).
-2. Commit and push the change to the branch you intend to release from.
-3. Make sure no `v<version>` tag already exists for that version (the workflow will refuse
+1. Update [`docs/content/changelog.md`](docs/content/changelog.md) — rename the pending
+   `[Unreleased]` / next-version section's heading to the release version and date, and make sure
+   any breaking-change summary for that version is accurate.
+2. Update `version` in `gradle.properties` to the release version (for example `1.0.0`).
+3. Commit and push the change to the branch you intend to release from.
+4. Make sure no `v<version>` tag already exists for that version (the workflow will refuse
    to run otherwise).
-4. In GitHub Actions, open **Release**, select that branch, and run the workflow.
-5. Approve the `maven-central` environment deployment when prompted.
-6. Verify the new [GitHub Release](https://github.com/mzlnk/javalin-security/releases) and,
+5. In GitHub Actions, open **Release**, select that branch, and run the workflow.
+6. Approve the `maven-central` environment deployment when prompted.
+7. Verify the new [GitHub Release](https://github.com/mzlnk/javalin-security/releases) and,
    once Maven Central has synced, that the artifacts are available.
-7. Bump `version` in `gradle.properties` to the next snapshot (for example `1.0.1-SNAPSHOT`),
+8. Bump `version` in `gradle.properties` to the next snapshot (for example `1.0.1-SNAPSHOT`),
    commit, and push.
 
 ## GitHub Environment: `maven-central`

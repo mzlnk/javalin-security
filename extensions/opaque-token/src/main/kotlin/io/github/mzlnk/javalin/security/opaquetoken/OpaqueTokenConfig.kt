@@ -13,18 +13,18 @@ import java.util.function.Consumer
 /**
  * Configuration for the [opaqueToken] strategy factory.
  *
- * [tokenLookup] is required. Roles come from [OpaqueTokenDetails.roles]. Builds an
- * [OpaqueTokenAuthenticator], and selects a [BearerChallengeUnauthorizedHandler] when
- * [bearerChallenge] is `true`.
+ * [lookup] is required. The identity type your [OpaqueTokenLookup] returns is your own — bring
+ * your own type; roles come from its `roles` property. Builds an [OpaqueTokenAuthenticator], and
+ * selects a [BearerChallengeUnauthorizedHandler] when [bearerChallenge] is `true`.
  */
 class OpaqueTokenConfig internal constructor() {
 
     /**
-     * Resolves a raw opaque token to its stored [OpaqueTokenDetails]. Required; throws
+     * Resolves a raw opaque token to its stored [TokenRecord]. Required; throws
      * [SecurityConfigurationException] if unset when the strategy is built.
      */
     @JvmField
-    var tokenLookup: OpaqueTokenLookup? = null
+    var lookup: OpaqueTokenLookup? = null
 
     /**
      * Locates the raw token in the request.
@@ -34,7 +34,7 @@ class OpaqueTokenConfig internal constructor() {
     var resolver: TokenResolver = TokenResolver.DEFAULT
 
     /**
-     * Clock used for [OpaqueTokenDetails.expiresAt] validation.
+     * Clock used for [TokenRecord.expiresAt] validation.
      * Defaults to [Clock.systemUTC].
      */
     @JvmField
@@ -70,11 +70,11 @@ class OpaqueTokenConfig internal constructor() {
     var realm: String = "API"
 
     internal fun buildAuthenticator(): OpaqueTokenAuthenticator {
-        val lookup = tokenLookup ?: throw SecurityConfigurationException(
-            "opaqueToken.tokenLookup is required but was not configured. " +
-                "Set 'tokenLookup = ...' inside the 'opaqueToken { }' block.",
+        val tokenLookup = lookup ?: throw SecurityConfigurationException(
+            "opaqueToken.lookup is required but was not configured. " +
+                "Set 'lookup = ...' inside the 'opaqueToken { }' block.",
         )
-        return OpaqueTokenAuthenticator.builder(lookup)
+        return OpaqueTokenAuthenticator.builder(tokenLookup)
             .resolver(resolver)
             .clock(clock)
             .build()
@@ -88,18 +88,17 @@ class OpaqueTokenConfig internal constructor() {
 /**
  * Builds an [AuthenticationStrategy.Sync] for opaque bearer-token authentication.
  *
- * Assign the result to `http.authentication`. Only [OpaqueTokenConfig.tokenLookup] is required.
- * To use [OpaqueTokenAuthenticator] directly, call [OpaqueTokenAuthenticator.builder] and wrap it
- * in a custom [AuthenticationStrategy.Sync].
+ * Assign the result to `http.authentication`. Only [OpaqueTokenConfig.lookup] is required. The
+ * identity type flowing through the extension is entirely yours — the extension attaches
+ * whichever identity your [OpaqueTokenLookup] returns. To use [OpaqueTokenAuthenticator]
+ * directly, call [OpaqueTokenAuthenticator.builder] and wrap it in a custom
+ * [AuthenticationStrategy.Sync] (or [AuthenticationStrategy.sync]).
  */
 fun opaqueToken(configure: Consumer<OpaqueTokenConfig>): AuthenticationStrategy.Sync {
     val config = OpaqueTokenConfig().also(configure::accept)
-    val authenticator = config.buildAuthenticator()
-    val unauthorizedHandlerValue = config.buildUnauthorizedHandler()
-    val forbiddenHandlerValue = config.forbiddenHandler
-    return object : AuthenticationStrategy.Sync {
-        override val unauthorizedHandler: UnauthorizedHandler get() = unauthorizedHandlerValue
-        override val forbiddenHandler: ForbiddenHandler get() = forbiddenHandlerValue
-        override fun authenticator() = authenticator
-    }
+    return AuthenticationStrategy.sync(
+        authenticator = config.buildAuthenticator(),
+        unauthorizedHandler = config.buildUnauthorizedHandler(),
+        forbiddenHandler = config.forbiddenHandler,
+    )
 }

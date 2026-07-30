@@ -11,17 +11,18 @@ import java.util.function.Consumer
 /**
  * Configuration for the [apiKey] strategy factory.
  *
- * [apiKeyLookup] is required. Roles come from [ApiKeyPrincipal.roles]. Builds an
- * [ApiKeyAuthenticator]. HTTP-only — there is no WebSocket variant.
+ * [lookup] is required. The identity type your [ApiKeyLookup] returns is your own — bring your
+ * own type; roles come from its `roles` property. Builds an [ApiKeyAuthenticator]. HTTP-only —
+ * there is no WebSocket variant.
  */
 class ApiKeyConfig internal constructor() {
 
     /**
-     * Resolves a raw API key to its stored [ApiKeyPrincipal]. Required; throws
+     * Resolves a raw API key to its owner's identity. Required; throws
      * [SecurityConfigurationException] if unset when the strategy is built.
      */
     @JvmField
-    var apiKeyLookup: ApiKeyLookup? = null
+    var lookup: ApiKeyLookup? = null
 
     /**
      * Locates the raw API key in the request.
@@ -42,13 +43,11 @@ class ApiKeyConfig internal constructor() {
     var unauthorizedHandler: UnauthorizedHandler = UnauthorizedHandler.DEFAULT
 
     internal fun buildAuthenticator(): ApiKeyAuthenticator {
-        val lookup = apiKeyLookup ?: throw SecurityConfigurationException(
-            "apiKey.apiKeyLookup is required but was not configured. " +
-                "Set 'apiKeyLookup = ...' inside the 'apiKey { }' block.",
+        val keyLookup = lookup ?: throw SecurityConfigurationException(
+            "apiKey.lookup is required but was not configured. " +
+                "Set 'lookup = ...' inside the 'apiKey { }' block.",
         )
-        return ApiKeyAuthenticator.builder(lookup)
-            .resolver(resolver)
-            .build()
+        return ApiKeyAuthenticator(lookup = keyLookup, resolver = resolver)
     }
 
 }
@@ -56,18 +55,17 @@ class ApiKeyConfig internal constructor() {
 /**
  * Builds an [AuthenticationStrategy.Sync] for opaque API-key authentication.
  *
- * Assign the result to `http.authentication`. Only [ApiKeyConfig.apiKeyLookup] is required.
- * To use [ApiKeyAuthenticator] directly, call [ApiKeyAuthenticator.builder] and wrap it in a
- * custom [AuthenticationStrategy.Sync].
+ * Assign the result to `http.authentication`. Only [ApiKeyConfig.lookup] is required. The
+ * identity type flowing through the extension is entirely yours — the extension attaches
+ * whichever identity your [ApiKeyLookup] returns. To use [ApiKeyAuthenticator] directly,
+ * construct it and wrap it in a custom [AuthenticationStrategy.Sync] (or
+ * [AuthenticationStrategy.sync]).
  */
 fun apiKey(configure: Consumer<ApiKeyConfig>): AuthenticationStrategy.Sync {
     val config = ApiKeyConfig().also(configure::accept)
-    val authenticator = config.buildAuthenticator()
-    val unauthorizedHandlerValue = config.unauthorizedHandler
-    val forbiddenHandlerValue = config.forbiddenHandler
-    return object : AuthenticationStrategy.Sync {
-        override val unauthorizedHandler: UnauthorizedHandler get() = unauthorizedHandlerValue
-        override val forbiddenHandler: ForbiddenHandler get() = forbiddenHandlerValue
-        override fun authenticator() = authenticator
-    }
+    return AuthenticationStrategy.sync(
+        authenticator = config.buildAuthenticator(),
+        unauthorizedHandler = config.unauthorizedHandler,
+        forbiddenHandler = config.forbiddenHandler,
+    )
 }

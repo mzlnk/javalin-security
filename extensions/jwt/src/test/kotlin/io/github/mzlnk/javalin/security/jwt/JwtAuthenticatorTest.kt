@@ -39,16 +39,16 @@ class JwtAuthenticatorTest {
     }
 
     @Test
-    fun `should return Success with JwtIdentity when decoder succeeds`() {
+    fun `should return Success with Jwt identity when decoder succeeds`() {
         val manager = JwtAuthenticator.of(successDecoder, verification)
         val result = manager.authenticate(ctx("Bearer $validToken"))
 
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
         val success = result as AuthenticationResult.Success
         assertThat(success.authentication.isAuthenticated).isTrue()
-        assertThat(success.authentication.identity).isInstanceOf(JwtIdentity::class.java)
+        assertThat(success.authentication.identity).isInstanceOf(Jwt::class.java)
 
-        val identity = success.authentication.identity as JwtIdentity
+        val identity = success.authentication.identity as Jwt
         assertThat(identity.name).isEqualTo("alice")
         assertThat(identity.token).isEqualTo(decodedJwt)
     }
@@ -85,14 +85,14 @@ class JwtAuthenticatorTest {
     }
 
     @Test
-    fun `JwtIdentity name is the token subject`() {
-        val identity = JwtIdentity(SimpleDecodedJwt(subject = "carol", claims = emptyMap()))
+    fun `Jwt name is the token subject`() {
+        val identity = Jwt(SimpleDecodedJwt(subject = "carol", claims = emptyMap()))
         assertThat(identity.name).isEqualTo("carol")
     }
 
     @Test
-    fun `JwtIdentity name is blank string when subject is empty`() {
-        val identity = JwtIdentity(SimpleDecodedJwt(subject = "", claims = emptyMap()))
+    fun `Jwt name is blank string when subject is empty`() {
+        val identity = Jwt(SimpleDecodedJwt(subject = "", claims = emptyMap()))
         assertThat(identity.name).isBlank()
     }
 

@@ -1,6 +1,5 @@
 package io.github.mzlnk.javalin.security.session
 
-import io.github.mzlnk.javalin.security.SecurityConfigurationException
 import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 import io.github.mzlnk.javalin.security.authorization.Rules
@@ -8,29 +7,16 @@ import io.github.mzlnk.javalin.security.security
 import io.javalin.Javalin
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.ObjectInputStream
-import java.io.ObjectOutputStream
-import java.io.Serializable
 
 class SessionConfigurationTest {
 
     @Test
-    fun `should throw SecurityConfigurationException when sessionManager is not configured`() {
-        assertThatThrownBy {
-            Javalin.create { cfg ->
-                cfg.security { security ->
-                    security.http.authentication = session {
-                        // sessionManager not set — should fail
-                    }
-                    security.http.fallback = Rules.allow()
-                }
-            }
-        }.isInstanceOf(SecurityConfigurationException::class.java)
-            .hasMessageContaining("sessionManager")
+    fun `session factory defaults to an HttpSessionManager when sessionManager is not configured`() {
+        val strategy = session { }
+        val authenticator = strategy.authenticator() as SessionAuthenticator
+
+        assertThat(authenticator.sessionManager).isInstanceOf(HttpSessionManager::class.java)
     }
 
     @Test
@@ -49,7 +35,6 @@ class SessionConfigurationTest {
         val customForbidden = ForbiddenHandler { ctx, _ -> ctx.status(403).result("denied") }
 
         val strategy = session { cfg ->
-            cfg.sessionManager = HttpSessionManager.of()
             cfg.unauthorizedHandler = customUnauthorized
             cfg.forbiddenHandler = customForbidden
         }
@@ -60,7 +45,7 @@ class SessionConfigurationTest {
 
     @Test
     fun `session factory can be assigned to http authentication`() {
-        val strategy = session { it.sessionManager = HttpSessionManager.of() }
+        val strategy = session { }
 
         Javalin.create { cfg ->
             cfg.security { security ->
@@ -68,22 +53,6 @@ class SessionConfigurationTest {
                 security.http.fallback = Rules.allow()
             }
         }
-    }
-
-    @Test
-    fun `SessionPrincipal is Serializable and round-trips`() {
-        val principal = SessionPrincipal(subject = "alice")
-        assertThat(principal).isInstanceOf(Serializable::class.java)
-
-        val bytes = ByteArrayOutputStream().use { baos ->
-            ObjectOutputStream(baos).use { it.writeObject(principal) }
-            baos.toByteArray()
-        }
-        val restored = ObjectInputStream(ByteArrayInputStream(bytes)).use {
-            it.readObject() as SessionPrincipal
-        }
-        assertThat(restored.subject).isEqualTo("alice")
-        assertThat(restored.roles).isEmpty()
     }
 
 }

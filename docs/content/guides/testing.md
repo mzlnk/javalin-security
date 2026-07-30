@@ -33,7 +33,7 @@ Keep your Javalin configuration in a reusable factory so tests and production sh
                         null -> AuthenticationResult.NotAuthenticated
                         "invalid" -> AuthenticationResult.Failure("bad")
                         else -> AuthenticationResult.Success(
-                            Authentication.authenticated(ApiIdentity(ctx.header("X-User")!!), setOf(Role.ADMIN)),
+                            Authentication.authenticated(ApiIdentity(ctx.header("X-User")!!, setOf(Role.ADMIN))),
                         )
                     }
                 }
@@ -64,7 +64,7 @@ Keep your Javalin configuration in a reusable factory so tests and production sh
                             if (user == null) return AuthenticationResult.NotAuthenticated.INSTANCE;
                             if ("invalid".equals(user)) return new AuthenticationResult.Failure("bad", null);
                             return new AuthenticationResult.Success(
-                                Authentication.authenticated(new ApiIdentity(user), Set.of(Role.ADMIN)));
+                                Authentication.authenticated(new ApiIdentity(user, Set.of(Role.ADMIN))));
                         };
                     }
                 };

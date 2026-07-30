@@ -1,6 +1,7 @@
 package io.github.mzlnk.javalin.security.opaquetoken
 
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.javalin.http.Context
 import io.javalin.security.RouteRole
@@ -15,12 +16,16 @@ import java.time.ZoneOffset
 class OpaqueTokenAuthenticatorTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
+    private data class Principal(
+        override val name: String,
+        override val roles: Set<RouteRole> = emptySet(),
+    ) : Identity
+
     private val now = Instant.parse("2026-01-15T12:00:00Z")
     private val fixedClock = Clock.fixed(now, ZoneOffset.UTC)
 
-    private val alice = OpaqueTokenDetails(
-        subject = "alice",
-        roles = setOf(Role.USER, Role.ADMIN),
+    private val alice = TokenRecord(
+        identity = Principal(name = "alice", roles = setOf(Role.USER, Role.ADMIN)),
         expiresAt = now.plusSeconds(3600),
     )
 
@@ -30,7 +35,7 @@ class OpaqueTokenAuthenticatorTest {
             "t-expired" -> alice.copy(expiresAt = now.minusSeconds(1))
             "t-exact" -> alice.copy(expiresAt = now)
             "t-no-expiry" -> alice.copy(expiresAt = null)
-            "t-noroles" -> OpaqueTokenDetails(subject = "anon")
+            "t-noroles" -> TokenRecord(identity = Principal(name = "anon"))
             else -> null
         }
     }
@@ -88,7 +93,7 @@ class OpaqueTokenAuthenticatorTest {
     }
 
     @Test
-    fun `should return Success with OpaqueTokenIdentity when token is valid`() {
+    fun `should return Success with the looked-up identity when token is valid`() {
         val authenticator = OpaqueTokenAuthenticator.builder(tokenLookup)
             .clock(fixedClock)
             .build()
@@ -97,9 +102,9 @@ class OpaqueTokenAuthenticatorTest {
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
         val success = result as AuthenticationResult.Success
         assertThat(success.authentication.isAuthenticated).isTrue()
-        assertThat(success.authentication.identity).isInstanceOf(OpaqueTokenIdentity::class.java)
+        assertThat(success.authentication.identity).isInstanceOf(Principal::class.java)
 
-        val identity = success.authentication.identity as OpaqueTokenIdentity
+        val identity = success.authentication.identity as Principal
         assertThat(identity.name).isEqualTo("alice")
     }
 
@@ -169,12 +174,6 @@ class OpaqueTokenAuthenticatorTest {
 
         val result = authenticator.authenticate(cookieCtx)
         assertThat(result).isEqualTo(AuthenticationResult.NotAuthenticated)
-    }
-
-    @Test
-    fun `OpaqueTokenIdentity name is the details subject`() {
-        val identity = OpaqueTokenIdentity("billing")
-        assertThat(identity.name).isEqualTo("billing")
     }
 
     private fun ctx(authorizationHeader: String?): Context = mockk {

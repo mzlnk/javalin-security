@@ -1,22 +1,23 @@
 # Session
 
-Session-based authentication via `javalin-security-session`. The extension is built around
-one abstraction — `SessionManager` — that owns session **create**, **validate**, and
-**invalidate**. `SessionAuthenticator` requires a `SessionManager` and simply delegates
-`validate` on every request. You hold the same `SessionManager` reference in your login and
-logout handlers to establish and destroy sessions.
+Session-based authentication via `javalin-security-session`. You bring your own `Identity` type;
+the extension is built around one abstraction — `SessionManager` — that owns session **create**,
+**validate**, and **invalidate**. `SessionAuthenticator` delegates `validate` on every request,
+attaching the returned identity to the request. Session create/invalidate is your responsibility:
+keep a reference to your `SessionManager` and call it from login/logout handlers.
 
 The bundled [`HttpSessionManager`](#httpsessionmanager-default) is the servlet-session-backed
-default (i.e. `ctx.sessionAttribute(...)`). Plug in any other implementation (Redis, in-memory,
-signed cookie, …) without changing the rest of the extension.
+default (i.e. `ctx.sessionAttribute(...)`) and is used automatically if you don't configure one.
+Plug in any other implementation (Redis, in-memory, signed cookie, …) without changing the rest
+of the extension.
 
 Use this for **cookie-backed browser sessions** — classic server-side login flows. There is
 **no built-in login form**, credential validator, CSRF protection, or opinionated distributed
-store: validate credentials in your own `/login` route, then call `manager.create(ctx, principal)`.
+store: validate credentials in your own `/login` route, then call `sessions.create(ctx, identity)`.
 
 !!! info "Session vs Opaque Token"
     Opaque tokens travel as bearer credentials you look up in your store. Session auth stores
-    the principal via a `SessionManager` — by default in the HTTP session addressed by
+    the identity via a `SessionManager` — by default in the HTTP session addressed by
     `JSESSIONID`. Prefer Session for browser apps; prefer Opaque Token for APIs and PATs.
 
 ## Architecture
@@ -25,15 +26,16 @@ store: validate credentials in your own `/login` route, then call `manager.creat
 flowchart LR
     Request --> Authenticator[SessionAuthenticator]
     Authenticator -- "validate(ctx)" --> Manager[SessionManager]
-    Login[Login handler] -- "manager.create(ctx, principal)" --> Manager
-    Logout[Logout handler] -- "manager.invalidate(ctx)" --> Manager
-    Manager -- "SessionPrincipal or null" --> Authenticator
+    Login[Login handler] -- "create(ctx, identity)" --> Manager
+    Logout[Logout handler] -- "invalidate(ctx)" --> Manager
+    Manager -- "identity or null" --> Authenticator
     Authenticator -- Success or NotAuthenticated --> Guard[Security guard]
 ```
 
 There is exactly one lifecycle abstraction — the `SessionManager`. The `session { }` factory
-returns a plain `AuthenticationStrategy.Sync` wrapping a `SessionAuthenticator`; login and
-logout are done by calling the manager you already hold.
+returns an `AuthenticationStrategy.Sync` wrapping a `SessionAuthenticator` that calls `validate`
+on each request. Hold onto the same `SessionManager` instance you configure so login/logout
+handlers can call `create` / `invalidate`.
 
 ## Installation
 
@@ -58,21 +60,27 @@ Add the extension on top of [core](../getting-started/installation.md):
 
 ## Minimal setup
 
-Create a `SessionManager` (use `HttpSessionManager.of()` for the default), pass it to
-`session { }`, and call it from your login / logout handlers:
+Hold a `SessionManager` (defaults to `HttpSessionManager.of()`) and assign it both to
+`session { }` and to your login/logout handlers. When you use `HttpSessionManager`, your
+identity must implement `java.io.Serializable` — see
+[`HttpSessionManager`](#httpsessionmanager-default):
 
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authentication.Identity
     import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.session.*
     import io.github.mzlnk.javalin.security.security
     import io.javalin.Javalin
     import io.javalin.security.RouteRole
+    import java.io.Serializable
 
     enum class Role : RouteRole { USER, ADMIN }
 
-    val sessions: SessionManager = HttpSessionManager.of()
+    data class User(override val name: String, override val roles: Set<RouteRole>) : Identity, Serializable
+
+    val sessions = HttpSessionManager.of()
 
     Javalin.create { config ->
         config.security { security ->
@@ -84,7 +92,7 @@ Create a `SessionManager` (use `HttpSessionManager.of()` for the default), pass 
         }
         config.routes.post("/login") { ctx ->
             // validate credentials yourself, then:
-            sessions.create(ctx, SessionPrincipal("alice", setOf(Role.USER)))
+            sessions.create(ctx, User("alice", setOf(Role.USER)))
             ctx.result("ok")
         }
         config.routes.post("/logout") { ctx ->
@@ -98,10 +106,17 @@ Create a `SessionManager` (use `HttpSessionManager.of()` for the default), pass 
 
     ```java
     import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
+    import io.github.mzlnk.javalin.security.authentication.Identity;
     import io.github.mzlnk.javalin.security.session.*;
     import io.github.mzlnk.javalin.security.authorization.Rules;
     import io.javalin.Javalin;
+    import java.io.Serializable;
     import java.util.Set;
+
+    record User(String name, Set<RouteRole> roles) implements Identity, Serializable {
+        @Override public String getName() { return name; }
+        @Override public Set<RouteRole> getRoles() { return roles; }
+    }
 
     SessionManager sessions = HttpSessionManager.of();
 
@@ -115,7 +130,7 @@ Create a `SessionManager` (use `HttpSessionManager.of()` for the default), pass 
         }));
         config.routes.post("/login", ctx -> {
             // validate credentials yourself, then:
-            sessions.create(ctx, new SessionPrincipal("alice", Set.of(Role.USER)));
+            sessions.create(ctx, new User("alice", Set.of(Role.USER)));
             ctx.result("ok");
         });
         config.routes.post("/logout", ctx -> {
@@ -127,39 +142,48 @@ Create a `SessionManager` (use `HttpSessionManager.of()` for the default), pass 
 
 ## Configuration
 
-| Field                 | Default        | Effect                                                                                        |
-|-----------------------|----------------|-----------------------------------------------------------------------------------------------|
-| `sessionManager`      | *required*     | Storage strategy for sessions. Missing → `SecurityConfigurationException` at plugin start.    |
-| `forbiddenHandler`    | bare HTTP 403  | Renders access denied for authenticated callers.                                              |
-| `unauthorizedHandler` | bare HTTP 401  | Renders failed or absent authentication.                                                      |
+| Field                 | Default                    | Effect                                                             |
+|-----------------------|-----------------------------|---------------------------------------------------------------------|
+| `sessionManager`      | `HttpSessionManager.of()`  | Storage strategy for sessions.                                     |
+| `forbiddenHandler`    | bare HTTP 403               | Renders access denied for authenticated callers.                   |
+| `unauthorizedHandler` | bare HTTP 401               | Renders failed or absent authentication.                           |
 
-`sessionManager` is the only required field. Everything about session lifetime, cookie name,
-attribute key, and session-fixation defense lives on the `SessionManager` you pass in — see
-below.
+Nothing is required for authentication alone — override `sessionManager` to change storage,
+cookie name, attribute key, or session-fixation defense; see below. To create or invalidate
+sessions from handlers, keep a reference to that same manager.
 
 ## `HttpSessionManager` (default)
 
-`HttpSessionManager` is the built-in servlet-session-backed implementation. Configure it via
-its builder:
+`HttpSessionManager` is the built-in servlet-session-backed implementation. It requires the
+`Identity` you pass to `create(...)` to implement `java.io.Serializable`, since the servlet
+container may serialize session attributes to disk or a replicated store. Non-serializable
+identities are rejected with `IllegalArgumentException` at create time — surfacing the mistake
+right away instead of at replication time.
+
+Configure it via its builder:
 
 === "Kotlin"
 
     ```kotlin
-    val sessions: SessionManager = HttpSessionManager.builder()
-        .attributeKey("app.user")            // default: "javalin-security.session.principal"
-        .rotateSessionIdOnCreate(true)       // default: true — session-fixation defense
-        .invalidateSessionOnDestroy(true)    // default: true — HttpSession.invalidate() on logout
-        .build()
+    session { cfg ->
+        cfg.sessionManager = HttpSessionManager.builder()
+            .attributeKey("app.user")            // default: "javalin-security.session.principal"
+            .rotateSessionIdOnCreate(true)       // default: true — session-fixation defense
+            .invalidateSessionOnDestroy(true)    // default: true — HttpSession.invalidate() on logout
+            .build()
+    }
     ```
 
 === "Java"
 
     ```java
-    SessionManager sessions = HttpSessionManager.builder()
-            .attributeKey("app.user")
-            .rotateSessionIdOnCreate(true)
-            .invalidateSessionOnDestroy(true)
-            .build();
+    SessionSecurity.session(cfg -> {
+        cfg.sessionManager = HttpSessionManager.builder()
+                .attributeKey("app.user")
+                .rotateSessionIdOnCreate(true)
+                .invalidateSessionOnDestroy(true)
+                .build();
+    });
     ```
 
 `HttpSessionManager.of()` returns the same defaults, and `HttpSessionManager.of("app.user")`
@@ -171,8 +195,8 @@ is shorthand for the attribute-key-only override.
 
 ```kotlin
 interface SessionManager {
-    fun create(context: Context, principal: SessionPrincipal)
-    fun validate(context: Context): SessionPrincipal?
+    fun create(context: Context, identity: Identity)
+    fun validate(context: Context): Identity?
     fun invalidate(context: Context)
 }
 ```
@@ -184,15 +208,15 @@ Everything else — the authenticator, the rule table, error rendering — stays
     ```kotlin
     // Toy in-memory store keyed by an opaque cookie value.
     class InMemorySessionManager : SessionManager {
-        private val store = ConcurrentHashMap<String, SessionPrincipal>()
+        private val store = ConcurrentHashMap<String, Identity>()
 
-        override fun create(ctx: Context, principal: SessionPrincipal) {
+        override fun create(ctx: Context, identity: Identity) {
             val token = UUID.randomUUID().toString()
-            store[token] = principal
+            store[token] = identity
             ctx.cookie("APPSESSION", token)
         }
 
-        override fun validate(ctx: Context): SessionPrincipal? =
+        override fun validate(ctx: Context): Identity? =
             ctx.cookie("APPSESSION")?.let(store::get)
 
         override fun invalidate(ctx: Context) {
@@ -201,27 +225,33 @@ Everything else — the authenticator, the rule table, error rendering — stays
         }
     }
 
-    val sessions: SessionManager = InMemorySessionManager()
+    val sessions = InMemorySessionManager()
+    session { it.sessionManager = sessions }
+    // call sessions.create / sessions.invalidate from your handlers
     ```
 
 === "Java"
 
     ```java
     SessionManager sessions = new SessionManager() {
-        @Override public void create(Context ctx, SessionPrincipal principal) { /* … */ }
-        @Override public SessionPrincipal validate(Context ctx) { return /* … */; }
+        @Override public void create(Context ctx, Identity identity) { /* … */ }
+        @Override public Identity validate(Context ctx) { return /* … */; }
         @Override public void invalidate(Context ctx) { /* … */ }
     };
+    SessionSecurity.session(cfg -> cfg.sessionManager = sessions);
     ```
+
+A custom `SessionManager` does not need `Identity` to be `Serializable` — that constraint is
+specific to `HttpSessionManager`.
 
 ## Identity
 
-On success the strategy attaches a `SessionIdentity` whose `name` is the
-`SessionPrincipal.subject` written at login:
+On success the strategy attaches the identity returned by `SessionManager.validate` as the
+request's identity:
 
 ```kotlin
 config.routes.get("/me") { ctx ->
-    ctx.result(ctx.identity<SessionIdentity>().name)
+    ctx.result(ctx.identity<User>().name)
 }
 ```
 
@@ -238,6 +268,8 @@ Validate passwords (or any other credential) in your `/login` handler, then call
 `sessions.create`:
 
 ```kotlin
+val sessions = HttpSessionManager.of()
+
 config.routes.post("/login") { ctx ->
     val username = ctx.formParam("username") ?: throw UnauthorizedResponse()
     val password = ctx.formParam("password") ?: throw UnauthorizedResponse()
@@ -245,7 +277,7 @@ config.routes.post("/login") { ctx ->
     if (!passwordEncoder.matches(password, user.password)) {
         throw UnauthorizedResponse()
     }
-    sessions.create(ctx, SessionPrincipal(user.username, user.roles))
+    sessions.create(ctx, User(user.username, user.roles))
     ctx.result("ok")
 }
 ```
@@ -259,8 +291,9 @@ still reuse its `PasswordEncoder` / user-lookup ideas inside a session login han
     - **Session fixation** — the default `HttpSessionManager` rotates the session id on create
       (`rotateSessionIdOnCreate` defaults to `true`). Custom `SessionManager` implementations
       should provide an equivalent guarantee.
-    - **Serializable principal** — `SessionPrincipal` implements `Serializable`. Prefer enum
-      `RouteRole`s when sessions may be replicated across nodes.
+    - **Serializable identity** — `HttpSessionManager` requires `Identity : Serializable` (checked
+      at create time). Prefer enum `RouteRole`s (enums are serializable) when sessions may be
+      replicated across nodes.
     - **Cookie flags** — set `Secure`, `HttpOnly`, and `SameSite` on the container's session
       cookie (`SessionCookieConfig` / Jetty session config) or, for custom managers, on
       whichever cookie you emit. The extension does not set cookie flags on your behalf.
@@ -275,7 +308,6 @@ Override `unauthorizedHandler` when you need a JSON body:
 
     ```kotlin
     session { s ->
-        s.sessionManager = sessions
         s.unauthorizedHandler = UnauthorizedHandler { ctx, _ ->
             ctx.status(401).result("""{"error":"login_required"}""")
         }
@@ -286,7 +318,6 @@ Override `unauthorizedHandler` when you need a JSON body:
 
     ```java
     SessionSecurity.session(s -> {
-        s.sessionManager = sessions;
         s.unauthorizedHandler = (ctx, failure) ->
             ctx.status(401).result("{\"error\":\"login_required\"}");
     });
@@ -294,8 +325,8 @@ Override `unauthorizedHandler` when you need a JSON body:
 
 ## Next steps
 
-- [Access caller identity](../getting-started/access-caller-identity.md) — read
-  `SessionIdentity` in handlers.
+- [Access caller identity](../getting-started/access-caller-identity.md) — read your
+  `Identity` in handlers.
 - [Authorization](../concepts/authorization.md) — pair sessions with the rule table.
 - [Error handling](../concepts/error-handling.md) — customize 401 / 403 responses.
 - [Custom authentication](../guides/custom-authentication.md) — when even a custom

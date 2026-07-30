@@ -11,15 +11,16 @@ import java.util.function.Consumer
 /**
  * Configuration for the [basicAuth] strategy factory (HTTP Basic, RFC 7617).
  *
- * [userLookup] is required. Roles come from [BasicUser.roles]. Builds a [BasicAuthenticator] and,
- * when [basicChallenge] is `true`, a [BasicChallengeUnauthorizedHandler]; otherwise uses
+ * [userLookup] is required. The identity type your [UserLookup] returns is your own — bring your
+ * own type; roles come from its `roles` property. Builds a [BasicAuthenticator] and, when
+ * [basicChallenge] is `true`, a [BasicChallengeUnauthorizedHandler]; otherwise uses
  * [UnauthorizedHandler.DEFAULT]. HTTP-only — there is no WebSocket variant.
  */
 class BasicAuthConfig internal constructor() {
 
     /**
-     * Resolves a username to its stored [BasicUser]. Required; throws
-     * [SecurityConfigurationException] if unset when the strategy is built.
+     * Resolves a username to its stored [io.github.mzlnk.javalin.security.authentication.PasswordCredentials].
+     * Required; throws [SecurityConfigurationException] if unset when the strategy is built.
      */
     @JvmField
     var userLookup: UserLookup? = null
@@ -73,17 +74,17 @@ class BasicAuthConfig internal constructor() {
  * Builds an [AuthenticationStrategy.Sync] for HTTP Basic authentication.
  *
  * Assign the result to `http.authentication`. Only [BasicAuthConfig.userLookup] is required.
- * To use [BasicAuthenticator] directly, call [BasicAuthenticator.builder] and wrap it in a custom
+ * The identity type flowing through the extension is entirely yours — the extension attaches
+ * whichever identity your [UserLookup] returns and never bundles its own. To use
+ * [BasicAuthenticator] directly, call [BasicAuthenticator.builder] and wrap it in a custom
  * [AuthenticationStrategy.Sync].
  */
 fun basicAuth(configure: Consumer<BasicAuthConfig>): AuthenticationStrategy.Sync {
     val config = BasicAuthConfig().also(configure::accept)
     val authenticator = config.buildAuthenticator()
-    val unauthorizedHandlerValue = config.buildUnauthorizedHandler()
-    val forbiddenHandlerValue = config.forbiddenHandler
-    return object : AuthenticationStrategy.Sync {
-        override val unauthorizedHandler: UnauthorizedHandler get() = unauthorizedHandlerValue
-        override val forbiddenHandler: ForbiddenHandler get() = forbiddenHandlerValue
-        override fun authenticator() = authenticator
-    }
+    return AuthenticationStrategy.sync(
+        authenticator = authenticator,
+        unauthorizedHandler = config.buildUnauthorizedHandler(),
+        forbiddenHandler = config.forbiddenHandler,
+    )
 }

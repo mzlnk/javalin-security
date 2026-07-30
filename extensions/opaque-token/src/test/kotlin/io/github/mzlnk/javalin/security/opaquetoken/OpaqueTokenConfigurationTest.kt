@@ -10,18 +10,18 @@ import org.junit.jupiter.api.Test
 class OpaqueTokenConfigurationTest {
 
     @Test
-    fun `should throw SecurityConfigurationException when tokenLookup is not configured`() {
+    fun `should throw SecurityConfigurationException when lookup is not configured`() {
         assertThatThrownBy {
             Javalin.create { cfg ->
                 cfg.security { security ->
                     security.http.authentication = opaqueToken { ot ->
-                        // tokenLookup not set — should fail
+                        // lookup not set — should fail
                     }
                     security.http.fallback = Rules.allow()
                 }
             }
         }.isInstanceOf(SecurityConfigurationException::class.java)
-            .hasMessageContaining("tokenLookup")
+            .hasMessageContaining("lookup")
     }
 
 }

@@ -9,11 +9,15 @@ import io.github.mzlnk.javalin.security.authentication.UnauthorizedHandler
 import io.github.mzlnk.javalin.security.authorization.ForbiddenHandler
 import io.javalin.http.Context
 import io.javalin.http.HandlerType
+import io.javalin.security.RouteRole
 import io.mockk.every
 import io.mockk.mockk
 
 /** Minimal [Identity] for unit tests. */
-data class TestIdentity(override val name: String) : Identity
+data class TestIdentity @JvmOverloads constructor(
+    override val name: String,
+    override val roles: Set<RouteRole> = emptySet(),
+) : Identity
 
 /** Creates a [Context] mock with [Context.method], [Context.path], and [Context.header] stubbed. */
 fun mockContext(

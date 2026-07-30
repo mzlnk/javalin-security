@@ -1,6 +1,8 @@
 package io.github.mzlnk.javalin.security.basicauth
 
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
+import io.github.mzlnk.javalin.security.authentication.Identity
+import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
 import io.javalin.http.Context
 import io.javalin.security.RouteRole
 import io.mockk.every
@@ -12,7 +14,15 @@ import java.util.Base64
 class BasicAuthenticatorTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
-    private val alice = BasicUser(username = "alice", password = "correct-password", roles = setOf(Role.USER, Role.ADMIN))
+    private data class TestUser(
+        override val name: String,
+        override val roles: Set<RouteRole> = emptySet(),
+    ) : Identity
+
+    private val alice = PasswordCredentials(
+        identity = TestUser(name = "alice", roles = setOf(Role.USER, Role.ADMIN)),
+        encodedPassword = "correct-password",
+    )
 
     private val userLookup = UserLookup { username -> if (username == "alice") alice else null }
 
@@ -64,17 +74,26 @@ class BasicAuthenticatorTest {
     }
 
     @Test
-    fun `should return Success with BasicAuthIdentity when credentials are valid`() {
+    fun `should return Success with the looked-up identity when credentials are valid`() {
         val manager = BasicAuthenticator.of(userLookup)
         val result = manager.authenticate(ctx(basicHeader("alice", "correct-password")))
 
         assertThat(result).isInstanceOf(AuthenticationResult.Success::class.java)
         val success = result as AuthenticationResult.Success
         assertThat(success.authentication.isAuthenticated).isTrue()
-        assertThat(success.authentication.identity).isInstanceOf(BasicAuthIdentity::class.java)
+        assertThat(success.authentication.identity).isInstanceOf(TestUser::class.java)
 
-        val identity = success.authentication.identity as BasicAuthIdentity
+        val identity = success.authentication.identity as TestUser
         assertThat(identity.name).isEqualTo("alice")
+    }
+
+    @Test
+    fun `should not expose the encoded password on the identity`() {
+        val manager = BasicAuthenticator.of(userLookup)
+        val result = manager.authenticate(ctx(basicHeader("alice", "correct-password"))) as AuthenticationResult.Success
+
+        // TestUser (like any user-defined Identity) simply has no password field to leak.
+        assertThat(result.authentication.identity).isEqualTo(TestUser(name = "alice", roles = setOf(Role.USER, Role.ADMIN)))
     }
 
     @Test
@@ -87,7 +106,9 @@ class BasicAuthenticatorTest {
 
     @Test
     fun `should return empty roles when the looked-up user has none`() {
-        val noRolesLookup = UserLookup { username -> BasicUser(username = username, password = "pw") }
+        val noRolesLookup = UserLookup { username ->
+            PasswordCredentials(TestUser(name = username), encodedPassword = "pw")
+        }
         val manager = BasicAuthenticator.of(noRolesLookup)
         val result = manager.authenticate(ctx(basicHeader("bob", "pw"))) as AuthenticationResult.Success
 
@@ -141,12 +162,6 @@ class BasicAuthenticatorTest {
 
         val result = manager.authenticate(customCtx)
         assertThat(result).isEqualTo(AuthenticationResult.NotAuthenticated)
-    }
-
-    @Test
-    fun `BasicAuthIdentity name is the username`() {
-        val identity = BasicAuthIdentity("carol")
-        assertThat(identity.name).isEqualTo("carol")
     }
 
     private fun basicHeader(username: String, password: String): String =

@@ -1,6 +1,6 @@
 package io.github.mzlnk.javalin.security.session;
 
-import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy;
+import io.github.mzlnk.javalin.security.authentication.Identity;
 import io.javalin.http.Context;
 import io.javalin.security.RouteRole;
 import org.junit.jupiter.api.Test;
@@ -17,6 +17,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SessionJavaInteropTest {
 
     private enum Role implements RouteRole { USER, ADMIN }
+
+    static class Principal implements Identity, Serializable {
+        private static final long serialVersionUID = 1L;
+
+        private final String name;
+        private final Set<RouteRole> roles;
+
+        Principal(String name) {
+            this(name, Set.of());
+        }
+
+        Principal(String name, Set<RouteRole> roles) {
+            this.name = name;
+            this.roles = roles;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Set<RouteRole> getRoles() {
+            return roles;
+        }
+    }
 
     @Test
     void authenticator_builder_requires_a_session_manager() {
@@ -57,37 +83,23 @@ class SessionJavaInteropTest {
     void session_manager_can_be_implemented_as_a_java_class() {
         SessionManager custom = new SessionManager() {
             @Override
-            public void create(Context context, SessionPrincipal principal) { /* stub */ }
+            public void create(Context context, Identity identity) { /* stub */ }
 
             @Override
-            public SessionPrincipal validate(Context context) {
-                return new SessionPrincipal("alice", Set.of(Role.USER));
+            public Identity validate(Context context) {
+                return new Principal("alice", Set.of(Role.USER));
             }
 
             @Override
             public void invalidate(Context context) { /* stub */ }
         };
 
-        assertThat(custom.validate(null).getSubject()).isEqualTo("alice");
+        assertThat(custom.validate(null).getName()).isEqualTo("alice");
     }
 
     @Test
-    void session_principal_defaults_optional_fields() {
-        SessionPrincipal principal = new SessionPrincipal("alice");
-        assertThat(principal.getSubject()).isEqualTo("alice");
-        assertThat(principal.getRoles()).isEmpty();
-    }
-
-    @Test
-    void session_principal_accepts_full_constructor() {
-        SessionPrincipal principal = new SessionPrincipal("alice", Set.of(Role.USER, Role.ADMIN));
-        assertThat(principal.getSubject()).isEqualTo("alice");
-        assertThat(principal.getRoles()).containsExactlyInAnyOrder(Role.USER, Role.ADMIN);
-    }
-
-    @Test
-    void session_principal_implements_Serializable() {
-        SessionPrincipal principal = new SessionPrincipal("alice", Set.of(Role.USER));
+    void user_defined_identity_implements_serializable_and_round_trips() {
+        Principal principal = new Principal("alice", Set.of(Role.USER));
         assertThat(principal).isInstanceOf(Serializable.class);
 
         byte[] bytes;
@@ -99,27 +111,21 @@ class SessionJavaInteropTest {
             throw new AssertionError(e);
         }
 
-        SessionPrincipal restored;
+        Principal restored;
         try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
-            restored = (SessionPrincipal) ois.readObject();
+            restored = (Principal) ois.readObject();
         } catch (Exception e) {
             throw new AssertionError(e);
         }
 
-        assertThat(restored.getSubject()).isEqualTo("alice");
+        assertThat(restored.getName()).isEqualTo("alice");
         assertThat(restored.getRoles()).containsExactly(Role.USER);
     }
 
     @Test
-    void session_identity_exposes_name() {
-        SessionIdentity identity = new SessionIdentity("alice");
-        assertThat(identity.getName()).isEqualTo("alice");
-    }
-
-    @Test
-    void session_factory_returns_a_plain_AuthenticationStrategy_Sync() {
+    void session_factory_returns_a_sync_strategy() {
         SessionManager manager = HttpSessionManager.of();
-        AuthenticationStrategy.Sync strategy = SessionSecurity.session(cfg -> cfg.sessionManager = manager);
+        var strategy = SessionSecurity.session(cfg -> cfg.sessionManager = manager);
 
         assertThat(strategy).isNotNull();
         assertThat(((SessionAuthenticator) strategy.authenticator()).getSessionManager()).isSameAs(manager);

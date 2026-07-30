@@ -18,15 +18,18 @@ fun interface JwtRolesMapper {
 
     companion object {
 
+        private val NO_ROLES: JwtRolesMapper = JwtRolesMapper { emptySet() }
+
         /**
          * Returns a mapper that always yields an empty set.
          *
          * This is the default when no mapper is configured. Authorization rules that require
          * specific roles will never match; use only when protected routes rely solely on
-         * `authenticated` / `allow`.
+         * `authenticated` / `allow`. Always returns the same instance, so `jwt.rolesMapper` can be
+         * compared against it to detect whether a caller configured a non-default mapper.
          */
         @JvmStatic
-        fun noRoles(): JwtRolesMapper = JwtRolesMapper { emptySet() }
+        fun noRoles(): JwtRolesMapper = NO_ROLES
 
         /**
          * Reads roles from a string or list-of-strings claim named [claimName], converting each

@@ -13,9 +13,11 @@ import java.util.function.Consumer
  * Configuration for the [jwt] strategy factory.
  *
  * Configures JWT bearer-token authentication. [decoder] and [keySource] are required; other
- * settings have defaults. Builds a [JwtVerification] and [JwtAuthenticator] for the returned
- * strategy, and selects a [BearerChallengeUnauthorizedHandler] when [bearerChallenge] is `true`.
- * Does not configure authorization rules — set those via `security.rules`.
+ * settings have defaults. Leave [identityMapper] unset to get the default [Jwt] identity (with
+ * roles from [rolesMapper]), or set it to map verified tokens to your own domain identity.
+ * Builds a [JwtVerification] and [JwtAuthenticator] for the returned strategy, and selects a
+ * [BearerChallengeUnauthorizedHandler] when [bearerChallenge] is `true`. Does not configure
+ * authorization rules — set those via `security.rules`.
  */
 class JwtConfig internal constructor() {
 
@@ -61,13 +63,26 @@ class JwtConfig internal constructor() {
     var clockSkewSeconds: Int = 60
 
     /**
-     * Maps a verified [DecodedJwt] to the caller's [io.javalin.security.RouteRole]s.
+     * Maps a verified [DecodedJwt] to the caller's [io.javalin.security.RouteRole]s, for the
+     * default [Jwt] identity.
      *
      * Defaults to [JwtRolesMapper.noRoles]. Routes and rules that require specific roles need a
      * non-default mapper such as [JwtRolesMapper.fromClaim] or [JwtRolesMapper.fromScope].
+     * Mutually exclusive with [identityMapper] — throws [SecurityConfigurationException] if both
+     * are set, since a mapped identity supplies its own roles.
      */
     @JvmField
     var rolesMapper: JwtRolesMapper = JwtRolesMapper.noRoles()
+
+    /**
+     * Maps a verified [DecodedJwt] to your own [io.github.mzlnk.javalin.security.authentication.Identity],
+     * replacing the default [Jwt] wrapper.
+     *
+     * Defaults to `null` (handlers see a [Jwt] identity). Mutually exclusive with [rolesMapper] —
+     * throws [SecurityConfigurationException] if both are set.
+     */
+    @JvmField
+    var identityMapper: JwtIdentityMapper? = null
 
     /**
      * Handler for access denied to an authenticated caller.
@@ -113,6 +128,13 @@ class JwtConfig internal constructor() {
                 "Set 'keySource = JwtKeySource.publicKey(...)' (or another JwtKeySource factory) " +
                 "inside the 'jwt { }' block.",
         )
+        if (identityMapper != null && rolesMapper !== JwtRolesMapper.noRoles()) {
+            throw SecurityConfigurationException(
+                "jwt.identityMapper and jwt.rolesMapper are mutually exclusive. " +
+                    "rolesMapper only resolves roles for the default Jwt identity; when identityMapper " +
+                    "is set, roles should come from the mapped identity's own 'roles' property.",
+            )
+        }
         val verification = JwtVerification.builder(ks)
             .apply { issuer?.let { issuer(it) } }
             .apply { if (audiences.isNotEmpty()) audience(*audiences.toTypedArray()) }
@@ -120,6 +142,7 @@ class JwtConfig internal constructor() {
             .build()
         return JwtAuthenticator.builder(d, verification)
             .rolesMapper(rolesMapper)
+            .identityMapper(identityMapper)
             .tokenResolver(tokenResolver)
             .build()
     }
@@ -130,21 +153,20 @@ class JwtConfig internal constructor() {
 }
 
 /**
- * Builds an [AuthenticationStrategy.Sync] for JWT bearer-token authentication and returns it for
- * assignment to `http.authentication` or `ws.authentication`.
+ * Builds an [AuthenticationStrategy.Sync] for JWT bearer-token authentication, and returns it
+ * for assignment to `http.authentication` or `ws.authentication`.
  *
  * Accepts a [JwtConfig] consumer; [JwtConfig.decoder] and [JwtConfig.keySource] are required.
- * Browser WebSocket clients cannot set an `Authorization` header on the handshake — use
- * [TokenResolver.cookie] and pair with `ws.allowedOrigins` when authenticating via cookie.
+ * By default handlers see the built-in [Jwt] identity (with roles from [JwtConfig.rolesMapper]);
+ * set [JwtConfig.identityMapper] to map verified tokens to your own domain [io.github.mzlnk.javalin.security.authentication.Identity]
+ * instead. Browser WebSocket clients cannot set an `Authorization` header on the handshake —
+ * use [TokenResolver.cookie] and pair with `ws.allowedOrigins` when authenticating via cookie.
  */
 fun jwt(configure: Consumer<JwtConfig>): AuthenticationStrategy.Sync {
     val config = JwtConfig().also(configure::accept)
-    val authenticator = config.buildAuthenticator()
-    val unauthorizedHandlerValue = config.buildUnauthorizedHandler()
-    val forbiddenHandlerValue = config.forbiddenHandler
-    return object : AuthenticationStrategy.Sync {
-        override val unauthorizedHandler: UnauthorizedHandler get() = unauthorizedHandlerValue
-        override val forbiddenHandler: ForbiddenHandler get() = forbiddenHandlerValue
-        override fun authenticator() = authenticator
-    }
+    return AuthenticationStrategy.sync(
+        authenticator = config.buildAuthenticator(),
+        unauthorizedHandler = config.buildUnauthorizedHandler(),
+        forbiddenHandler = config.forbiddenHandler,
+    )
 }

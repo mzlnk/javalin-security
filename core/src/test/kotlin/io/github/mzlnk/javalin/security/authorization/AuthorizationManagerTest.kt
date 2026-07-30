@@ -251,7 +251,7 @@ class AuthorizationManagerTest {
     }
 
     private fun authenticated(vararg roles: RouteRole): Authentication =
-        Authentication.authenticated(TestIdentity("bob"), *roles)
+        Authentication.authenticated(TestIdentity("bob", roles.toSet()))
 
     private fun entry(pattern: String, method: HandlerType?, rule: Rule, router: RouterConfig = defaultRouter) =
         AuthorizationManager.Entry(pattern, method, rule, router)

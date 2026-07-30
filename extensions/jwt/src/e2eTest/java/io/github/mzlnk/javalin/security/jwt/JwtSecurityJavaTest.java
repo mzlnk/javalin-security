@@ -3,6 +3,7 @@ package io.github.mzlnk.javalin.security.jwt;
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
 import io.github.mzlnk.javalin.security.authentication.Authenticator;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy;
+import io.github.mzlnk.javalin.security.authentication.Identity;
 import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.github.mzlnk.javalin.security.common.token.TokenResolver;
 import io.javalin.Javalin;
@@ -12,12 +13,31 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtSecurityJavaTest {
     private enum Role implements RouteRole { ADMIN, USER }
+
+    static class Principal implements Identity {
+        private final String name;
+
+        Principal(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Set<RouteRole> getRoles() {
+            return Set.of();
+        }
+    }
 
     private final JwtDecoder testDecoder = (token, verification) -> {
         if ("INVALID".equals(token)) throw new IllegalArgumentException("bad token");
@@ -125,7 +145,7 @@ class JwtSecurityJavaTest {
     }
 
     @Test
-    void should_expose_JwtIdentity_on_the_context_when_the_caller_is_authenticated() {
+    void should_expose_Jwt_identity_on_the_context_when_the_caller_is_authenticated() {
         // given
         Javalin app = Javalin.create(config -> {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
@@ -135,7 +155,7 @@ class JwtSecurityJavaTest {
                 });
                 security.http.fallback = Rules.authenticated();
             }));
-            config.routes.get("/me", ctx -> ctx.result(identity(ctx, JwtIdentity.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, Jwt.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {
@@ -145,6 +165,31 @@ class JwtSecurityJavaTest {
             // then
             assertThat(response.code()).isEqualTo(200);
             assertThat(response.body().string()).isEqualTo("alice");
+        });
+    }
+
+    @Test
+    void should_expose_a_user_defined_identity_on_the_context_when_identityMapper_is_configured() {
+        // given
+        Javalin app = Javalin.create(config -> {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.http.authentication = JwtSecurity.jwt(jwt -> {
+                    jwt.decoder = testDecoder;
+                    jwt.keySource = JwtKeySource.secret("test-secret");
+                    jwt.identityMapper = token -> new Principal("user-" + token.getSubject());
+                });
+                security.http.fallback = Rules.authenticated();
+            }));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, Principal.class).getName()));
+        });
+
+        JavalinTest.test(app, (server, client) -> {
+            // when
+            var response = client.get("/me", req -> req.header("Authorization", "Bearer alice"));
+
+            // then
+            assertThat(response.code()).isEqualTo(200);
+            assertThat(response.body().string()).isEqualTo("user-alice");
         });
     }
 
@@ -209,7 +254,7 @@ class JwtSecurityJavaTest {
                 });
                 security.http.fallback = Rules.authenticated();
             }));
-            config.routes.get("/me", ctx -> ctx.result(identity(ctx, JwtIdentity.class).getName()));
+            config.routes.get("/me", ctx -> ctx.result(identity(ctx, Jwt.class).getName()));
         });
 
         JavalinTest.test(app, (server, client) -> {

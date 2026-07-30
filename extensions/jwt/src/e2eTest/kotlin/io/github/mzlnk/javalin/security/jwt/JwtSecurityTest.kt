@@ -1,5 +1,6 @@
 package io.github.mzlnk.javalin.security.jwt
 
+import io.github.mzlnk.javalin.security.authentication.Identity
 import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.common.token.TokenResolver
 import io.github.mzlnk.javalin.security.identity
@@ -126,7 +127,7 @@ class JwtSecurityTest {
     }
 
     @Test
-    fun `should expose JwtIdentity on the context when the caller is authenticated`() {
+    fun `should expose Jwt identity on the context when the caller is authenticated`() {
         // given
         val app = Javalin.create { cfg ->
             cfg.security { security ->
@@ -137,7 +138,7 @@ class JwtSecurityTest {
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<JwtIdentity>()
+                val identity = ctx.identity<Jwt>()
                 ctx.result(identity.name)
             }
         }
@@ -214,7 +215,7 @@ class JwtSecurityTest {
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.get("/me") { ctx ->
-                val identity = ctx.identity<JwtIdentity>()
+                val identity = ctx.identity<Jwt>()
                 ctx.result(identity.name)
             }
         }
@@ -226,6 +227,62 @@ class JwtSecurityTest {
             // then
             assertThat(response.code).isEqualTo(200)
             assertThat(response.body.string()).isEqualTo("alice")
+        }
+    }
+
+    @Test
+    fun `should expose a user-defined identity on the context when identityMapper is configured`() {
+        // given
+        data class Principal(override val name: String) : Identity
+
+        val app = Javalin.create { cfg ->
+            cfg.security { security ->
+                security.http.authentication = jwt { jwt ->
+                    jwt.decoder = testDecoder
+                    jwt.keySource = JwtKeySource.secret("test-secret")
+                    jwt.identityMapper = JwtIdentityMapper { token -> Principal(name = "user-${token.subject}") }
+                }
+                security.http.fallback = Rules.authenticated()
+            }
+            cfg.routes.get("/me") { ctx ->
+                val identity = ctx.identity<Principal>()
+                ctx.result(identity.name)
+            }
+        }
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val response = client.get("/me") { it.header("Authorization", "Bearer alice") }
+
+            // then
+            assertThat(response.code).isEqualTo(200)
+            assertThat(response.body.string()).isEqualTo("user-alice")
+        }
+    }
+
+    @Test
+    fun `should return 401 when identityMapper returns null for a verified token`() {
+        // given
+        data class Principal(override val name: String) : Identity
+
+        val app = Javalin.create { cfg ->
+            cfg.security { security ->
+                security.http.authentication = jwt { jwt ->
+                    jwt.decoder = testDecoder
+                    jwt.keySource = JwtKeySource.secret("test-secret")
+                    jwt.identityMapper = JwtIdentityMapper { null }
+                }
+                security.http.fallback = Rules.authenticated()
+            }
+            cfg.routes.get("/me") { it.result("ok") }
+        }
+
+        JavalinTest.test(app) { _, client ->
+            // when
+            val response = client.get("/me") { it.header("Authorization", "Bearer alice") }
+
+            // then
+            assertThat(response.code).isEqualTo(401)
         }
     }
 
