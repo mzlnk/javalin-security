@@ -21,3 +21,6 @@ project(":extensions/basic-auth").name = "javalin-security-basic-auth"
 
 include("extensions/api-key")
 project(":extensions/api-key").name = "javalin-security-api-key"
+
+include("extensions/opaque-token")
+project(":extensions/opaque-token").name = "javalin-security-opaque-token"

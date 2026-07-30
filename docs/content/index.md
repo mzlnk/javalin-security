@@ -11,8 +11,9 @@ learning a large new configuration surface — just register the plugin inside
 The plugin is designed to be **pluggable and extensible**: authentication runs through a small
 `AuthenticationStrategy` interface, so you are free to pick whichever mechanism fits your app.
 Reach for a built-in strategy like [JWT](extensions/jwt/index.md),
-[HTTP Basic Auth](extensions/basic-auth.md), or [API Key](extensions/api-key.md), or [implement a fully custom strategy](guides/custom-authentication.md) —
-API keys, opaque session tokens, mTLS, HMAC signing, whatever your system needs. The same is true for authorization: use
+[HTTP Basic Auth](extensions/basic-auth.md), [API Key](extensions/api-key.md), or
+[Opaque Token](extensions/opaque-token.md), or [implement a fully custom strategy](guides/custom-authentication.md) —
+mTLS, HMAC signing, whatever your system needs. The same is true for authorization: use
 the built-in rule table and role checks, or drop in your own `Rule` predicates.
 
 The whole library is intentionally built on a **small set of simple abstractions** —
@@ -35,7 +36,8 @@ flow has two stages:
 
 On success, the resolved `Authentication` is attached to the `Context` (and to the `WsContext`
 for the life of a WebSocket session) so handlers can read the caller. Extensions such as
-[Basic Auth](extensions/basic-auth.md), [API Key](extensions/api-key.md), and [JWT](extensions/jwt/index.md) supply ready-made
+[Basic Auth](extensions/basic-auth.md), [API Key](extensions/api-key.md),
+[Opaque Token](extensions/opaque-token.md), and [JWT](extensions/jwt/index.md) supply ready-made
 strategies; you can also [write your own](guides/custom-authentication.md).
 
 ## Example
@@ -96,7 +98,7 @@ strategies; you can also [write your own](guides/custom-authentication.md).
    user inside handlers.
 4. [Authentication](concepts/authentication.md) and [Authorization](concepts/authorization.md) —
    the two concepts in depth.
-5. Extensions — [Basic Auth](extensions/basic-auth.md), [API Key](extensions/api-key.md), [JWT](extensions/jwt/index.md).
+5. Extensions — [Basic Auth](extensions/basic-auth.md), [API Key](extensions/api-key.md), [Opaque Token](extensions/opaque-token.md), [JWT](extensions/jwt/index.md).
 6. Guides — [Custom authentication](guides/custom-authentication.md), [CORS](guides/cors.md),
    [Testing](guides/testing.md).
 

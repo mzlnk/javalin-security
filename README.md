@@ -61,6 +61,7 @@ below (or plug in your own strategy):
 |------------------------------------------------|---------------------------------------------|
 | `io.github.mzlnk:javalin-security-basic-auth`  | HTTP Basic Auth (RFC 7617)                  |
 | `io.github.mzlnk:javalin-security-api-key`     | Static API key authentication (`X-Api-Key` by default) |
+| `io.github.mzlnk:javalin-security-opaque-token` | Server-issued opaque bearer tokens (sessions, PATs) with expiry |
 | `io.github.mzlnk:javalin-security-jwt`         | JWT authentication (bring your own decoder) |
 | `io.github.mzlnk:javalin-security-jwt-nimbus`  | JWT decoder adapter for Nimbus              |
 | `io.github.mzlnk:javalin-security-jwt-auth0`   | JWT decoder adapter for Auth0               |
