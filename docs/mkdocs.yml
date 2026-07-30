@@ -1,7 +1,7 @@
 site_name: javalin-security
 site_description: >-
   Authentication and authorization for Javalin 7 — HTTP & WebSocket security,
-  role-based access control, pluggable JWT, HTTP Basic, and API Key strategies, for Java and Kotlin.
+  role-based access control, pluggable JWT, HTTP Basic, API Key, and Opaque Token strategies, for Java and Kotlin.
 site_author: mzlnk
 site_url: https://mzlnk.github.io/javalin-security/
 
@@ -122,6 +122,7 @@ nav:
               - Auth0: extensions/jwt/auth0.md
               - Key sources: extensions/jwt/key-sources.md
               - Roles mapping: extensions/jwt/roles-mapping.md
+          - Opaque Token: extensions/opaque-token.md
       - Guides:
           - Custom authentication: guides/custom-authentication.md
           - Custom authorization rules: guides/custom-rules.md
