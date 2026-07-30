@@ -1,6 +1,6 @@
 # Installation
 
-Add the **core** artifact and Javalin. Everything else — Basic Auth, API Key, Opaque Token, JWT, custom strategies — is
+Add the **core** artifact and Javalin. Everything else — Basic Auth, API Key, Opaque Token, Session, JWT, custom strategies — is
 optional and installed from its own page.
 
 !!! warning "Bring your own Javalin and SLF4J"
@@ -91,6 +91,7 @@ install snippet:
 | Basic Auth    | HTTP Basic (RFC 7617)             | [Basic Auth](../extensions/basic-auth.md#installation)                    |
 | API Key       | Opaque API keys (`X-Api-Key`)     | [API Key](../extensions/api-key.md#installation)                          |
 | Opaque Token  | Server-issued opaque bearer tokens | [Opaque Token](../extensions/opaque-token.md#installation)               |
+| Session       | HTTP-session cookie auth          | [Session](../extensions/session.md#installation)                          |
 | JWT           | Verified JWTs (HTTP / WebSocket)  | [JWT](../extensions/jwt/index.md#installation)                          |
 | Custom        | mTLS, HMAC, other schemes         | [Custom authentication](../guides/custom-authentication.md)               |
 
