@@ -87,7 +87,7 @@ for the life of a WebSocket session) so handlers can read the caller. Extensions
 | Component   | Version                                                       |
 |-------------|---------------------------------------------------------------|
 | Java        | **17+**                                                       |
-| Kotlin      | **{{ versions.kotlin_family }}** (consumers may use any JVM language) |
+| Kotlin      | **{{ versions.kotlin_language_family }}+** (consumers may use any JVM language) |
 | Javalin     | **{{ versions.javalin_family }}**                             |
 | Coordinates | `io.github.mzlnk:javalin-security:{{ versions.library }}`     |
 

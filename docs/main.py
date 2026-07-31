@@ -6,11 +6,13 @@ the actual artifacts. Referenced from ``mkdocs.yml`` via the
 
 Available in Markdown as::
 
-    {{ versions.library }}          # project version, from gradle.properties
-    {{ versions.javalin }}          # from gradle/libs.versions.toml
-    {{ versions.javalin_family }}   # major.minor + ".x" (e.g. "7.2.x")
-    {{ versions.kotlin }}
-    {{ versions.kotlin_family }}    # major.minor (e.g. "2.4")
+    {{ versions.library }}                 # project version, from gradle.properties
+    {{ versions.javalin }}                 # from gradle/libs.versions.toml
+    {{ versions.javalin_family }}          # major.minor + ".x" (e.g. "7.2.x")
+    {{ versions.kotlin }}                  # Kotlin compiler used to build
+    {{ versions.kotlin_family }}           # major.minor of build Kotlin (e.g. "2.4")
+    {{ versions.kotlin_language }}         # published language/api version (consumer floor)
+    {{ versions.kotlin_language_family }}  # major.minor of language version (e.g. "2.0")
     {{ versions.slf4j }}
     {{ versions.nimbus_jose_jwt }}
     {{ versions.auth0_java_jwt }}
@@ -69,6 +71,8 @@ def define_env(env):
         "javalin_family": _family(deps["javalin"], parts=2, suffix=".x"),
         "kotlin": deps["kotlin"],
         "kotlin_family": _family(deps["kotlin"], parts=2),
+        "kotlin_language": deps["kotlin-language"],
+        "kotlin_language_family": _family(deps["kotlin-language"], parts=2),
         "slf4j": deps["slf4j"],
         "nimbus_jose_jwt": deps["nimbus-jose-jwt"],
         "auth0_java_jwt": deps["auth0-java-jwt"],

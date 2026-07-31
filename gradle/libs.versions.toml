@@ -1,5 +1,7 @@
 [versions]
 kotlin = "2.4.0"
+# Language/API version for published artifacts — keeps Kotlin 2.0+ consumers compatible.
+kotlin-language = "2.0"
 dokka = "2.0.0"
 javalin = "7.2.2"
 slf4j = "2.0.16"

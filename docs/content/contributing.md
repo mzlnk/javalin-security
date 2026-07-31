@@ -7,13 +7,14 @@ Thanks for helping improve `javalin-security`.
 | Tool    | Version                             |
 |---------|-------------------------------------|
 | JDK     | 17                                  |
-| Kotlin  | {{ versions.kotlin_family }}        |
+| Kotlin  | {{ versions.kotlin_family }} (build) / language & API {{ versions.kotlin_language_family }} (consumer floor) |
 | Javalin | {{ versions.javalin_family }}       |
 | Build   | Gradle (wrapper included)           |
 
 Dependency versions live in `gradle/libs.versions.toml`; the documentation site reads from
 there (and from `gradle.properties`) via `docs/main.py`, so bumping a version in Gradle updates
-the docs automatically.
+the docs automatically. Published artifacts use `kotlin-language` / `apiVersion` so Kotlin
+**{{ versions.kotlin_language_family }}+** consumers can compile against the library.
 
 ## Building and testing
 

@@ -73,7 +73,7 @@ brought by the caller and read back with `ctx.identity<T>()` — an unchecked ca
 
 ### Compatibility
 
-- Java **17+**, Javalin **{{ versions.javalin_family }}**, Kotlin **{{ versions.kotlin_family }}**.
+- Java **17+**, Javalin **{{ versions.javalin_family }}**, Kotlin **{{ versions.kotlin_language_family }}+**.
 
 !!! note "Pre-release"
     While the version is `{{ versions.library }}`, the public API may still change before the

@@ -1,7 +1,9 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension
 import org.gradle.plugins.ide.idea.model.IdeaModel
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
@@ -34,6 +36,9 @@ dokka {
     moduleName.set("javalin-security API")
 }
 
+// Captured at root: version catalogs are not available as `libs` inside `subprojects {}`.
+val kotlinLanguageVersion = KotlinVersion.fromVersion(libs.versions.kotlin.language.get())
+
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.dokka")
@@ -58,6 +63,11 @@ subprojects {
 
     extensions.configure<KotlinJvmProjectExtension> {
         jvmToolchain(17)
+        compilerOptions {
+            languageVersion.set(kotlinLanguageVersion)
+            apiVersion.set(kotlinLanguageVersion)
+            jvmDefault.set(JvmDefaultMode.ENABLE)
+        }
     }
 
     tasks.withType<Test> {

@@ -92,8 +92,9 @@ values are computed at build time by `main.py`:
 
 - **Project version** is parsed from the root `gradle.properties` (`version=…`).
 - **Dependency versions** are read from `gradle/libs.versions.toml`.
-- Convenience families such as `versions.javalin_family` (`7.2.x`) and `versions.kotlin_family`
-  (`2.4`) are computed by trimming to `major.minor`.
+- Convenience families such as `versions.javalin_family` (`7.2.x`), `versions.kotlin_family`
+  (build Kotlin, e.g. `2.4`), and `versions.kotlin_language_family` (published language/API /
+  consumer floor, e.g. `2.0`) are computed by trimming to `major.minor`.
 
 Bumping a version in Gradle propagates to the docs on the next build — no Markdown edits
 required. If you add or remove a key in `libs.versions.toml`, update the `env.variables` map in

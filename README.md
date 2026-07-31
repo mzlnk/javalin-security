@@ -7,7 +7,7 @@
 [![Build](https://github.com/mzlnk/javalin-security/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/mzlnk/javalin-security/actions/workflows/main.yml)
 [![codecov](https://codecov.io/gh/mzlnk/javalin-security/branch/main/graph/badge.svg)](https://codecov.io/gh/mzlnk/javalin-security)
 [![Java 17+](https://img.shields.io/badge/Java-17%2B-blue?logo=openjdk)](https://adoptium.net/)
-[![Kotlin 2.4+](https://img.shields.io/badge/Kotlin-2.4%2B-blue?logo=kotlin)](https://kotlinlang.org/)
+[![Kotlin 2.0+](https://img.shields.io/badge/Kotlin-2.0%2B-blue?logo=kotlin)](https://kotlinlang.org/)
 [![Javalin 7+](https://img.shields.io/badge/Javalin-7.x%2B-blue)](https://javalin.io/)
 
 ---
