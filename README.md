@@ -27,7 +27,7 @@ To get started with `javalin-security` in your Javalin project:
 
 ```kotlin
 dependencies {
-    implementation("io.github.mzlnk:javalin-security:0.1.0")
+    implementation("io.github.mzlnk:javalin-security:0.2.0")
 }
 ```
 
