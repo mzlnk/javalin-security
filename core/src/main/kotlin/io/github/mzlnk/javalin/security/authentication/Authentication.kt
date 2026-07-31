@@ -6,7 +6,7 @@ import io.javalin.security.RouteRole
  * Security token stored on the Javalin [io.javalin.http.Context] for the duration of a request.
  *
  * Exposes [identity], granted [roles], and [isAuthenticated]. Create instances only through
- * [authenticated] / [unauthenticated].
+ * [authenticated] / [unauthenticated]. Roles are owned here — not on [Identity].
  */
 class Authentication private constructor(
 
@@ -23,10 +23,17 @@ class Authentication private constructor(
 
     companion object {
 
-        /** Builds an authenticated [Authentication] for [identity], deriving [roles] from [Identity.roles]. */
+        /**
+         * Builds an authenticated [Authentication] for [identity] with the given [roles].
+         *
+         * [roles] defaults to empty when the scheme grants no roles.
+         */
         @JvmStatic
-        fun authenticated(identity: Identity): Authentication =
-            Authentication(identity = identity, roles = identity.roles)
+        @JvmOverloads
+        fun authenticated(
+            identity: Identity,
+            roles: Set<RouteRole> = emptySet(),
+        ): Authentication = Authentication(identity = identity, roles = roles)
 
         /** Returns the shared unauthenticated [Authentication]. */
         @JvmStatic

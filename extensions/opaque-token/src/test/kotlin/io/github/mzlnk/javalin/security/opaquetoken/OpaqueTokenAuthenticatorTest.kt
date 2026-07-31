@@ -16,17 +16,15 @@ import java.time.ZoneOffset
 class OpaqueTokenAuthenticatorTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
-    private data class Principal(
-        override val name: String,
-        override val roles: Set<RouteRole> = emptySet(),
-    ) : Identity
+    private data class Principal(override val name: String) : Identity
 
     private val now = Instant.parse("2026-01-15T12:00:00Z")
     private val fixedClock = Clock.fixed(now, ZoneOffset.UTC)
 
-    private val alice = TokenRecord(
-        identity = Principal(name = "alice", roles = setOf(Role.USER, Role.ADMIN)),
+    private val alice = OpaqueTokenDetails(
+        identity = Principal(name = "alice"),
         expiresAt = now.plusSeconds(3600),
+        roles = setOf(Role.USER, Role.ADMIN),
     )
 
     private val tokenLookup = OpaqueTokenLookup { rawToken ->
@@ -35,7 +33,7 @@ class OpaqueTokenAuthenticatorTest {
             "t-expired" -> alice.copy(expiresAt = now.minusSeconds(1))
             "t-exact" -> alice.copy(expiresAt = now)
             "t-no-expiry" -> alice.copy(expiresAt = null)
-            "t-noroles" -> TokenRecord(identity = Principal(name = "anon"))
+            "t-noroles" -> OpaqueTokenDetails(identity = Principal(name = "anon"))
             else -> null
         }
     }

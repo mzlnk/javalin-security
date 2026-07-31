@@ -5,9 +5,10 @@ import io.javalin.security.RouteRole
 /**
  * Maps a decoded JWT to the set of [RouteRole]s granted to the caller.
  *
- * The resulting set is passed to
+ * The resulting set is passed as the roles argument to
  * [io.github.mzlnk.javalin.security.authentication.Authentication.authenticated] and is used by
- * declared-role routes and authorization rules such as `hasRole`. Register via the `jwt { }` block
+ * declared-role routes and authorization rules such as `hasRole`. Applied for both the default
+ * [Jwt] identity and a custom [JwtIdentityMapper]. Register via the `jwt { }` block
  * (`rolesMapper`); the default when unset is [noRoles]. Custom mappers receive a verified
  * [DecodedJwt] and may read any claim.
  */

@@ -19,28 +19,15 @@ class SessionJavaInteropTest {
     private enum Role implements RouteRole { USER, ADMIN }
 
     static class Principal implements Identity, Serializable {
-        private static final long serialVersionUID = 1L;
-
         private final String name;
-        private final Set<RouteRole> roles;
 
         Principal(String name) {
-            this(name, Set.of());
-        }
-
-        Principal(String name, Set<RouteRole> roles) {
             this.name = name;
-            this.roles = roles;
         }
 
         @Override
         public String getName() {
             return name;
-        }
-
-        @Override
-        public Set<RouteRole> getRoles() {
-            return roles;
         }
     }
 
@@ -83,23 +70,24 @@ class SessionJavaInteropTest {
     void session_manager_can_be_implemented_as_a_java_class() {
         SessionManager custom = new SessionManager() {
             @Override
-            public void create(Context context, Identity identity) { /* stub */ }
+            public void create(Context context, SessionDetails details) { /* stub */ }
 
             @Override
-            public Identity validate(Context context) {
-                return new Principal("alice", Set.of(Role.USER));
+            public SessionDetails validate(Context context) {
+                return new SessionDetails(new Principal("alice"), Set.of(Role.USER));
             }
 
             @Override
             public void invalidate(Context context) { /* stub */ }
         };
 
-        assertThat(custom.validate(null).getName()).isEqualTo("alice");
+        assertThat(custom.validate(null).getIdentity().getName()).isEqualTo("alice");
+        assertThat(custom.validate(null).getRoles()).containsExactly(Role.USER);
     }
 
     @Test
     void user_defined_identity_implements_serializable_and_round_trips() {
-        Principal principal = new Principal("alice", Set.of(Role.USER));
+        Principal principal = new Principal("alice");
         assertThat(principal).isInstanceOf(Serializable.class);
 
         byte[] bytes;
@@ -119,6 +107,29 @@ class SessionJavaInteropTest {
         }
 
         assertThat(restored.getName()).isEqualTo("alice");
+    }
+
+    @Test
+    void session_details_round_trips_through_java_serialization() {
+        SessionDetails details = new SessionDetails(new Principal("alice"), Set.of(Role.USER));
+
+        byte[] bytes;
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+            oos.writeObject(details);
+            bytes = baos.toByteArray();
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+
+        SessionDetails restored;
+        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+            restored = (SessionDetails) ois.readObject();
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+
+        assertThat(restored.getIdentity().getName()).isEqualTo("alice");
         assertThat(restored.getRoles()).containsExactly(Role.USER);
     }
 

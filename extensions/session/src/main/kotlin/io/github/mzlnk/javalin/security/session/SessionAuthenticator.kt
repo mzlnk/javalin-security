@@ -8,9 +8,9 @@ import io.javalin.http.Context
 /**
  * Implements session-based authentication by delegating to a [SessionManager].
  *
- * On each request, calls [SessionManager.validate] to resolve the current identity:
+ * On each request, calls [SessionManager.validate] to resolve the current session details:
  * - `null` → [AuthenticationResult.NotAuthenticated] (the request continues as anonymous)
- * - non-null → [AuthenticationResult.Success] with the identity
+ * - non-null → [AuthenticationResult.Success] with the identity and roles
  *
  * [sessionManager] is a required composition dependency: it fully owns how sessions are
  * created, validated, and destroyed. The authenticator itself is storage-agnostic.
@@ -23,10 +23,10 @@ class SessionAuthenticator private constructor(
 ) : Authenticator {
 
     override fun authenticate(context: Context): AuthenticationResult {
-        val identity = sessionManager.validate(context)
+        val details = sessionManager.validate(context)
             ?: return AuthenticationResult.NotAuthenticated
 
-        return AuthenticationResult.Success(Authentication.authenticated(identity))
+        return AuthenticationResult.Success(Authentication.authenticated(details.identity, details.roles))
     }
 
     /** Fluent builder for constructing a [SessionAuthenticator]. */

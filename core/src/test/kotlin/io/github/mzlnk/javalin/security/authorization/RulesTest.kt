@@ -79,5 +79,5 @@ class RulesTest {
     }
 
     private fun authenticated(vararg roles: RouteRole): Authentication =
-        Authentication.authenticated(TestIdentity("bob", roles.toSet()))
+        Authentication.authenticated(TestIdentity("bob"), roles.toSet())
 }

@@ -13,7 +13,7 @@ import java.util.function.Consumer
  *
  * Builds an [AuthenticationStrategy.Sync] backed by a [SessionAuthenticator] and
  * [sessionManager]. The identity type your session stores is your own — bring your own type;
- * roles come from its `roles` property. When using the default [HttpSessionManager], the
+ * roles come from [SessionDetails.roles]. When using the default [HttpSessionManager], the
  * identity must be `java.io.Serializable` (rejected at create time). Session create/invalidate
  * is the caller's responsibility — keep a reference to [sessionManager] and call it from your
  * login/logout handlers.

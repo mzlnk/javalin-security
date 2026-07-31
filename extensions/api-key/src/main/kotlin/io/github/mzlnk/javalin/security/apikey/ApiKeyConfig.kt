@@ -12,13 +12,13 @@ import java.util.function.Consumer
  * Configuration for the [apiKey] strategy factory.
  *
  * [lookup] is required. The identity type your [ApiKeyLookup] returns is your own — bring your
- * own type; roles come from its `roles` property. Builds an [ApiKeyAuthenticator]. HTTP-only —
+ * own type; roles come from [ApiKeyDetails.roles]. Builds an [ApiKeyAuthenticator]. HTTP-only —
  * there is no WebSocket variant.
  */
 class ApiKeyConfig internal constructor() {
 
     /**
-     * Resolves a raw API key to its owner's identity. Required; throws
+     * Resolves a raw API key to its owner's [ApiKeyDetails]. Required; throws
      * [SecurityConfigurationException] if unset when the strategy is built.
      */
     @JvmField
@@ -57,9 +57,9 @@ class ApiKeyConfig internal constructor() {
  *
  * Assign the result to `http.authentication`. Only [ApiKeyConfig.lookup] is required. The
  * identity type flowing through the extension is entirely yours — the extension attaches
- * whichever identity your [ApiKeyLookup] returns. To use [ApiKeyAuthenticator] directly,
- * construct it and wrap it in a custom [AuthenticationStrategy.Sync] (or
- * [AuthenticationStrategy.sync]).
+ * whichever identity and roles your [ApiKeyLookup] returns via [ApiKeyDetails]. To use
+ * [ApiKeyAuthenticator] directly, construct it and wrap it in a custom
+ * [AuthenticationStrategy.Sync] (or [AuthenticationStrategy.sync]).
  */
 fun apiKey(configure: Consumer<ApiKeyConfig>): AuthenticationStrategy.Sync {
     val config = ApiKeyConfig().also(configure::accept)

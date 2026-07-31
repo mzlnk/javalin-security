@@ -15,9 +15,10 @@ import org.slf4j.LoggerFactory
  * [AuthenticationResult.NotAuthenticated]. Calls [JwtDecoder.decode] with the configured
  * [JwtVerification]; any thrown exception yields [AuthenticationResult.Failure]. On success,
  * resolves the identity:
- * - when [identityMapper] is set, maps the [DecodedJwt] to it directly (`null` yields
+ * - when [identityMapper] is set, maps the [DecodedJwt] to it (`null` yields
  *   [AuthenticationResult.Failure]);
- * - otherwise falls back to the default [Jwt] identity, with roles from [rolesMapper].
+ * - otherwise falls back to the default [Jwt] identity.
+ * Roles always come from [rolesMapper], independent of which identity is attached.
  *
  * Construct via `jwt { }` or [Builder].
  */
@@ -44,14 +45,16 @@ class JwtAuthenticator private constructor(
         val identity: Identity? = if (mapper != null) {
             mapper.map(decoded)
         } else {
-            Jwt(decoded, rolesMapper.map(decoded))
+            Jwt(decoded)
         }
 
         if (identity == null) {
             return AuthenticationResult.Failure(message = "jwt.identityMapper returned null for a verified token")
         }
 
-        return AuthenticationResult.Success(Authentication.authenticated(identity))
+        return AuthenticationResult.Success(
+            Authentication.authenticated(identity, rolesMapper.map(decoded)),
+        )
     }
 
     /** Fluent builder for constructing a [JwtAuthenticator]. */
@@ -65,8 +68,8 @@ class JwtAuthenticator private constructor(
         private var tokenResolver: TokenResolver = TokenResolver.DEFAULT
 
         /**
-         * Sets the [JwtRolesMapper] used to resolve roles from a verified token when no
-         * [identityMapper] is configured. Defaults to [JwtRolesMapper.noRoles].
+         * Sets the [JwtRolesMapper] used to resolve roles from a verified token.
+         * Defaults to [JwtRolesMapper.noRoles].
          */
         fun rolesMapper(mapper: JwtRolesMapper): Builder {
             this.rolesMapper = mapper

@@ -98,6 +98,8 @@ class JwtConfigurationTest {
 
     private data class Principal(override val name: String) : Identity
 
+    private enum class Role : io.javalin.security.RouteRole { USER }
+
     @Test
     fun `should map the verified token to a user-defined identity via identityMapper`() {
         val strategy = jwt { jwt ->
@@ -127,21 +129,18 @@ class JwtConfigurationTest {
     }
 
     @Test
-    fun `should throw SecurityConfigurationException when identityMapper and a non-default rolesMapper are both configured`() {
-        assertThatThrownBy {
-            Javalin.create { cfg ->
-                cfg.security { security ->
-                    security.http.authentication = jwt { jwt ->
-                        jwt.decoder = testDecoder
-                        jwt.keySource = JwtKeySource.secret("test-secret")
-                        jwt.identityMapper = JwtIdentityMapper { token -> Principal(name = token.subject) }
-                        jwt.rolesMapper = JwtRolesMapper.fromScope { null }
-                    }
-                    security.http.fallback = Rules.allow()
-                }
-            }
-        }.isInstanceOf(SecurityConfigurationException::class.java)
-            .hasMessageContaining("mutually exclusive")
+    fun `should apply rolesMapper alongside identityMapper`() {
+        val strategy = jwt { jwt ->
+            jwt.decoder = testDecoder
+            jwt.keySource = JwtKeySource.secret("test-secret")
+            jwt.identityMapper = JwtIdentityMapper { token -> Principal(name = "user-${token.subject}") }
+            jwt.rolesMapper = JwtRolesMapper { setOf(Role.USER) }
+        }
+
+        val result = strategy.authenticator().authenticate(ctx) as AuthenticationResult.Success
+
+        assertThat(result.authentication.identity).isEqualTo(Principal(name = "user-some.jwt.token"))
+        assertThat(result.authentication.roles).containsExactly(Role.USER)
     }
 
 }

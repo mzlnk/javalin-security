@@ -14,15 +14,12 @@ import org.junit.jupiter.api.Test
 class ApiKeySecurityTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
-    private data class Client(
-        override val name: String,
-        override val roles: Set<RouteRole> = emptySet(),
-    ) : Identity
+    private data class Client(override val name: String) : Identity
 
     private val testApiKeyLookup = ApiKeyLookup { rawKey ->
         when (rawKey) {
-            "k-alice" -> Client(name = "alice-svc", roles = setOf(Role.USER))
-            "k-admin" -> Client(name = "admin-svc", roles = setOf(Role.ADMIN))
+            "k-alice" -> ApiKeyDetails(Client(name = "alice-svc"), roles = setOf(Role.USER))
+            "k-admin" -> ApiKeyDetails(Client(name = "admin-svc"), roles = setOf(Role.ADMIN))
             else -> null
         }
     }

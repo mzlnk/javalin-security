@@ -19,27 +19,20 @@ class ApiKeySecurityJavaTest {
 
     static class Client implements Identity {
         private final String name;
-        private final Set<RouteRole> roles;
 
-        Client(String name, Set<RouteRole> roles) {
+        Client(String name) {
             this.name = name;
-            this.roles = roles;
         }
 
         @Override
         public String getName() {
             return name;
         }
-
-        @Override
-        public Set<RouteRole> getRoles() {
-            return roles;
-        }
     }
 
     private final ApiKeyLookup testApiKeyLookup = rawKey -> switch (rawKey) {
-        case "k-alice" -> new Client("alice-svc", Set.of(Role.USER));
-        case "k-admin" -> new Client("admin-svc", Set.of(Role.ADMIN));
+        case "k-alice" -> new ApiKeyDetails(new Client("alice-svc"), Set.of(Role.USER));
+        case "k-admin" -> new ApiKeyDetails(new Client("admin-svc"), Set.of(Role.ADMIN));
         default -> null;
     };
 

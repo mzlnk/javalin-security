@@ -31,7 +31,7 @@ class JavalinSecurityHttpJavaTest {
                 : Arrays.stream(rolesHeader.split(","))
                         .map(name -> (RouteRole) Role.valueOf(name))
                         .collect(Collectors.toSet());
-        return new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user, roles)));
+        return new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user), roles));
     };
 
     @Test
@@ -292,7 +292,7 @@ class JavalinSecurityHttpJavaTest {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.rules.get("/plain", Rules.deny());
                 security.http.authentication = authenticationStrategy(ctx -> new AuthenticationResult.Success(
-                        Authentication.authenticated(new TestIdentity("alice", Set.of(Role.ADMIN)))));
+                        Authentication.authenticated(new TestIdentity("alice"), Set.of(Role.ADMIN))));
             }));
             config.routes.get("/plain", ctx -> ctx.result("ok")); // no roles declared
         });

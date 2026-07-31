@@ -12,14 +12,14 @@ import java.util.function.Consumer
  * Configuration for the [basicAuth] strategy factory (HTTP Basic, RFC 7617).
  *
  * [userLookup] is required. The identity type your [UserLookup] returns is your own — bring your
- * own type; roles come from its `roles` property. Builds a [BasicAuthenticator] and, when
+ * own type; roles come from [BasicUserDetails.roles]. Builds a [BasicAuthenticator] and, when
  * [basicChallenge] is `true`, a [BasicChallengeUnauthorizedHandler]; otherwise uses
  * [UnauthorizedHandler.DEFAULT]. HTTP-only — there is no WebSocket variant.
  */
 class BasicAuthConfig internal constructor() {
 
     /**
-     * Resolves a username to its stored [io.github.mzlnk.javalin.security.authentication.PasswordCredentials].
+     * Resolves a username to its stored [BasicUserDetails].
      * Required; throws [SecurityConfigurationException] if unset when the strategy is built.
      */
     @JvmField
@@ -75,7 +75,7 @@ class BasicAuthConfig internal constructor() {
  *
  * Assign the result to `http.authentication`. Only [BasicAuthConfig.userLookup] is required.
  * The identity type flowing through the extension is entirely yours — the extension attaches
- * whichever identity your [UserLookup] returns and never bundles its own. To use
+ * whichever identity and roles your [UserLookup] returns via [BasicUserDetails]. To use
  * [BasicAuthenticator] directly, call [BasicAuthenticator.builder] and wrap it in a custom
  * [AuthenticationStrategy.Sync].
  */

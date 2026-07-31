@@ -1,13 +1,12 @@
 package io.github.mzlnk.javalin.security.session
 
-import io.github.mzlnk.javalin.security.authentication.Identity
 import io.javalin.http.Context
 import java.io.Serializable
 
 /**
  * Default [SessionManager] backed by the servlet HTTP session.
  *
- * Stores the caller's [Identity] as a session attribute under [attributeKey]. On [create],
+ * Stores the caller's [SessionDetails] as a session attribute under [attributeKey]. On [create],
  * ensures a session exists and (when [rotateSessionIdOnCreate] is `true`) rotates the session
  * id via `HttpServletRequest.changeSessionId()` to defend against session fixation. On
  * [invalidate], clears the attribute and (when [invalidateSessionOnDestroy] is `true`) calls
@@ -16,11 +15,11 @@ import java.io.Serializable
  * [validate] never creates a session — it only reads the current session, preserving the
  * "no credentials → anonymous" contract of the extension.
  *
- * The stored [Identity] must be [Serializable] so it can travel with the session when the
- * container uses a distributed session store. [create] rejects non-serializable identities with
- * [IllegalArgumentException] — surface the failure at create time rather than at replication
- * time. Prefer enum [io.javalin.security.RouteRole]s (enums are serializable) when sessions may
- * be replicated.
+ * The stored [SessionDetails.identity] must be [Serializable] so it can travel with the session
+ * when the container uses a distributed session store. [create] rejects non-serializable
+ * identities with [IllegalArgumentException] — surface the failure at create time rather than at
+ * replication time. Prefer enum [io.javalin.security.RouteRole]s (enums are serializable) when
+ * sessions may be replicated.
  */
 class HttpSessionManager private constructor(
     private val attributeKey: String,
@@ -28,9 +27,9 @@ class HttpSessionManager private constructor(
     private val invalidateSessionOnDestroy: Boolean,
 ) : SessionManager {
 
-    override fun create(context: Context, identity: Identity) {
-        require(identity is Serializable) {
-            "HttpSessionManager requires a Serializable Identity, but ${identity::class.qualifiedName} is not. " +
+    override fun create(context: Context, details: SessionDetails) {
+        require(details.identity is Serializable) {
+            "HttpSessionManager requires a Serializable Identity, but ${details.identity::class.qualifiedName} is not. " +
                 "Make your Identity type implement java.io.Serializable, or plug in a custom SessionManager."
         }
         val request = context.req()
@@ -38,11 +37,11 @@ class HttpSessionManager private constructor(
         if (rotateSessionIdOnCreate) {
             request.changeSessionId()
         }
-        context.sessionAttribute(attributeKey, identity)
+        context.sessionAttribute(attributeKey, details)
     }
 
-    override fun validate(context: Context): Identity? =
-        context.sessionAttribute<Identity>(attributeKey)
+    override fun validate(context: Context): SessionDetails? =
+        context.sessionAttribute<SessionDetails>(attributeKey)
 
     override fun invalidate(context: Context) {
         val session = context.req().getSession(false) ?: return
@@ -64,7 +63,7 @@ class HttpSessionManager private constructor(
         private var invalidateSessionOnDestroy: Boolean = true
 
         /**
-         * Overrides the session attribute name used to store the identity.
+         * Overrides the session attribute name used to store the session details.
          *
          * Defaults to [DEFAULT_ATTRIBUTE_KEY].
          */
@@ -84,7 +83,7 @@ class HttpSessionManager private constructor(
 
         /**
          * When `true` (default), [invalidate] calls `HttpSession.invalidate()` after clearing
-         * the identity attribute.
+         * the session-details attribute.
          */
         fun invalidateSessionOnDestroy(enabled: Boolean): Builder {
             this.invalidateSessionOnDestroy = enabled

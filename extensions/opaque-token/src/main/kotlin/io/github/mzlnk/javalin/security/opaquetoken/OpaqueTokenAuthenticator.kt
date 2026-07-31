@@ -13,10 +13,10 @@ import java.time.Clock
  *
  * Extracts a raw token via [TokenResolver]: missing credentials yield
  * [AuthenticationResult.NotAuthenticated]. Looks up the token via [OpaqueTokenLookup]; an unknown
- * token yields [AuthenticationResult.Failure]. When [TokenRecord.expiresAt] is set and is
+ * token yields [AuthenticationResult.Failure]. When [OpaqueTokenDetails.expiresAt] is set and is
  * at-or-before [clock]'s instant, yields [AuthenticationResult.Failure] with message
  * `"token expired"`. On success, returns [AuthenticationResult.Success] with the looked-up
- * identity as the identity. Construct via `opaqueToken { }` or [Builder].
+ * identity and roles. Construct via `opaqueToken { }` or [Builder].
  */
 class OpaqueTokenAuthenticator private constructor(
     private val tokenLookup: OpaqueTokenLookup,
@@ -27,19 +27,19 @@ class OpaqueTokenAuthenticator private constructor(
     override fun authenticate(context: Context): AuthenticationResult {
         val rawToken = resolver.resolve(context) ?: return AuthenticationResult.NotAuthenticated
 
-        val record = tokenLookup.lookup(rawToken)
-        if (record == null) {
+        val details = tokenLookup.lookup(rawToken)
+        if (details == null) {
             log.debug("Opaque token authentication failed: unknown token")
             return AuthenticationResult.Failure(message = "invalid token")
         }
 
-        val expiresAt = record.expiresAt
+        val expiresAt = details.expiresAt
         if (expiresAt != null && !expiresAt.isAfter(clock.instant())) {
             log.debug("Opaque token authentication failed: token expired")
             return AuthenticationResult.Failure(message = "token expired")
         }
 
-        return AuthenticationResult.Success(Authentication.authenticated(record.identity))
+        return AuthenticationResult.Success(Authentication.authenticated(details.identity, details.roles))
     }
 
     /** Fluent builder for constructing an [OpaqueTokenAuthenticator]. */
@@ -59,7 +59,7 @@ class OpaqueTokenAuthenticator private constructor(
         }
 
         /**
-         * Overrides the clock used for [TokenRecord.expiresAt] validation.
+         * Overrides the clock used for [OpaqueTokenDetails.expiresAt] validation.
          *
          * Defaults to [Clock.systemUTC]. Inject a fixed clock in tests.
          */

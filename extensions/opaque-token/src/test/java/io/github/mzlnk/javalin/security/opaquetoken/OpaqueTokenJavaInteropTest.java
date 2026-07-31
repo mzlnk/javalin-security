@@ -15,32 +15,21 @@ class OpaqueTokenJavaInteropTest {
 
     static class Principal implements Identity {
         private final String name;
-        private final Set<RouteRole> roles;
 
         Principal(String name) {
-            this(name, Set.of());
-        }
-
-        Principal(String name, Set<RouteRole> roles) {
             this.name = name;
-            this.roles = roles;
         }
 
         @Override
         public String getName() {
             return name;
         }
-
-        @Override
-        public Set<RouteRole> getRoles() {
-            return roles;
-        }
     }
 
     @Test
     void authenticator_builder_is_fluent_from_java() {
         OpaqueTokenLookup testLookup = rawToken ->
-                "t-valid".equals(rawToken) ? new TokenRecord(new Principal("alice"), null) : null;
+                "t-valid".equals(rawToken) ? new OpaqueTokenDetails(new Principal("alice"), null) : null;
 
         OpaqueTokenAuthenticator authenticator = OpaqueTokenAuthenticator.builder(testLookup)
                 .resolver(io.github.mzlnk.javalin.security.common.token.TokenResolver.getDEFAULT())
@@ -53,7 +42,7 @@ class OpaqueTokenJavaInteropTest {
     @Test
     void authenticator_of_factory_works_from_java() {
         OpaqueTokenLookup testLookup = rawToken ->
-                "t-valid".equals(rawToken) ? new TokenRecord(new Principal("alice"), null) : null;
+                "t-valid".equals(rawToken) ? new OpaqueTokenDetails(new Principal("alice"), null) : null;
 
         OpaqueTokenAuthenticator authenticator = OpaqueTokenAuthenticator.of(testLookup);
         assertThat(authenticator).isNotNull();
@@ -61,23 +50,23 @@ class OpaqueTokenJavaInteropTest {
 
     @Test
     void opaque_token_lookup_can_be_expressed_as_java_lambda() {
-        OpaqueTokenLookup lookup = rawToken -> new TokenRecord(new Principal("svc"), null);
-        TokenRecord record = lookup.lookup("any");
+        OpaqueTokenLookup lookup = rawToken -> new OpaqueTokenDetails(new Principal("svc"), null);
+        OpaqueTokenDetails record = lookup.lookup("any");
         assertThat(record.getIdentity().getName()).isEqualTo("svc");
     }
 
     @Test
     void token_record_defaults_optional_fields() {
-        TokenRecord record = new TokenRecord(new Principal("sub"), null);
+        OpaqueTokenDetails record = new OpaqueTokenDetails(new Principal("sub"), null);
         assertThat(record.getIdentity().getName()).isEqualTo("sub");
-        assertThat(record.getIdentity().getRoles()).isEmpty();
+        assertThat(record.getRoles()).isEmpty();
         assertThat(record.getExpiresAt()).isNull();
     }
 
     @Test
     void token_record_accepts_expiry() {
         Instant expires = Instant.parse("2026-06-01T00:00:00Z");
-        TokenRecord record = new TokenRecord(new Principal("alice"), expires);
+        OpaqueTokenDetails record = new OpaqueTokenDetails(new Principal("alice"), expires);
         assertThat(record.getIdentity().getName()).isEqualTo("alice");
         assertThat(record.getExpiresAt()).isEqualTo(expires);
     }
@@ -91,7 +80,7 @@ class OpaqueTokenJavaInteropTest {
     @Test
     void fixed_clock_can_be_injected_from_java() {
         Clock fixed = Clock.fixed(Instant.parse("2026-01-15T12:00:00Z"), ZoneOffset.UTC);
-        OpaqueTokenLookup testLookup = rawToken -> new TokenRecord(new Principal("alice"), null);
+        OpaqueTokenLookup testLookup = rawToken -> new OpaqueTokenDetails(new Principal("alice"), null);
 
         OpaqueTokenAuthenticator authenticator = OpaqueTokenAuthenticator.builder(testLookup)
                 .clock(fixed)

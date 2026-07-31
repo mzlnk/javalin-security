@@ -1,10 +1,9 @@
 package io.github.mzlnk.javalin.security.session
 
-import io.github.mzlnk.javalin.security.authentication.Identity
 import io.javalin.http.Context
 
 /**
- * Owns the lifecycle of a caller's session and its stored identity.
+ * Owns the lifecycle of a caller's session and its stored [SessionDetails].
  *
  * The default implementation ([HttpSessionManager]) is backed by the servlet HTTP session
  * (`ctx.sessionAttribute(...)`). Plug in a custom [SessionManager] to back sessions with
@@ -12,10 +11,10 @@ import io.javalin.http.Context
  * extension is agnostic to the storage strategy.
  *
  * The three operations are:
- * - [create] — establishes a session for an identity (call from your login handler after
+ * - [create] — establishes a session for [SessionDetails] (call from your login handler after
  *   verifying credentials).
- * - [validate] — returns the [Identity] for the current request, or `null` when the request has
- *   no valid session. Invoked by [SessionAuthenticator] on every request.
+ * - [validate] — returns the [SessionDetails] for the current request, or `null` when the
+ *   request has no valid session. Invoked by [SessionAuthenticator] on every request.
  * - [invalidate] — destroys the current session (call from your logout handler). Must be safe to
  *   call when there is no active session.
  *
@@ -25,21 +24,21 @@ import io.javalin.http.Context
 interface SessionManager {
 
     /**
-     * Establishes a session for [identity] on the current request.
+     * Establishes a session for [details] on the current request.
      *
      * Call from your login handler after verifying credentials. May rotate/replace any
      * pre-existing session id to mitigate session fixation, depending on the implementation.
      */
-    fun create(context: Context, identity: Identity)
+    fun create(context: Context, details: SessionDetails)
 
     /**
-     * Returns the [Identity] associated with the current request, or `null` when no valid
+     * Returns the [SessionDetails] associated with the current request, or `null` when no valid
      * session exists.
      *
      * Called by [SessionAuthenticator] on every request. Must not throw when credentials are
      * absent.
      */
-    fun validate(context: Context): Identity?
+    fun validate(context: Context): SessionDetails?
 
     /**
      * Destroys the current session, if any.

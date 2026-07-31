@@ -1,8 +1,8 @@
 # API Key
 
 Opaque API-key authentication via `javalin-security-api-key`. You bring your own `Identity`
-type; `ApiKeyLookup` resolves a raw key directly to your identity — there is no separate
-principal type to convert.
+type; `ApiKeyLookup` resolves a raw key to an `ApiKeyDetails` (your identity plus the roles to
+grant).
 
 !!! info "HTTP only"
     Assign to `http.authentication`. There is no WebSocket variant of API-key auth.
@@ -48,11 +48,11 @@ Add the extension on top of [core](../getting-started/installation.md):
 
     enum class Role : RouteRole { SERVICE, ADMIN }
 
-    data class Client(override val name: String, override val roles: Set<RouteRole>) : Identity
+    data class Client(override val name: String) : Identity
 
     val keys = mapOf(
-        "k-alice" to Client("orders-svc", setOf(Role.SERVICE)),
-        "k-admin" to Client("admin-svc", setOf(Role.ADMIN)),
+        "k-alice" to ApiKeyDetails(Client("orders-svc"), setOf(Role.SERVICE)),
+        "k-admin" to ApiKeyDetails(Client("admin-svc"), setOf(Role.ADMIN)),
     )
 
     Javalin.create { config ->
@@ -78,14 +78,13 @@ Add the extension on top of [core](../getting-started/installation.md):
     import java.util.Map;
     import java.util.Set;
 
-    record Client(String name, Set<RouteRole> roles) implements Identity {
+    record Client(String name) implements Identity {
         @Override public String getName() { return name; }
-        @Override public Set<RouteRole> getRoles() { return roles; }
     }
 
-    Map<String, Client> keys = Map.of(
-        "k-alice", new Client("orders-svc", Set.of(Role.SERVICE)),
-        "k-admin", new Client("admin-svc", Set.of(Role.ADMIN)));
+    Map<String, ApiKeyDetails> keys = Map.of(
+        "k-alice", new ApiKeyDetails(new Client("orders-svc"), Set.of(Role.SERVICE)),
+        "k-admin", new ApiKeyDetails(new Client("admin-svc"), Set.of(Role.ADMIN)));
 
     Javalin.create(config -> {
         config.registerPlugin(new JavalinSecurityPlugin(security -> {
@@ -103,7 +102,7 @@ Add the extension on top of [core](../getting-started/installation.md):
 
 | Field                  | Default                | Effect                                                              |
 |------------------------|------------------------|-----------------------------------------------------------------------|
-| `lookup`               | *required*             | Raw key → `Identity` (or `null`).                                   |
+| `lookup`               | *required*             | Raw key → `ApiKeyDetails` (or `null`).                              |
 | `resolver`             | `X-Api-Key` header     | Where the key is read from.                                         |
 | `forbiddenHandler`     | bare HTTP 403          | Renders access denied for authenticated callers.                    |
 | `unauthorizedHandler`  | bare HTTP 401          | Renders failed or absent authentication.                            |

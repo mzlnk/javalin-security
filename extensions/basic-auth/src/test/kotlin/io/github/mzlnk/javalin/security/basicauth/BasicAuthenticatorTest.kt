@@ -2,7 +2,6 @@ package io.github.mzlnk.javalin.security.basicauth
 
 import io.github.mzlnk.javalin.security.authentication.AuthenticationResult
 import io.github.mzlnk.javalin.security.authentication.Identity
-import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
 import io.javalin.http.Context
 import io.javalin.security.RouteRole
 import io.mockk.every
@@ -14,14 +13,12 @@ import java.util.Base64
 class BasicAuthenticatorTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
-    private data class TestUser(
-        override val name: String,
-        override val roles: Set<RouteRole> = emptySet(),
-    ) : Identity
+    private data class TestUser(override val name: String) : Identity
 
-    private val alice = PasswordCredentials(
-        identity = TestUser(name = "alice", roles = setOf(Role.USER, Role.ADMIN)),
+    private val alice = BasicUserDetails(
+        identity = TestUser(name = "alice"),
         encodedPassword = "correct-password",
+        roles = setOf(Role.USER, Role.ADMIN),
     )
 
     private val userLookup = UserLookup { username -> if (username == "alice") alice else null }
@@ -93,11 +90,11 @@ class BasicAuthenticatorTest {
         val result = manager.authenticate(ctx(basicHeader("alice", "correct-password"))) as AuthenticationResult.Success
 
         // TestUser (like any user-defined Identity) simply has no password field to leak.
-        assertThat(result.authentication.identity).isEqualTo(TestUser(name = "alice", roles = setOf(Role.USER, Role.ADMIN)))
+        assertThat(result.authentication.identity).isEqualTo(TestUser(name = "alice"))
     }
 
     @Test
-    fun `should populate roles from the looked-up user`() {
+    fun `should populate roles from the looked-up user details`() {
         val manager = BasicAuthenticator.of(userLookup)
         val result = manager.authenticate(ctx(basicHeader("alice", "correct-password"))) as AuthenticationResult.Success
 
@@ -105,9 +102,9 @@ class BasicAuthenticatorTest {
     }
 
     @Test
-    fun `should return empty roles when the looked-up user has none`() {
+    fun `should return empty roles when the looked-up user details have none`() {
         val noRolesLookup = UserLookup { username ->
-            PasswordCredentials(TestUser(name = username), encodedPassword = "pw")
+            BasicUserDetails(TestUser(name = username), encodedPassword = "pw")
         }
         val manager = BasicAuthenticator.of(noRolesLookup)
         val result = manager.authenticate(ctx(basicHeader("bob", "pw"))) as AuthenticationResult.Success

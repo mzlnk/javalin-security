@@ -36,7 +36,7 @@ class JavalinSecurityWsJavaTest {
                 : java.util.Arrays.stream(rolesHeader.split(","))
                         .map(name -> (RouteRole) Role.valueOf(name))
                         .collect(java.util.stream.Collectors.toSet());
-        return new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user, roles)));
+        return new AuthenticationResult.Success(Authentication.authenticated(new TestIdentity(user), roles));
     };
 
     @Test
@@ -144,7 +144,7 @@ class JavalinSecurityWsJavaTest {
             config.registerPlugin(new JavalinSecurityPlugin(security -> {
                 security.rules.ws("/ws/*", Rules.hasRole(Role.ADMIN));
                 security.ws.authentication = authenticationStrategy(ctx -> new AuthenticationResult.Success(
-                        Authentication.authenticated(new TestIdentity("alice", java.util.Set.of(Role.ADMIN)))));
+                        Authentication.authenticated(new TestIdentity("alice"), java.util.Set.of(Role.ADMIN))));
             }));
             config.routes.ws("/ws/admin", ws -> { });
         });

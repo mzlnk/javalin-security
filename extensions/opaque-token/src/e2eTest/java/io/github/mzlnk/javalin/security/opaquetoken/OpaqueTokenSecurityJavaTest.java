@@ -21,29 +21,21 @@ class OpaqueTokenSecurityJavaTest {
 
     static class Principal implements Identity {
         private final String name;
-        private final Set<RouteRole> roles;
 
-        Principal(String name, Set<RouteRole> roles) {
+        Principal(String name) {
             this.name = name;
-            this.roles = roles;
         }
 
         @Override
         public String getName() {
             return name;
         }
-
-        @Override
-        public Set<RouteRole> getRoles() {
-            return roles;
-        }
     }
 
     private final OpaqueTokenLookup testTokenLookup = rawToken -> switch (rawToken) {
-        case "t-alice" -> new TokenRecord(new Principal("alice", Set.of(Role.USER)));
-        case "t-admin" -> new TokenRecord(new Principal("admin", Set.of(Role.ADMIN)));
-        case "t-expired" -> new TokenRecord(
-                new Principal("expired-user", Set.of(Role.USER)), Instant.now().minusSeconds(60));
+        case "t-alice" -> new OpaqueTokenDetails(new Principal("alice"), null, Set.of(Role.USER));
+        case "t-admin" -> new OpaqueTokenDetails(new Principal("admin"), null, Set.of(Role.ADMIN));
+        case "t-expired" -> new OpaqueTokenDetails(new Principal("expired-user"), Instant.now().minusSeconds(60), Set.of(Role.USER));
         default -> null;
     };
 

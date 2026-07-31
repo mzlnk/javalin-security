@@ -13,10 +13,7 @@ import org.junit.jupiter.api.Test
 class SessionAuthenticatorTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
-    private data class Principal(
-        override val name: String,
-        override val roles: Set<RouteRole> = emptySet(),
-    ) : Identity
+    private data class Principal(override val name: String) : Identity
 
     @Test
     fun `should return NotAuthenticated when SessionManager returns null`() {
@@ -34,10 +31,10 @@ class SessionAuthenticatorTest {
 
     @Test
     fun `should return Success with the session identity when SessionManager returns one`() {
-        val principal = Principal(name = "alice", roles = setOf(Role.USER, Role.ADMIN))
+        val details = SessionDetails(Principal(name = "alice"), roles = setOf(Role.USER, Role.ADMIN))
         val context: Context = mockk()
         val manager: SessionManager = mockk {
-            every { validate(context) } returns principal
+            every { validate(context) } returns details
         }
 
         val authenticator = SessionAuthenticator.of(manager)
@@ -57,7 +54,7 @@ class SessionAuthenticatorTest {
     fun `should return empty roles when the session has none`() {
         val context: Context = mockk()
         val manager: SessionManager = mockk {
-            every { validate(context) } returns Principal(name = "anon")
+            every { validate(context) } returns SessionDetails(Principal(name = "anon"))
         }
 
         val authenticator = SessionAuthenticator.of(manager)
@@ -68,10 +65,10 @@ class SessionAuthenticatorTest {
 
     @Test
     fun `builder produces a functional authenticator that delegates to the given SessionManager`() {
-        val principal = Principal(name = "alice", roles = setOf(Role.USER))
+        val details = SessionDetails(Principal(name = "alice"), roles = setOf(Role.USER))
         val context: Context = mockk()
         val manager: SessionManager = mockk {
-            every { validate(context) } returns principal
+            every { validate(context) } returns details
         }
 
         val authenticator = SessionAuthenticator.builder(manager).build()

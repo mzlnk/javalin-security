@@ -12,12 +12,12 @@ import org.junit.jupiter.api.Test
 class ApiKeyAuthenticatorTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
-    private data class Client(
-        override val name: String,
-        override val roles: Set<RouteRole> = emptySet(),
-    ) : Identity
+    private data class Client(override val name: String) : Identity
 
-    private val orders = Client(name = "orders-svc", roles = setOf(Role.USER, Role.ADMIN))
+    private val orders = ApiKeyDetails(
+        identity = Client(name = "orders-svc"),
+        roles = setOf(Role.USER, Role.ADMIN),
+    )
 
     private val apiKeyLookup = ApiKeyLookup { rawKey -> if (rawKey == "k-valid") orders else null }
 
@@ -58,7 +58,7 @@ class ApiKeyAuthenticatorTest {
     }
 
     @Test
-    fun `should populate roles from the looked-up principal`() {
+    fun `should populate roles from the looked-up details`() {
         val authenticator = ApiKeyAuthenticator(apiKeyLookup)
         val result = authenticator.authenticate(ctx("k-valid")) as AuthenticationResult.Success
 
@@ -66,9 +66,9 @@ class ApiKeyAuthenticatorTest {
     }
 
     @Test
-    fun `should return empty roles when the looked-up principal has none`() {
+    fun `should return empty roles when the looked-up details have none`() {
         val noRolesLookup = ApiKeyLookup { rawKey ->
-            if (rawKey == "k-noroles") Client(name = "anon-svc") else null
+            if (rawKey == "k-noroles") ApiKeyDetails(Client(name = "anon-svc")) else null
         }
         val authenticator = ApiKeyAuthenticator(noRolesLookup)
         val result = authenticator.authenticate(ctx("k-noroles")) as AuthenticationResult.Success

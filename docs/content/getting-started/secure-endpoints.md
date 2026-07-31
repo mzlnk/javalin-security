@@ -26,17 +26,17 @@ will call for each request:
 
     ```kotlin
     import io.github.mzlnk.javalin.security.authentication.Identity
-    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
+    import io.github.mzlnk.javalin.security.basicauth.BasicUserDetails
     import io.github.mzlnk.javalin.security.basicauth.UserLookup
     import io.javalin.security.RouteRole
 
     enum class Role : RouteRole { USER, ADMIN }
 
-    data class User(override val name: String, override val roles: Set<RouteRole>) : Identity
+    data class User(override val name: String) : Identity
 
     val users = mapOf(
-        "alice" to PasswordCredentials(User("alice", setOf(Role.USER)), "secret"),
-        "admin" to PasswordCredentials(User("admin", setOf(Role.ADMIN)), "secret"),
+        "alice" to BasicUserDetails(User("alice"), "secret", setOf(Role.USER)),
+        "admin" to BasicUserDetails(User("admin"), "secret", setOf(Role.ADMIN)),
     )
 
     val userLookup = UserLookup { users[it] }
@@ -46,7 +46,7 @@ will call for each request:
 
     ```java
     import io.github.mzlnk.javalin.security.authentication.Identity;
-    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials;
+    import io.github.mzlnk.javalin.security.basicauth.BasicUserDetails;
     import io.github.mzlnk.javalin.security.basicauth.UserLookup;
     import io.javalin.security.RouteRole;
     import java.util.Map;
@@ -54,14 +54,13 @@ will call for each request:
 
     enum Role implements RouteRole { USER, ADMIN }
 
-    record User(String name, Set<RouteRole> roles) implements Identity {
+    record User(String name) implements Identity {
         @Override public String getName() { return name; }
-        @Override public Set<RouteRole> getRoles() { return roles; }
     }
 
-    Map<String, PasswordCredentials> users = Map.of(
-        "alice", new PasswordCredentials(new User("alice", Set.of(Role.USER)), "secret"),
-        "admin", new PasswordCredentials(new User("admin", Set.of(Role.ADMIN)), "secret"));
+    Map<String, BasicUserDetails> users = Map.of(
+        "alice", new BasicUserDetails(new User("alice"), "secret", Set.of(Role.USER)),
+        "admin", new BasicUserDetails(new User("admin"), "secret", Set.of(Role.ADMIN)));
 
     UserLookup userLookup = users::get;
     ```
@@ -162,7 +161,6 @@ When paths share a prefix, nest rules under `apiBuilder` — analogous to Javali
 
     ```kotlin
     import io.github.mzlnk.javalin.security.authentication.Identity
-    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
     import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.basicauth.*
     import io.github.mzlnk.javalin.security.identity
@@ -172,12 +170,12 @@ When paths share a prefix, nest rules under `apiBuilder` — analogous to Javali
 
     enum class Role : RouteRole { USER, ADMIN }
 
-    data class User(override val name: String, override val roles: Set<RouteRole>) : Identity
+    data class User(override val name: String) : Identity
 
     fun main() {
         val users = mapOf(
-            "alice" to PasswordCredentials(User("alice", setOf(Role.USER)), "secret"),
-            "admin" to PasswordCredentials(User("admin", setOf(Role.ADMIN)), "secret"),
+            "alice" to BasicUserDetails(User("alice"), "secret", setOf(Role.USER)),
+            "admin" to BasicUserDetails(User("admin"), "secret", setOf(Role.ADMIN)),
         )
         val userLookup = UserLookup { users[it] }
 
@@ -207,7 +205,6 @@ When paths share a prefix, nest rules under `apiBuilder` — analogous to Javali
     ```java
     import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
     import io.github.mzlnk.javalin.security.authentication.Identity;
-    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials;
     import io.github.mzlnk.javalin.security.authorization.Rules;
     import io.github.mzlnk.javalin.security.basicauth.*;
     import io.javalin.Javalin;
@@ -219,15 +216,14 @@ When paths share a prefix, nest rules under `apiBuilder` — analogous to Javali
 
     enum Role implements RouteRole { USER, ADMIN }
 
-    record User(String name, Set<RouteRole> roles) implements Identity {
+    record User(String name) implements Identity {
         @Override public String getName() { return name; }
-        @Override public Set<RouteRole> getRoles() { return roles; }
     }
 
     void main() {
-        Map<String, PasswordCredentials> users = Map.of(
-            "alice", new PasswordCredentials(new User("alice", Set.of(Role.USER)), "secret"),
-            "admin", new PasswordCredentials(new User("admin", Set.of(Role.ADMIN)), "secret"));
+        Map<String, BasicUserDetails> users = Map.of(
+            "alice", new BasicUserDetails(new User("alice"), "secret", Set.of(Role.USER)),
+            "admin", new BasicUserDetails(new User("admin"), "secret", Set.of(Role.ADMIN)));
         UserLookup userLookup = users::get;
 
         Javalin.create(config -> {

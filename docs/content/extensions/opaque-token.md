@@ -1,7 +1,7 @@
 # Opaque Token
 
 Opaque bearer-token authentication via `javalin-security-opaque-token`. You bring your own
-`Identity` type; `OpaqueTokenLookup` resolves a raw token to a `TokenRecord` (your identity plus
+`Identity` type; `OpaqueTokenLookup` resolves a raw token to a `OpaqueTokenDetails` (your identity plus
 an optional expiry). The extension resolves the token from the request (default:
 `Authorization: Bearer …`), validates the optional expiry, and attaches your identity.
 
@@ -55,11 +55,11 @@ Add the extension on top of [core](../getting-started/installation.md):
 
     enum class Role : RouteRole { USER, ADMIN }
 
-    data class User(override val name: String, override val roles: Set<RouteRole>) : Identity
+    data class User(override val name: String) : Identity
 
     val tokens = mapOf(
-        "t-alice" to TokenRecord(User("alice", setOf(Role.USER))),
-        "t-admin" to TokenRecord(User("admin", setOf(Role.ADMIN))),
+        "t-alice" to OpaqueTokenDetails(User("alice"), roles = setOf(Role.USER)),
+        "t-admin" to OpaqueTokenDetails(User("admin"), roles = setOf(Role.ADMIN)),
     )
 
     Javalin.create { config ->
@@ -85,14 +85,13 @@ Add the extension on top of [core](../getting-started/installation.md):
     import java.util.Map;
     import java.util.Set;
 
-    record User(String name, Set<RouteRole> roles) implements Identity {
+    record User(String name) implements Identity {
         @Override public String getName() { return name; }
-        @Override public Set<RouteRole> getRoles() { return roles; }
     }
 
-    Map<String, TokenRecord> tokens = Map.of(
-        "t-alice", new TokenRecord(new User("alice", Set.of(Role.USER))),
-        "t-admin", new TokenRecord(new User("admin", Set.of(Role.ADMIN))));
+    Map<String, OpaqueTokenDetails> tokens = Map.of(
+        "t-alice", new OpaqueTokenDetails(new User("alice"), null, Set.of(Role.USER)),
+        "t-admin", new OpaqueTokenDetails(new User("admin"), null, Set.of(Role.ADMIN)));
 
     Javalin.create(config -> {
         config.registerPlugin(new JavalinSecurityPlugin(security -> {
@@ -110,9 +109,9 @@ Add the extension on top of [core](../getting-started/installation.md):
 
 | Field                  | Default                          | Effect                                                              |
 |------------------------|-----------------------------------|---------------------------------------------------------------------|
-| `lookup`               | *required*                       | Raw token → `TokenRecord` (or `null`).                              |
+| `lookup`               | *required*                       | Raw token → `OpaqueTokenDetails` (or `null`).                              |
 | `resolver`             | `Authorization: Bearer …`        | Where the token is read from (`TokenResolver`).                     |
-| `clock`                | `Clock.systemUTC()`              | Used to validate `TokenRecord.expiresAt`.                           |
+| `clock`                | `Clock.systemUTC()`              | Used to validate `OpaqueTokenDetails.expiresAt`.                           |
 | `bearerChallenge`      | `false`                          | When `true`, 401 responses include `WWW-Authenticate: Bearer`.      |
 | `realm`                | `"API"`                          | Realm attribute for the bearer challenge.                           |
 | `forbiddenHandler`     | bare HTTP 403                    | Renders access denied for authenticated callers.                    |
@@ -152,7 +151,7 @@ Override via `resolver`:
 
 ## Expiry and revocation
 
-When `TokenRecord.expiresAt` is non-null, the authenticator rejects the token if `expiresAt` is
+When `OpaqueTokenDetails.expiresAt` is non-null, the authenticator rejects the token if `expiresAt` is
 at-or-before the configured `clock`'s instant (`Failure("token expired")`). Leave `expiresAt` as
 `null` for non-expiring tokens.
 
@@ -160,7 +159,8 @@ To **revoke** a token early, return `null` from the lookup (same as an unknown t
 
 ## Identity
 
-On success the strategy attaches the resolved `TokenRecord.identity` as the request's identity:
+On success the strategy attaches the resolved `OpaqueTokenDetails.identity` as the request's
+identity and `OpaqueTokenDetails.roles` as the granted roles:
 
 ```kotlin
 config.routes.get("/me") { ctx ->

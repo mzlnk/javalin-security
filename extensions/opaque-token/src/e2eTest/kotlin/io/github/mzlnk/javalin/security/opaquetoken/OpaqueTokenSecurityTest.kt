@@ -16,18 +16,16 @@ import java.time.Instant
 class OpaqueTokenSecurityTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
-    private data class Principal(
-        override val name: String,
-        override val roles: Set<RouteRole> = emptySet(),
-    ) : Identity
+    private data class Principal(override val name: String) : Identity
 
     private val testTokenLookup = OpaqueTokenLookup { rawToken ->
         when (rawToken) {
-            "t-alice" -> TokenRecord(Principal(name = "alice", roles = setOf(Role.USER)))
-            "t-admin" -> TokenRecord(Principal(name = "admin", roles = setOf(Role.ADMIN)))
-            "t-expired" -> TokenRecord(
-                Principal(name = "expired-user", roles = setOf(Role.USER)),
+            "t-alice" -> OpaqueTokenDetails(Principal(name = "alice"), roles = setOf(Role.USER))
+            "t-admin" -> OpaqueTokenDetails(Principal(name = "admin"), roles = setOf(Role.ADMIN))
+            "t-expired" -> OpaqueTokenDetails(
+                Principal(name = "expired-user"),
                 expiresAt = Instant.now().minusSeconds(60),
+                roles = setOf(Role.USER),
             )
             else -> null
         }

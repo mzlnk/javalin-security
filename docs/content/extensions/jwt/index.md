@@ -112,43 +112,47 @@ Adapters are Kotlin `object`s (`NimbusJwtDecoder` / `NimbusJwtDecoder.INSTANCE`)
 
 ## `JwtConfig` reference
 
-| Field                | Type              | Default              | Effect                                       |
-|----------------------|-------------------|----------------------|----------------------------------------------|
-| `decoder`            | `JwtDecoder?`             | `null` (*required*)  | Adapter that verifies tokens.                |
-| `keySource`          | `JwtKeySource?`           | `null` (*required*)  | Verification key source.                     |
-| `issuer`             | `String?`                 | `null`               | When set, require matching `iss`.            |
-| `audiences`          | `Set<String>`             | empty                | When non-empty, require matching `aud`.      |
-| `clockSkewSeconds`   | `Int`                     | `60`                 | Leeway for `exp` / `nbf`.                    |
-| `rolesMapper`        | `JwtRolesMapper`          | `noRoles()`          | Maps token → roles (default `Jwt` identity only). |
-| `identityMapper`     | `JwtIdentityMapper?`      | `null`               | Maps token → your own `Identity`.            |
-| `forbiddenHandler`   | `ForbiddenHandler`        | `DEFAULT`            | Renders 403.                                 |
-| `bearerChallenge`    | `Boolean`                 | `false`              | Add `WWW-Authenticate: Bearer` on 401.       |
-| `realm`              | `String`                  | `"API"`              | Realm for the bearer challenge.              |
+| Field                | Type              | Default              | Effect                                      |
+|----------------------|-------------------|----------------------|---------------------------------------------|
+| `decoder`            | `JwtDecoder?`             | `null` (*required*)  | Adapter that verifies tokens.               |
+| `keySource`          | `JwtKeySource?`           | `null` (*required*)  | Verification key source.                    |
+| `issuer`             | `String?`                 | `null`               | When set, require matching `iss`.           |
+| `audiences`          | `Set<String>`             | empty                | When non-empty, require matching `aud`.     |
+| `clockSkewSeconds`   | `Int`                     | `60`                 | Leeway for `exp` / `nbf`.                   |
+| `rolesMapper`        | `JwtRolesMapper`          | `noRoles()`          | Maps token → roles.         |
+| `identityMapper`     | `JwtIdentityMapper?`      | `null`               | Maps token → your own `Identity`.           |
+| `forbiddenHandler`   | `ForbiddenHandler`        | `DEFAULT`            | Renders 403.                                |
+| `bearerChallenge`    | `Boolean`                 | `false`              | Add `WWW-Authenticate: Bearer` on 401.      |
+| `realm`              | `String`                  | `"API"`              | Realm for the bearer challenge.             |
 
 !!! danger "Default roles mapper grants no roles"
     With `noRoles()`, `hasRole` / role routes never match. Configure `fromClaim` / `fromScope`
-    as soon as you use roles (default `Jwt` identity path only). See [Roles mapping](roles-mapping.md).
+    as soon as you use roles. See [Roles mapping](roles-mapping.md).
 
 Verification failures (bad signature, expiry, issuer / audience mismatch) become **401** — the
 reason is logged, never returned to the client.
 
 ## Identity mapping
 
-By default, `jwt { }` attaches the built-in `Jwt` identity (wrapping the verified `DecodedJwt`,
-with roles from `rolesMapper`) — this is the zero-config path shown above. To attach your own
-domain identity instead — e.g. looking up a local user record by the token's `sub` claim — set
-`identityMapper` on the same `jwt { }` block:
+By default, `jwt { }` attaches the built-in `Jwt` identity (wrapping the verified `DecodedJwt`)
+— this is the zero-config path shown above. Roles always come from `rolesMapper` and land on
+`Authentication.roles`. To attach your own domain identity instead — e.g. looking up a local
+user record by the token's `sub` claim — set `identityMapper` on the same `jwt { }` block
+(you can still use `rolesMapper` alongside it):
 
 === "Kotlin"
 
     ```kotlin
-    data class User(override val name: String, override val roles: Set<RouteRole>) : Identity
+    data class User(override val name: String) : Identity
 
     security.http.authentication = jwt { jwt ->
         jwt.decoder = NimbusJwtDecoder
         jwt.keySource = JwtKeySource.jwks("https://issuer.example.com/.well-known/jwks.json")
         jwt.identityMapper = JwtIdentityMapper { token ->
-            usersBySubject[token.subject]?.let { User(it.name, it.roles) }
+            usersBySubject[token.subject]?.let { User(it.name) }
+        }
+        jwt.rolesMapper = JwtRolesMapper.fromClaim("roles") { name ->
+            Role.entries.find { it.name == name }
         }
     }
     config.routes.get("/api/me") { it.result(it.identity<User>().name) }
@@ -157,9 +161,8 @@ domain identity instead — e.g. looking up a local user record by the token's `
 === "Java"
 
     ```java
-    record User(String name, Set<RouteRole> roles) implements Identity {
+    record User(String name) implements Identity {
         @Override public String getName() { return name; }
-        @Override public Set<RouteRole> getRoles() { return roles; }
     }
 
     security.http.authentication = JwtSecurity.jwt(jwt -> {
@@ -167,16 +170,13 @@ domain identity instead — e.g. looking up a local user record by the token's `
         jwt.keySource = JwtKeySource.jwks("https://issuer.example.com/.well-known/jwks.json");
         jwt.identityMapper = token ->
                 usersBySubject.get(token.getSubject());
+        jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", name -> Role.valueOf(name));
     });
     config.routes.get("/api/me", ctx -> ctx.result(identity(ctx, User.class).getName()));
     ```
 
 Returning `null` from `identityMapper` fails authentication (401) — use this when the token is
 cryptographically valid but no longer maps to a real caller (e.g. a deleted user).
-
-`identityMapper` and `rolesMapper` are mutually exclusive — since the mapped identity supplies
-its own `roles`, `rolesMapper` (which only resolves roles for the built-in `Jwt` identity) throws
-`SecurityConfigurationException` if both are set.
 
 ## Reading claims
 

@@ -37,9 +37,9 @@ Import them from `io.github.mzlnk.javalin.security`:
 
 On a successful authentication, the strategy attaches an `Identity` to the request. That is the
 value you read back with `identity()` / `identityOrNull()` — typically your own domain type that
-implements `Identity` (name, roles, and any extra fields you need). The cast is unchecked and
-verified at runtime (like `ctx.attribute<T>()`): requesting a type other than the one the
-strategy attached throws `ClassCastException`.
+implements `Identity` (`name` and any extra fields you need). Roles live on `Authentication`,
+not on `Identity`. The cast is unchecked and verified at runtime (like `ctx.attribute<T>()`):
+requesting a type other than the one the strategy attached throws `ClassCastException`.
 
 Prefer `identity()` on routes guarded by `authenticated` or `hasRole(...)` — the caller is
 known to be authenticated, so the non-null return is safe. Use `identityOrNull()` when the
@@ -49,7 +49,7 @@ route may be hit anonymously.
 
     ```kotlin
     // User is whatever Identity type you configured your strategy with, e.g.:
-    // data class User(override val name: String, override val roles: Set<RouteRole>) : Identity
+    // data class User(override val name: String) : Identity
 
     // Route behind Rules.authenticated() / hasRole(...) — identity is guaranteed
     config.routes.get("/api/v1/me") { ctx ->
@@ -68,7 +68,7 @@ route may be hit anonymously.
 
     ```java
     // User is whatever Identity type you configured your strategy with, e.g.:
-    // record User(String name, Set<RouteRole> roles) implements Identity { ... }
+    // record User(String name) implements Identity { ... }
 
     // Route behind Rules.authenticated() / hasRole(...) — identity is guaranteed
     config.routes.get("/api/v1/me", ctx -> {

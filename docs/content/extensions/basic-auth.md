@@ -1,10 +1,11 @@
 # Basic Auth
 
 HTTP Basic authentication (RFC 7617) via `javalin-security-basic-auth`. You bring your own
-`Identity` type; `UserLookup` resolves a username to a `PasswordCredentials` (your identity plus
-the encoded password to verify against). The extension parses the header, verifies the password
-with timing-safe comparison, and attaches your identity — the encoded password itself never
-lands on the request identity, so it can't leak through `ctx.identity<I>()`.
+`Identity` type; `UserLookup` resolves a username to a `BasicUserDetails` (your identity, the
+encoded password to verify against, and the roles to grant). The extension parses the header,
+verifies the password with timing-safe comparison, and attaches your identity and roles — the
+encoded password itself never lands on the request identity, so it can't leak through
+`ctx.identity<I>()`.
 
 !!! info "HTTP only"
     Assign to `http.authentication`. There is no WebSocket variant of Basic Auth.
@@ -40,7 +41,6 @@ Add the extension on top of [core](../getting-started/installation.md):
 
     ```kotlin
     import io.github.mzlnk.javalin.security.authentication.Identity
-    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
     import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.basicauth.*
     import io.github.mzlnk.javalin.security.security
@@ -49,11 +49,11 @@ Add the extension on top of [core](../getting-started/installation.md):
 
     enum class Role : RouteRole { USER, ADMIN }
 
-    data class User(override val name: String, override val roles: Set<RouteRole>) : Identity
+    data class User(override val name: String) : Identity
 
     val users = mapOf(
-        "alice" to PasswordCredentials(User("alice", setOf(Role.USER)), "alice-hash"),
-        "admin" to PasswordCredentials(User("admin", setOf(Role.ADMIN)), "admin-hash"),
+        "alice" to BasicUserDetails(User("alice"), "alice-hash", setOf(Role.USER)),
+        "admin" to BasicUserDetails(User("admin"), "admin-hash", setOf(Role.ADMIN)),
     )
 
     Javalin.create { config ->
@@ -74,21 +74,19 @@ Add the extension on top of [core](../getting-started/installation.md):
     ```java
     import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
     import io.github.mzlnk.javalin.security.authentication.Identity;
-    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials;
     import io.github.mzlnk.javalin.security.basicauth.*;
     import io.github.mzlnk.javalin.security.authorization.Rules;
     import io.javalin.Javalin;
     import java.util.Map;
     import java.util.Set;
 
-    record User(String name, Set<RouteRole> roles) implements Identity {
+    record User(String name) implements Identity {
         @Override public String getName() { return name; }
-        @Override public Set<RouteRole> getRoles() { return roles; }
     }
 
-    Map<String, PasswordCredentials> users = Map.of(
-        "alice", new PasswordCredentials(new User("alice", Set.of(Role.USER)), "alice-hash"),
-        "admin", new PasswordCredentials(new User("admin", Set.of(Role.ADMIN)), "admin-hash"));
+    Map<String, BasicUserDetails> users = Map.of(
+        "alice", new BasicUserDetails(new User("alice"), "alice-hash", Set.of(Role.USER)),
+        "admin", new BasicUserDetails(new User("admin"), "admin-hash", Set.of(Role.ADMIN)));
 
     Javalin.create(config -> {
         config.registerPlugin(new JavalinSecurityPlugin(security -> {
@@ -107,16 +105,16 @@ Add the extension on top of [core](../getting-started/installation.md):
 
 | Field                  | Default                      | Effect                                                            |
 |------------------------|------------------------------|--------------------------------------------------------------------|
-| `userLookup`           | *required*                   | Username → `PasswordCredentials` (or `null`).                     |
+| `userLookup`           | *required*                   | Username → `BasicUserDetails` (or `null`).                        |
 | `passwordEncoder`      | `noOp()`                     | Compares raw vs. stored password — **change in production**.      |
 | `credentialsResolver`  | `Authorization: Basic …`     | Where credentials are read from.                                  |
 | `basicChallenge`       | `false`                      | Add `WWW-Authenticate: Basic` on 401.                             |
 | `realm`                | `"API"`                      | Realm reported in the challenge.                                  |
 
-`PasswordCredentials.encodedPassword` is the **encoded** value used for comparison; it is kept
+`BasicUserDetails.encodedPassword` is the **encoded** value used for comparison; it is kept
 separate from your `Identity`, so it is never reachable from handlers via `ctx.identity<I>()`.
-Return `null` for unknown users (never throw). Unknown-user lookups still run a dummy password
-comparison for timing uniformity.
+`BasicUserDetails.roles` land on `Authentication.roles`. Return `null` for unknown users (never
+throw). Unknown-user lookups still run a dummy password comparison for timing uniformity.
 
 ## PasswordEncoder
 

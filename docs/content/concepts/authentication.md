@@ -71,23 +71,24 @@ An authenticator returns one of three results:
     Missing credentials must be `NotAuthenticated` — otherwise every public route becomes a 401.
     Reserve `Failure` for bad passwords, expired tokens, or malformed headers.
 
-## Identity
+## Identity and roles
 
-`Authentication` wraps an optional `Identity` (the caller) and a set of `RouteRole`s. `Identity`
-itself declares `name` and `roles`. Every extension attaches whichever `Identity` your lookup /
-mapper returns — Basic Auth, API Key, Opaque Token, and Session take yours directly. JWT
-defaults to its own `Jwt` identity (wrapping the verified token and its `rolesMapper`-derived
-roles), or your own type when you configure an `identityMapper`. A custom scheme implements
-`Identity` — including `roles` — in the same way. Cast with `ctx.identity<YourType>()` (checked
-at runtime, like `ctx.attribute<T>()`).
+`Authentication` is the security token for a request. It holds an optional `Identity` (who is
+calling) and a set of `RouteRole`s (what they may do). Those concerns stay separate:
 
-`Authentication.authenticated(identity)` takes a single `Identity` argument and derives
-`Authentication.roles` from `identity.roles`; there is no separate roles parameter.
+- **`Identity`** answers “who?”. It declares only `name` — a human-readable identifier such as a
+  username or subject. Concrete types may add scheme-specific fields, but roles are not part of
+  the interface.
+- **`Authentication.roles`** answers “with which rights?”. Roles are owned by `Authentication`
+  and are supplied when the token is built via `Authentication.authenticated(identity, roles)`
+  (`roles` defaults to empty when omitted).
+
+Cast the identity with `ctx.identity<YourType>()` (checked at runtime, like `ctx.attribute<T>()`).
 
 | Member            | Meaning                                    |
 |-------------------|--------------------------------------------|
 | `identity`        | Who is calling (`null` when anonymous).    |
-| `roles`           | Granted roles (empty when anonymous), taken from `identity.roles`. |
+| `roles`           | Granted roles (empty when anonymous).      |
 | `isAuthenticated` | `true` when `identity != null`.            |
 
 ## Reading auth in handlers

@@ -3,7 +3,6 @@ package io.github.mzlnk.javalin.security.basicauth;
 import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
 import io.github.mzlnk.javalin.security.authentication.AuthenticationStrategy;
 import io.github.mzlnk.javalin.security.authentication.Identity;
-import io.github.mzlnk.javalin.security.authentication.PasswordCredentials;
 import io.github.mzlnk.javalin.security.authorization.Rules;
 import io.javalin.Javalin;
 import io.javalin.security.RouteRole;
@@ -21,27 +20,20 @@ class BasicAuthSecurityJavaTest {
 
     static class TestUser implements Identity {
         private final String name;
-        private final Set<RouteRole> roles;
 
-        TestUser(String name, Set<RouteRole> roles) {
+        TestUser(String name) {
             this.name = name;
-            this.roles = roles;
         }
 
         @Override
         public String getName() {
             return name;
         }
-
-        @Override
-        public Set<RouteRole> getRoles() {
-            return roles;
-        }
     }
 
     private final UserLookup testUserLookup = username -> switch (username) {
-        case "alice" -> new PasswordCredentials(new TestUser("alice", Set.of(Role.USER)), "alice-pw");
-        case "admin" -> new PasswordCredentials(new TestUser("admin", Set.of(Role.ADMIN)), "admin-pw");
+        case "alice" -> new BasicUserDetails(new TestUser("alice"), "alice-pw", Set.of(Role.USER));
+        case "admin" -> new BasicUserDetails(new TestUser("admin"), "admin-pw", Set.of(Role.ADMIN));
         default -> null;
     };
 

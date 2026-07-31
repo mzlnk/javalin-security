@@ -1,7 +1,6 @@
 package io.github.mzlnk.javalin.security.basicauth
 
 import io.github.mzlnk.javalin.security.authentication.Identity
-import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
 import io.github.mzlnk.javalin.security.authorization.Rules
 import io.github.mzlnk.javalin.security.identity
 import io.github.mzlnk.javalin.security.security
@@ -15,15 +14,12 @@ import java.util.Base64
 class BasicAuthSecurityTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
-    private data class TestUser(
-        override val name: String,
-        override val roles: Set<RouteRole> = emptySet(),
-    ) : Identity
+    private data class TestUser(override val name: String) : Identity
 
     private val testUserLookup = UserLookup { username ->
         when (username) {
-            "alice" -> PasswordCredentials(TestUser(name = "alice", roles = setOf(Role.USER)), encodedPassword = "alice-pw")
-            "admin" -> PasswordCredentials(TestUser(name = "admin", roles = setOf(Role.ADMIN)), encodedPassword = "admin-pw")
+            "alice" -> BasicUserDetails(TestUser(name = "alice"), encodedPassword = "alice-pw", roles = setOf(Role.USER))
+            "admin" -> BasicUserDetails(TestUser(name = "admin"), encodedPassword = "admin-pw", roles = setOf(Role.ADMIN))
             else -> null
         }
     }

@@ -21,24 +21,15 @@ class SessionSecurityJavaTest {
     private enum Role implements RouteRole { USER, ADMIN }
 
     static class Principal implements Identity, Serializable {
-        private static final long serialVersionUID = 1L;
-
         private final String name;
-        private final Set<RouteRole> roles;
 
-        Principal(String name, Set<RouteRole> roles) {
+        Principal(String name) {
             this.name = name;
-            this.roles = roles;
         }
 
         @Override
         public String getName() {
             return name;
-        }
-
-        @Override
-        public Set<RouteRole> getRoles() {
-            return roles;
         }
     }
 
@@ -124,7 +115,7 @@ class SessionSecurityJavaTest {
                 security.http.fallback = Rules.authenticated();
             }));
             config.routes.post("/login", ctx -> {
-                sessions.create(ctx, new Principal("alice", Set.of(Role.USER)));
+                sessions.create(ctx, new SessionDetails(new Principal("alice"), Set.of(Role.USER)));
                 ctx.result("ok");
             });
             config.routes.get("/me", ctx ->
@@ -158,7 +149,7 @@ class SessionSecurityJavaTest {
             config.routes.post("/login", ctx -> {
                 String username = ctx.queryParam("user") != null ? ctx.queryParam("user") : "alice";
                 Role role = "ADMIN".equals(ctx.queryParam("role")) ? Role.ADMIN : Role.USER;
-                sessions.create(ctx, new Principal(username, Set.of(role)));
+                sessions.create(ctx, new SessionDetails(new Principal(username), Set.of(role)));
                 ctx.result("ok");
             });
             config.routes.post("/logout", ctx -> {

@@ -18,10 +18,7 @@ import java.io.Serializable
 class SessionSecurityTest {
     private enum class Role : RouteRole { USER, ADMIN }
 
-    private data class Principal(
-        override val name: String,
-        override val roles: Set<RouteRole> = emptySet(),
-    ) : Identity, Serializable
+    private data class Principal(override val name: String) : Identity, Serializable
 
     @Test
     fun `should allow anonymous access when route is allow`() {
@@ -124,7 +121,7 @@ class SessionSecurityTest {
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.post("/login") { ctx ->
-                sessions.create(ctx, Principal(name = "alice", roles = setOf(Role.USER)))
+                sessions.create(ctx, SessionDetails(Principal(name = "alice"), roles = setOf(Role.USER)))
                 ctx.result("ok")
             }
             cfg.routes.get("/me") { ctx ->
@@ -153,7 +150,7 @@ class SessionSecurityTest {
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.post("/login") { ctx ->
-                sessions.create(ctx, Principal(name = "carol", roles = setOf(Role.USER)))
+                sessions.create(ctx, SessionDetails(Principal(name = "carol"), roles = setOf(Role.USER)))
                 ctx.result("ok")
             }
             cfg.routes.get("/me") { ctx ->
@@ -186,7 +183,7 @@ class SessionSecurityTest {
                 ctx.result(session.id)
             }
             cfg.routes.post("/login") { ctx ->
-                sessions.create(ctx, Principal(name = "alice", roles = setOf(Role.USER)))
+                sessions.create(ctx, SessionDetails(Principal(name = "alice"), roles = setOf(Role.USER)))
                 ctx.result(ctx.req().session.id)
             }
         }
@@ -210,15 +207,15 @@ class SessionSecurityTest {
 
     @Test
     fun `should authenticate via a custom SessionManager plugged in through composition`() {
-        val store = mutableMapOf<String, Principal>()
+        val store = mutableMapOf<String, SessionDetails>()
         val customManager = object : SessionManager {
-            override fun create(context: Context, identity: Identity) {
+            override fun create(context: Context, details: SessionDetails) {
                 val token = "sid-${store.size + 1}"
-                store[token] = identity as Principal
+                store[token] = details
                 context.cookie("APPSESSION", token)
             }
 
-            override fun validate(context: Context): Identity? {
+            override fun validate(context: Context): SessionDetails? {
                 val token = context.cookie("APPSESSION") ?: return null
                 return store[token]
             }
@@ -238,7 +235,7 @@ class SessionSecurityTest {
                 security.http.fallback = Rules.authenticated()
             }
             cfg.routes.post("/login") { ctx ->
-                customManager.create(ctx, Principal(name = "alice", roles = setOf(Role.USER)))
+                customManager.create(ctx, SessionDetails(Principal(name = "alice"), roles = setOf(Role.USER)))
                 ctx.result("ok")
             }
             cfg.routes.post("/logout") { ctx ->
@@ -313,7 +310,7 @@ class SessionSecurityTest {
                     "ADMIN" -> Role.ADMIN
                     else -> Role.USER
                 }
-                sessions.create(ctx, Principal(name = username, roles = setOf(role)))
+                sessions.create(ctx, SessionDetails(Principal(name = username), roles = setOf(role)))
                 ctx.result("ok")
             }
             cfg.routes.post("/logout") { ctx ->

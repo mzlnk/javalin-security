@@ -14,13 +14,14 @@ import java.util.function.Consumer
  * Configuration for the [opaqueToken] strategy factory.
  *
  * [lookup] is required. The identity type your [OpaqueTokenLookup] returns is your own — bring
- * your own type; roles come from its `roles` property. Builds an [OpaqueTokenAuthenticator], and
- * selects a [BearerChallengeUnauthorizedHandler] when [bearerChallenge] is `true`.
+ * your own type; roles come from [OpaqueTokenDetails.roles]. Builds an
+ * [OpaqueTokenAuthenticator], and selects a [BearerChallengeUnauthorizedHandler] when
+ * [bearerChallenge] is `true`.
  */
 class OpaqueTokenConfig internal constructor() {
 
     /**
-     * Resolves a raw opaque token to its stored [TokenRecord]. Required; throws
+     * Resolves a raw opaque token to its stored [OpaqueTokenDetails]. Required; throws
      * [SecurityConfigurationException] if unset when the strategy is built.
      */
     @JvmField
@@ -34,7 +35,7 @@ class OpaqueTokenConfig internal constructor() {
     var resolver: TokenResolver = TokenResolver.DEFAULT
 
     /**
-     * Clock used for [TokenRecord.expiresAt] validation.
+     * Clock used for [OpaqueTokenDetails.expiresAt] validation.
      * Defaults to [Clock.systemUTC].
      */
     @JvmField

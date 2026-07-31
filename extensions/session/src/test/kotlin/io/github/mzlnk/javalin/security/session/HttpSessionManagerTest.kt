@@ -19,7 +19,6 @@ class HttpSessionManagerTest {
 
     private data class Principal(
         override val name: String,
-        override val roles: Set<RouteRole> = emptySet(),
     ) : Identity, Serializable
 
     private data class NonSerializablePrincipal(
@@ -27,9 +26,9 @@ class HttpSessionManagerTest {
     ) : Identity
 
     @Test
-    fun `validate returns null when no principal attribute exists`() {
+    fun `validate returns null when no session details attribute exists`() {
         val context: Context = mockk {
-            every { sessionAttribute<Identity>(HttpSessionManager.DEFAULT_ATTRIBUTE_KEY) } returns null
+            every { sessionAttribute<SessionDetails>(HttpSessionManager.DEFAULT_ATTRIBUTE_KEY) } returns null
         }
 
         val manager = HttpSessionManager.of()
@@ -38,61 +37,61 @@ class HttpSessionManagerTest {
     }
 
     @Test
-    fun `validate returns the stored principal`() {
-        val principal = Principal(name = "alice", roles = setOf(Role.USER))
+    fun `validate returns the stored session details`() {
+        val details = SessionDetails(Principal(name = "alice"), roles = setOf(Role.USER))
         val context: Context = mockk {
-            every { sessionAttribute<Identity>(HttpSessionManager.DEFAULT_ATTRIBUTE_KEY) } returns principal
+            every { sessionAttribute<SessionDetails>(HttpSessionManager.DEFAULT_ATTRIBUTE_KEY) } returns details
         }
 
         val manager = HttpSessionManager.of()
 
-        assertThat(manager.validate(context)).isSameAs(principal)
+        assertThat(manager.validate(context)).isSameAs(details)
     }
 
     @Test
     fun `validate reads from custom attributeKey`() {
-        val principal = Principal(name = "bob")
+        val details = SessionDetails(Principal(name = "bob"))
         val context: Context = mockk {
-            every { sessionAttribute<Identity>("custom.principal") } returns principal
+            every { sessionAttribute<SessionDetails>("custom.principal") } returns details
         }
 
         val manager = HttpSessionManager.builder().attributeKey("custom.principal").build()
 
-        assertThat(manager.validate(context)).isSameAs(principal)
+        assertThat(manager.validate(context)).isSameAs(details)
     }
 
     @Test
-    fun `create ensures a session, rotates the id, and writes the principal attribute`() {
-        val principal = Principal(name = "alice")
+    fun `create ensures a session, rotates the id, and writes the session details attribute`() {
+        val details = SessionDetails(Principal(name = "alice"))
         val request: HttpServletRequest = mockk {
             every { getSession(true) } returns mockk()
             every { changeSessionId() } returns "new-id"
         }
         val context: Context = mockk {
             every { req() } returns request
-            justRun { sessionAttribute(HttpSessionManager.DEFAULT_ATTRIBUTE_KEY, principal) }
+            justRun { sessionAttribute(HttpSessionManager.DEFAULT_ATTRIBUTE_KEY, details) }
         }
 
         val manager = HttpSessionManager.of()
 
-        manager.create(context, principal)
+        manager.create(context, details)
 
         verify(exactly = 1) { request.getSession(true) }
         verify(exactly = 1) { request.changeSessionId() }
         verify(exactly = 1) {
-            context.sessionAttribute(HttpSessionManager.DEFAULT_ATTRIBUTE_KEY, principal)
+            context.sessionAttribute(HttpSessionManager.DEFAULT_ATTRIBUTE_KEY, details)
         }
     }
 
     @Test
     fun `create does not rotate the session id when rotateSessionIdOnCreate is disabled`() {
-        val principal = Principal(name = "alice")
+        val details = SessionDetails(Principal(name = "alice"))
         val request: HttpServletRequest = mockk {
             every { getSession(true) } returns mockk()
         }
         val context: Context = mockk {
             every { req() } returns request
-            justRun { sessionAttribute("k", principal) }
+            justRun { sessionAttribute("k", details) }
         }
 
         val manager = HttpSessionManager.builder()
@@ -100,7 +99,7 @@ class HttpSessionManagerTest {
             .rotateSessionIdOnCreate(false)
             .build()
 
-        manager.create(context, principal)
+        manager.create(context, details)
 
         verify(exactly = 0) { request.changeSessionId() }
     }
@@ -110,7 +109,9 @@ class HttpSessionManagerTest {
         val manager = HttpSessionManager.of()
         val context: Context = mockk()
 
-        assertThatThrownBy { manager.create(context, NonSerializablePrincipal("alice")) }
+        assertThatThrownBy {
+            manager.create(context, SessionDetails(NonSerializablePrincipal("alice")))
+        }
             .isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("Serializable")
     }

@@ -25,11 +25,6 @@ class JwtJavaInteropTest {
         public String getName() {
             return name;
         }
-
-        @Override
-        public Set<RouteRole> getRoles() {
-            return Set.of();
-        }
     }
 
     private final JwtDecoder testDecoder = (token, verification) ->
