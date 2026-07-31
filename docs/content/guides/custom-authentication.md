@@ -1,7 +1,8 @@
 # Custom authentication
 
-When neither Basic Auth nor JWT fits — API keys, opaque session tokens, mTLS client certs, HMAC
-request signing — implement your own `Authenticator` on top of core. No extra modules required.
+When ready-made extensions do not cover your scheme — mTLS client certificates, HMAC request
+signing, or a proprietary header protocol — implement your own `Authenticator` on top of
+javalin-security. No extra modules are required.
 
 ## The recipe
 
@@ -9,7 +10,10 @@ request signing — implement your own `Authenticator` on top of core. No extra 
 2. Write an `Authenticator` that returns `Success`, `Failure`, or `NotAuthenticated`.
 3. Wrap it in an `AuthenticationStrategy.Sync` (or `.Async`) and assign it.
 
-## Example: API-key authentication
+## Example: header-based authentication
+
+A minimal strategy that reads an `X-Api-Key` header, looks it up in an in-memory store, and
+attaches a custom identity plus roles.
 
 === "Kotlin"
 
@@ -20,12 +24,13 @@ request signing — implement your own `Authenticator` on top of core. No extra 
 
     enum class Role : RouteRole { SERVICE }
 
+    // Caller-specific identity attached to the context
     class ServiceIdentity(
         override val name: String,
         val tenant: String,
     ) : Identity
 
-    // Your store: key -> (name, tenant, roles)
+    // in-memory store: key → (name, tenant, roles)
     val keys = mapOf("k-123" to Triple("orders-svc", "acme", setOf(Role.SERVICE)))
 
     val apiKeyAuthenticator = Authenticator { ctx ->
@@ -44,13 +49,13 @@ request signing — implement your own `Authenticator` on top of core. No extra 
 
     val apiKeyStrategy = object : AuthenticationStrategy.Sync {
         override fun authenticator() = apiKeyAuthenticator
-        // Optional: customize failure rendering.
+        // Optional: customize failure rendering
         override val unauthorizedHandler = UnauthorizedHandler { ctx, _ ->
             ctx.status(401).json(mapOf("error" to "invalid_api_key"))
         }
     }
 
-    // Assign it:
+    // Assign it
     // http.authentication = apiKeyStrategy
     ```
 
@@ -63,15 +68,19 @@ request signing — implement your own `Authenticator` on top of core. No extra 
 
     enum Role implements RouteRole { SERVICE }
 
+    // Caller-specific identity attached to the context
     final class ServiceIdentity implements Identity {
-        private final String name; private final String tenant;
+        private final String name;
+        private final String tenant;
         ServiceIdentity(String name, String tenant) {
-            this.name = name; this.tenant = tenant;
+            this.name = name;
+            this.tenant = tenant;
         }
         @Override public String getName() { return name; }
         public String getTenant() { return tenant; }
     }
 
+    // in-memory store: key → (name, tenant, roles)
     record KeyRecord(String name, String tenant, Set<RouteRole> roles) {}
     Map<String, KeyRecord> keys = Map.of("k-123",
         new KeyRecord("orders-svc", "acme", Set.of(Role.SERVICE)));
@@ -92,9 +101,12 @@ request signing — implement your own `Authenticator` on top of core. No extra 
         }
     };
 
-    // Assign it:
+    // Assign it
     // http.authentication = apiKeyStrategy;
     ```
+
+For production API-key auth, prefer the ready-made [API Key](../extensions/api-key.md)
+extension. The example above is only a teaching sketch of the authenticator pattern.
 
 ## Rules for a well-behaved authenticator
 
@@ -103,15 +115,16 @@ request signing — implement your own `Authenticator` on top of core. No extra 
     `Failure` would 401 every anonymous request and break public routes and the `Anyone` role.
     Reserve `Failure` for credentials that are **present but invalid**.
 
-- **Don't throw** when credentials are absent. (A synchronous throw is treated as a failure →
-  401 for async; for sync authenticators, return `NotAuthenticated`.)
+- **Don't throw** when credentials are absent. Return `NotAuthenticated` from a sync
+  authenticator. A throw is treated as a failure and becomes a 401.
 - **Don't leak** why authentication failed — put the reason in `Failure.message` (logged only).
-- Keep the authenticator **fast** on the request thread; if you must do remote I/O, use the
+- Keep the authenticator **fast** on the request thread. If you must do remote I/O, use the
   async variant below.
 
 ## Async variant
 
-For remote validation (introspection endpoint, DB), implement `AuthenticationStrategy.Async`:
+For remote validation (introspection endpoint, database lookup), implement
+`AuthenticationStrategy.Async`:
 
 === "Kotlin"
 

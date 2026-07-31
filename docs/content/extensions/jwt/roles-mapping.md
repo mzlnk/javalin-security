@@ -1,12 +1,12 @@
 # Roles mapping
 
-A `JwtRolesMapper` turns a verified token into the set of `RouteRole`s granted to the caller.
+A `JwtRolesMapper` turns a verified JWT into the set of `RouteRole`s granted to the caller.
 Those roles land on `Authentication.roles` and drive `hasRole` / `hasAnyRole` rules and
-role-declaring routes.
+role-declaring routes in javalin-security.
 
 !!! danger "The default grants NO roles"
     `jwt.rolesMapper` defaults to `JwtRolesMapper.noRoles()`, which always returns an empty set.
-    With it, **every role-based check fails** — authenticated callers can only satisfy
+    With it, **every role-based check fails**. Authenticated callers can only satisfy
     `authenticated` / `allow`. As soon as you use roles, configure a real mapper.
 
 ## Built-in mappers
@@ -17,19 +17,20 @@ role-declaring routes.
 | `fromClaim(name, roleOf)`    | A string or list-of-strings claim.                 | Each value → a role via `roleOf`.              |
 | `fromScope(roleOf)`          | The space-delimited `scope` claim (OAuth 2.0).     | Each scope token → a role via `roleOf`.        |
 
-The `roleOf` function maps a **string name** to a `RouteRole?`; returning `null` drops that name
-(unknown roles are ignored rather than causing failure).
+The `roleOf` function maps a string name to a `RouteRole?`. Returning `null` drops that name —
+unknown roles are ignored rather than causing failure.
 
 ## From a claim
 
-Best when your issuer puts roles in a custom claim, e.g. `"roles": ["ADMIN", "USER"]` or a single
-`"role": "ADMIN"`.
+Use this when your issuer puts roles in a custom claim, for example `"roles": ["ADMIN", "USER"]`
+or a single `"role": "ADMIN"`.
 
 === "Kotlin"
 
     ```kotlin
     enum class Role : RouteRole { ADMIN, USER }
 
+    // Map each string in the "roles" claim to a RouteRole (null = ignore)
     jwt.rolesMapper = JwtRolesMapper.fromClaim("roles") { name ->
         Role.entries.find { it.name == name }
     }
@@ -40,6 +41,7 @@ Best when your issuer puts roles in a custom claim, e.g. `"roles": ["ADMIN", "US
     ```java
     enum Role implements RouteRole { ADMIN, USER }
 
+    // Map each string in the "roles" claim to a RouteRole (null = ignore)
     jwt.rolesMapper = JwtRolesMapper.fromClaim("roles", name -> {
         try { return Role.valueOf(name); }
         catch (IllegalArgumentException e) { return null; }   // drop unknown role names
@@ -51,12 +53,13 @@ element's `toString()` becomes a name). An absent or unrecognized claim yields a
 
 ## From the OAuth `scope` claim
 
-Best when your authorization server issues OAuth scopes, e.g.
+Use this when your authorization server issues OAuth scopes, for example
 `"scope": "orders:read orders:write admin"`.
 
 === "Kotlin"
 
     ```kotlin
+    // Map each space-delimited scope token to a RouteRole
     jwt.rolesMapper = JwtRolesMapper.fromScope { scope ->
         when (scope) {
             "admin" -> Role.ADMIN
@@ -69,6 +72,7 @@ Best when your authorization server issues OAuth scopes, e.g.
 === "Java"
 
     ```java
+    // Map each space-delimited scope token to a RouteRole
     jwt.rolesMapper = JwtRolesMapper.fromScope(scope -> switch (scope) {
         case "admin" -> Role.ADMIN;
         case "orders:write" -> Role.ORDER_WRITER;
@@ -81,8 +85,8 @@ token via `roleOf`.
 
 ## Custom mapper
 
-`JwtRolesMapper` is a functional interface — implement it directly for anything more complex
-(nested claims, Keycloak's `realm_access.roles`, combining multiple claims, and so on):
+`JwtRolesMapper` is a functional interface. Implement it directly for anything more complex —
+nested claims, Keycloak's `realm_access.roles`, combining multiple claims, and so on.
 
 === "Kotlin"
 
@@ -113,12 +117,3 @@ token via `roleOf`.
             .collect(Collectors.toSet());
     };
     ```
-
-## Tips
-
-- Keep `RouteRole` names aligned with your issuer's role or scope strings, or centralize the
-  mapping in `roleOf` so renames stay localized.
-- Unknown names are **ignored**, not errors — a token with an extra role your app doesn't know
-  about still authenticates; that role simply is not granted.
-- Roles are only as trustworthy as the token. Make sure your [key source](key-sources.md) and
-  claim checks (`issuer`, `audiences`) are correct so a caller cannot self-assign roles.

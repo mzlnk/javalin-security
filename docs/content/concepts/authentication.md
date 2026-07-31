@@ -5,7 +5,7 @@ and produces an `Authentication` (identity + roles) that [authorization](authori
 uses.
 
 You usually do not implement this yourself — assign a strategy from
-[Basic Auth](../extensions/basic-auth.md), [JWT](../extensions/jwt/index.md), or a
+[Basic Auth](../extensions/basic-auth.md), [JWT](../extensions/jwt/configuration.md), or a
 [custom authenticator](../guides/custom-authentication.md).
 
 ## Assigning a strategy

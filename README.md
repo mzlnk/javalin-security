@@ -14,6 +14,11 @@
 
 `javalin-security` is a lightweight and straightforward community plugin dedicated to securing Javalin applications. Its primary goal is to make adding authentication and authorization to your app as easy as possible, without dragging in large frameworks or complicated configuration. The plugin offers a clear and intuitive abstraction model, centering around interfaces like `AuthenticationStrategy`, `Authentication`, `Identity`, and `Rule`. This makes the security workflow easy to follow and understand while allowing you to customize or extend any part of the system to fit your needs.
 
+> 🚧 **Pre-release version of library**  
+> javalin-security is still in a beta / pre-release state. Breaking changes may be introduced before the 1.0.0 stable release.
+
+
+
 ## Get started
 
 To get started with `javalin-security` in your Javalin project:

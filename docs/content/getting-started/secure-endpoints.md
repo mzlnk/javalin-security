@@ -11,7 +11,7 @@ plugs in the same way.
     `javalin-security` provides the plugin and the rule table, not a login mechanism. Use a
     built-in strategy like [Basic Auth](../extensions/basic-auth.md),
     [API Key](../extensions/api-key.md), [Opaque Token](../extensions/opaque-token.md),
-    [Session](../extensions/session.md), [JWT](../extensions/jwt/index.md), or create a
+    [Session](../extensions/session.md), [JWT](../extensions/jwt/configuration.md), or create a
     [custom authenticator](../guides/custom-authentication.md) that fit your needs.
 
 Install [`javalin-security`](installation.md) plus the
@@ -97,7 +97,7 @@ the plugin is registered. Declare rules on `security.rules` or set `http.fallbac
     ```
 
 For WebSocket upgrades, set fields on `security.ws` the same way (typically with
-[JWT](../extensions/jwt/index.md)) — see [WebSocket security](../websocket-security.md).
+[JWT](../extensions/jwt/configuration.md)) — see [WebSocket security](../websocket-security.md).
 
 ## 3. Declare who is allowed
 
@@ -267,5 +267,5 @@ Anonymous denials return **401**. Authenticated-but-forbidden calls return **403
 - [Access caller identity](access-caller-identity.md) — read the authenticated user in handlers.
 - [Authorization](../concepts/authorization.md) — rules, roles, and deny-by-default.
 - [Authentication](../concepts/authentication.md) — strategies and outcomes.
-- Prefer JWT or WebSockets? See the [JWT extension](../extensions/jwt/index.md) and
+- Prefer JWT or WebSockets? See the [JWT extension](../extensions/jwt/configuration.md) and
   [WebSocket security](../websocket-security.md).

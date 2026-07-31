@@ -2,7 +2,7 @@
 
 Cross-origin browser calls trigger a **preflight** `OPTIONS` request before the real request.
 That preflight carries no credentials, so a deny-by-default rule table would block it and break
-CORS. `javalin-security` has a narrow bypass for exactly this case, but it does **not** add CORS
+CORS. javalin-security has a narrow bypass for exactly this case, but it does **not** add CORS
 response headers — that is still Javalin's CORS plugin's job.
 
 ## Two independent concerns
@@ -24,12 +24,12 @@ You typically need **both**.
     import io.javalin.Javalin
 
     Javalin.create { config ->
-        // 1. CORS response headers.
+        // 1. CORS response headers
         config.bundledPlugins.enableCors { cors ->
             cors.addRule { it.allowHost("https://app.example.com") }
         }
 
-        // 2. Security: let the preflight through, protect the rest.
+        // 2. Let the preflight through, protect the rest
         config.security { security ->
             security.rules.any("/api/*", Rules.authenticated())
             security.http.authentication = myStrategy
@@ -48,11 +48,11 @@ You typically need **both**.
     import io.javalin.Javalin;
 
     Javalin.create(config -> {
-        // 1. CORS response headers.
+        // 1. CORS response headers
         config.bundledPlugins.enableCors(cors ->
             cors.addRule(it -> it.allowHost("https://app.example.com")));
 
-        // 2. Security: let the preflight through, protect the rest.
+        // 2. Let the preflight through, protect the rest
         config.registerPlugin(new JavalinSecurityPlugin(security -> {
             security.rules.any("/api/*", Rules.authenticated());
             security.http.authentication = myStrategy;

@@ -10,6 +10,10 @@ centers around a small set of abstractions — `AuthenticationStrategy`, `Authen
 `Identity`, and `Rule` — so the security workflow stays easy to follow while remaining open to
 customization.
 
+!!! warning "Pre-release version of library"
+    javalin-security is still in a beta / pre-release state. Breaking changes may be introduced
+    before the 1.0.0 stable release.
+
 ## How it works
 
 Security runs as a guard before matched handlers (HTTP) or during the WebSocket upgrade. The
@@ -96,7 +100,7 @@ common cases, however, ready-made extensions are available:
 | [API Key](extensions/api-key.md)           | Static API key authentication (`X-Api-Key` by default)          |
 | [Opaque Token](extensions/opaque-token.md) | Server-issued opaque bearer tokens (sessions, PATs) with expiry |
 | [Session](extensions/session.md)           | HTTP-session authentication                                     |
-| [JWT](extensions/jwt/index.md)             | JWT authentication                                              |
+| [JWT](extensions/jwt/configuration.md)             | JWT authentication                                              |
 
 
 ## Where to start
@@ -108,7 +112,7 @@ common cases, however, ready-made extensions are available:
   user inside handlers.
 4. [Authentication](concepts/authentication.md) and [Authorization](concepts/authorization.md) —
   the two concepts in depth.
-5. Extensions — [Basic Auth](extensions/basic-auth.md), [API Key](extensions/api-key.md), [Opaque Token](extensions/opaque-token.md), [Session](extensions/session.md), [JWT](extensions/jwt/index.md).
+5. Extensions — [Basic Auth](extensions/basic-auth.md), [API Key](extensions/api-key.md), [Opaque Token](extensions/opaque-token.md), [Session](extensions/session.md), [JWT](extensions/jwt/configuration.md).
 6. Guides — [Custom authentication](guides/custom-authentication.md), [CORS](guides/cors.md),
   [Testing](guides/testing.md).
 

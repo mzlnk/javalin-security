@@ -9,7 +9,7 @@ Full generated KDoc for every public module:
 | Module                          | Key entry points                                                                                                       |
 |---------------------------------|------------------------------------------------------------------------------------------------------------------------|
 | `javalin-security`              | `JavalinSecurityPlugin`, `security` / `authentication` / `identity` / `identityOrNull`, `Authenticator`, `AuthenticationStrategy`, `Authentication`, `Identity`, `Rule`, `Rules`, `Anyone`. |
-| `javalin-security-jwt`          | `jwt`, `JwtConfig`, `JwtDecoder`, `JwtVerification`, `JwtKeySource`, `JwtRolesMapper`, `JwtIdentityMapper`, `Jwt`, `DecodedJwt`. |
+| `javalin-security-jwt`          | `jwt`, `JwtConfig`, `JwtDecoder`, `JwtKeySource`, `JwtRolesMapper`, `JwtIdentityMapper`, `Jwt`, `DecodedJwt`. |
 | `javalin-security-jwt-nimbus`   | `NimbusJwtDecoder`.                                                                                                    |
 | `javalin-security-jwt-auth0`    | `Auth0JwtDecoder`.                                                                                                     |
 | `javalin-security-basic-auth`   | `basicAuth`, `BasicAuthConfig`, `BasicAuthenticator`, `BasicUserDetails`, `UserLookup`, `PasswordEncoder`.            |

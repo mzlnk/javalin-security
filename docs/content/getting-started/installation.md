@@ -79,7 +79,7 @@ The `javalin-security` library itself does not include any built-in authenticati
 | [API Key](../extensions/api-key.md#installation)                                                  | Opaque API keys (`X-Api-Key`)       |
 | [Opaque Token](../extensions/opaque-token.md#installation)                                        | Server-issued opaque bearer tokens  |
 | [Session](../extensions/session.md#installation)                                                  | HTTP-session cookie auth            |
-| [JWT](../extensions/jwt/index.md#installation)                                                    | Verified JWTs (HTTP / WebSocket)    |
+| [JWT](../extensions/jwt/configuration.md#installation)                                                    | Verified JWTs (HTTP / WebSocket)    |
 | [Custom authentication](../guides/custom-authentication.md)                                       | mTLS, HMAC, other schemes           |
 
 ## Next steps

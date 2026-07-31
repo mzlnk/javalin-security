@@ -3,7 +3,7 @@
 The built-in rules (`allow`, `deny`, `authenticated`, `hasRole`, `hasAnyRole`) cover the common
 cases, but real applications often need decisions that depend on the request itself — the
 caller's IP must be on an allowlist, the request must arrive during business hours, and so on.
-`javalin-security` exposes a small `Rule` interface for exactly these cases; you can plug custom
+javalin-security exposes a small `Rule` interface for exactly these cases. You can plug custom
 rules into the same `security.rules` table you already use for the built-ins.
 
 ## What a `Rule` is
@@ -17,8 +17,8 @@ fun interface Rule {
 ```
 
 - **`authentication`** — the resolved [`Authentication`](../concepts/authentication.md) for the
-  request. `authentication.identity` is `null` for anonymous callers; `authentication.roles` is
-  the set of granted roles.
+  request. `authentication.identity` is `null` for anonymous callers.
+  `authentication.roles` is the set of granted roles.
 - **`context`** — the Javalin `Context` for HTTP rules (or the upgrade `Context` for
   WebSocket rules). Read the client IP, headers, path or query parameters, or anything else
   from it.
@@ -44,7 +44,7 @@ role membership alone cannot answer the question.
 ## Example: IP allowlist
 
 A common case: an internal admin API should only be reachable from a small set of trusted IP
-addresses (an office network, a jump host, a corporate VPN). We express that as a rule that
+addresses (an office network, a jump host, a corporate VPN). Express that as a rule that
 inspects the client IP on the `Context`.
 
 === "Kotlin"
@@ -55,10 +55,12 @@ inspects the client IP on the `Context`.
 
     val allowedIps = setOf("10.0.0.10", "10.0.0.11", "203.0.113.42")
 
+    // Grant only when the caller IP is on the allowlist
     val fromTrustedIp = Rule { _, ctx -> ctx.ip() in allowedIps }
 
     config.security { security ->
         security.rules.any("/admin/*", fromTrustedIp)
+
         security.http.authentication = myStrategy
         security.http.fallback = Rules.deny()
     }
@@ -72,16 +74,18 @@ inspects the client IP on the `Context`.
 
     Set<String> allowedIps = Set.of("10.0.0.10", "10.0.0.11", "203.0.113.42");
 
+    // Grant only when the caller IP is on the allowlist
     Rule fromTrustedIp = (auth, ctx) -> allowedIps.contains(ctx.ip());
 
     config.registerPlugin(new JavalinSecurityPlugin(security -> {
         security.rules.any("/admin/*", fromTrustedIp);
+
         security.http.authentication = myStrategy;
         security.http.fallback = Rules.deny();
     }));
     ```
 
-Anonymous callers whose IP is not on the list get a **401**; authenticated callers from an
+Anonymous callers whose IP is not on the list get a **401**. Authenticated callers from an
 unlisted IP get a **403**. See [Denial status](../concepts/authorization.md#denial-status).
 
 !!! tip "Behind a proxy or load balancer"
@@ -91,7 +95,7 @@ unlisted IP get a **403**. See [Denial status](../concepts/authorization.md#deni
 
 ## WebSocket rules
 
-`Rule` is the same type for HTTP and WebSocket authorization; register WebSocket entries with
+`Rule` is the same type for HTTP and WebSocket authorization. Register WebSocket entries with
 `security.rules.ws(…)` instead of verb methods. WebSocket rules match on path only (no method),
 and they run **once at upgrade time** — the resulting `Authentication` is then reused for every
 message on that session.
@@ -99,8 +103,8 @@ message on that session.
 === "Kotlin"
 
     ```kotlin
-import io.github.mzlnk.javalin.security.authorization.Rules
     security.rules.ws("/ws/admin/*", fromTrustedIp)
+    
     security.ws.authentication = myWsStrategy
     security.ws.fallback = Rules.deny()
     ```
@@ -109,6 +113,7 @@ import io.github.mzlnk.javalin.security.authorization.Rules
 
     ```java
     security.rules.ws("/ws/admin/*", fromTrustedIp);
+
     security.ws.authentication = myWsStrategy;
     security.ws.fallback = Rules.deny();
     ```
@@ -120,16 +125,14 @@ import io.github.mzlnk.javalin.security.authorization.Rules
     proper 401 or 403 based on whether the caller is authenticated. Reserve exceptions for real
     programming errors.
 
-- **Always null-check the identity.** Anonymous callers reach custom rules too. The idiomatic
-  Kotlin form is `auth.identity as? MyIdentity ?: return@Rule false`; in Java, use
-  `instanceof` pattern matching.
+- **Always null-check the identity.** Anonymous callers reach custom rules too.
 - **Do not do I/O in a rule.** Rules run on the request thread. If you need remote lookups,
   cache the answer in the authenticator (attach it to the identity) so the rule can read it
   synchronously.
 - **Keep rules pure.** No mutation, no logging of sensitive request data, no side effects on
   the `Context` — a rule only decides, the handler acts.
-- **Order matters in the table.** Entries are evaluated top-to-bottom and the first match wins;
-  put specific patterns before broader ones.
+- **Order matters in the table.** Entries are evaluated top-to-bottom and the first match wins.
+  Put specific patterns before broader ones.
 - **Prefer role checks when possible.** If the answer only depends on identity, put the check
   in your `Authenticator` (grant a role) and use `hasRole` — it is faster to read and easier to
   audit.

@@ -117,9 +117,10 @@ nav:
           - Basic Auth: extensions/basic-auth.md
           - API Key: extensions/api-key.md
           - JWT:
-              - extensions/jwt/index.md
-              - Nimbus: extensions/jwt/nimbus.md
-              - Auth0: extensions/jwt/auth0.md
+              - Configuration: extensions/jwt/configuration.md
+              - Decoders:
+                  - Nimbus: extensions/jwt/nimbus.md
+                  - Auth0: extensions/jwt/auth0.md
               - Key sources: extensions/jwt/key-sources.md
               - Roles mapping: extensions/jwt/roles-mapping.md
           - Opaque Token: extensions/opaque-token.md

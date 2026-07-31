@@ -63,6 +63,6 @@ A strategy may override either hook (or both) to plug in richer responses — JS
 back to the plain 401 / 403 defaults. See [Authentication](authentication.md) for how a strategy
 is assigned to `http.authentication` / `ws.authentication`.
 
-!!! danger "Never echo failure detail"
+!!! tip "Never echo failure detail"
     Do not write `failure.message` or exception text into the response body. That helps attackers
     enumerate users and probe tokens. Log the reason server-side; keep the response opaque.

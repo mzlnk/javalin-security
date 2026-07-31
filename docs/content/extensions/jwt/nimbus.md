@@ -5,19 +5,25 @@
 
 ## Installation
 
-On top of [core](../../getting-started/installation.md) and the [JWT extension](index.md):
+Add the adapter alongside [javalin-security](../../getting-started/installation.md) and the
+[JWT extension](configuration.md):
 
 === "Gradle (Kotlin DSL)"
 
     ```kotlin
     implementation("io.github.mzlnk:javalin-security-jwt:{{ versions.library }}")
     implementation("io.github.mzlnk:javalin-security-jwt-nimbus:{{ versions.library }}")
-    implementation("com.nimbusds:nimbus-jose-jwt:{{ versions.nimbus_jose_jwt }}")   // add it yourself
+    implementation("com.nimbusds:nimbus-jose-jwt:10.+")
     ```
 
 === "Maven"
 
     ```xml
+    <dependency>
+      <groupId>io.github.mzlnk</groupId>
+      <artifactId>javalin-security-jwt</artifactId>
+      <version>{{ versions.library }}</version>
+    </dependency>
     <dependency>
       <groupId>io.github.mzlnk</groupId>
       <artifactId>javalin-security-jwt-nimbus</artifactId>
@@ -26,12 +32,12 @@ On top of [core](../../getting-started/installation.md) and the [JWT extension](
     <dependency>
       <groupId>com.nimbusds</groupId>
       <artifactId>nimbus-jose-jwt</artifactId>
-      <version>{{ versions.nimbus_jose_jwt }}</version>
+      <version>[10,11)</version>
     </dependency>
     ```
 
-`nimbus-jose-jwt` is not shipped with the adapter — add it yourself, ideally at the version the
-adapter was built against (**{{ versions.nimbus_jose_jwt }}**).
+`nimbus-jose-jwt` is not bundled with the adapter. Add any **10+** release of that library to
+your project yourself.
 
 ## Usage
 
@@ -73,16 +79,9 @@ adapter was built against (**{{ versions.nimbus_jose_jwt }}**).
 | RSA algorithms | RS256/384/512, PS256/384/512.                                                        |
 | EC algorithms  | ES256/384/512.                                                                       |
 | HMAC algorithms | HS256/384/512.                                                                      |
-| JWKS           | Fetched and **cached** per URL; keys selected by `kid` and key type.                 |
-| Claim checks   | `iss`, `aud`, and clock skew for `exp` / `nbf` from `JwtVerification`.               |
+| JWKS           | Fetched and **cached** per URL. Keys are selected by `kid` and key type.             |
+| Claim checks   | `iss`, `aud`, and clock skew for `exp` / `nbf` from `JwtConfig`.                     |
 
 When a public key source declares no explicit algorithms, all JWS algorithms matching the key
 type are accepted (RSA → RS/PS family, EC → ES family), and the token's `alg` header selects
 the specific one.
-
-!!! warning "PEM format"
-    Local PEM keys must be **X.509 / PKCS#8** (`-----BEGIN PUBLIC KEY-----`). PKCS#1 RSA PEMs
-    (`-----BEGIN RSA PUBLIC KEY-----`) are **not** accepted. See [Key sources](key-sources.md).
-
-Both Nimbus and Auth0 implement the same `JwtDecoder` SPI — pick based on which JOSE library you
-prefer. See [Auth0](auth0.md).

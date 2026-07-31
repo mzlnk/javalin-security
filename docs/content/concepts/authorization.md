@@ -82,36 +82,35 @@ Use **Javalin** route syntax — the same as your routes:
 | `{param}`   | One segment                | `/users/{id}`   |
 | `<param>`   | Slash-accepting            | `/files/<path>` |
 
-Ant-style `**` and `?` are rejected at startup. Patterns match the path **without** the context
-path prefix.
+!!! tip "Pattern Notes"
+    Ant-style `**` and `?` are rejected at startup. Patterns match the path **without** the context path prefix.
 
 ## Custom rules
 
-A `Rule` is a lambda `(Authentication, Context) -> Boolean`. Use it for ownership checks and
+A `Rule` is a lambda `(Authentication, Context) -> Boolean`. Use it for IP allowlists and
 similar per-request logic.
 
 === "Kotlin"
 
     ```kotlin
-    val sameTenant = Rule { auth, ctx ->
-        val identity = auth.identity as? Jwt ?: return@Rule false
-        identity.token.claim<String>("tenant") == ctx.pathParam("tenant")
-    }
-    security.rules.any("/tenants/{tenant}/*", sameTenant)
+    // define custom rule
+    val allowedIps = setOf("10.0.0.10", "10.0.0.11")
+    val fromTrustedIp = Rule { _, ctx -> ctx.ip() in allowedIps }
+
+    // then use custom rule when configuring security
+    security.rules.any("/admin/*", fromTrustedIp)
     ```
 
 === "Java"
 
     ```java
-    Rule sameTenant = (auth, ctx) -> {
-        if (!(auth.getIdentity() instanceof Jwt identity)) return false;
-        String tenant = identity.getToken().claim("tenant");
-        return tenant != null && tenant.equals(ctx.pathParam("tenant"));
-    };
-    security.rules.any("/tenants/{tenant}/*", sameTenant);
+    Set<String> allowedIps = Set.of("10.0.0.10", "10.0.0.11");
+    Rule fromTrustedIp = (auth, ctx) -> allowedIps.contains(ctx.ip());
+    security.rules.any("/admin/*", fromTrustedIp);
     ```
 
-Always guard against anonymous callers (`identity == null`) inside custom rules.
+!!! tip "Anonymous callers"
+    If your rule inspects `identity`, always guard against anonymous callers (`identity == null`).
 
 ## Denial status
 
