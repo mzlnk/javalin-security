@@ -1,7 +1,8 @@
 # Authentication
 
-Authentication answers **"who is calling?"**. A strategy inspects the request and produces an
-`Authentication` (identity + roles) that [authorization](authorization.md) then uses.
+Authentication answers **"who is calling?"**. An `AuthenticationStrategy` inspects the request
+and produces an `Authentication` (identity + roles) that [authorization](authorization.md) then
+uses.
 
 You usually do not implement this yourself — assign a strategy from
 [Basic Auth](../extensions/basic-auth.md), [JWT](../extensions/jwt/index.md), or a
@@ -30,6 +31,31 @@ Any `AuthenticationStrategy` can be assigned to `http.authentication` or `ws.aut
 
 Leaving `authentication` unset is valid: every caller is **anonymous**, and the rule table alone
 decides access.
+
+## Anatomy of a strategy
+
+`AuthenticationStrategy` is a sealed type with two variants. Both carry the same optional handlers
+for rendering failures; they differ only in how authentication runs:
+
+| Variant                     | Authenticator            | When to use                                              |
+|-----------------------------|--------------------------|----------------------------------------------------------|
+| `AuthenticationStrategy.Sync`  | `Authenticator`       | Blocking work on the request thread (typical).           |
+| `AuthenticationStrategy.Async` | `AsyncAuthenticator` | Remote I/O (DB lookups, IdP calls) that should not block.|
+
+The authenticator is the piece that looks at the request and returns an `AuthenticationResult`
+(see [Three outcomes](#three-outcomes)). Sync authenticators return the result directly; async
+ones return a `CompletableFuture` of the same type.
+
+A strategy also exposes:
+
+| Member                | Role                                                              |
+|-----------------------|-------------------------------------------------------------------|
+| `authenticator()`     | Resolves who is calling.                                          |
+| `unauthorizedHandler` | Renders failed or absent authentication (default: bare HTTP 401). |
+| `forbiddenHandler`    | Renders access denied for an authenticated caller (default: 403). |
+
+Prefer `AuthenticationStrategy.Async` when authentication performs remote I/O and the request
+thread should be released while that work is in flight.
 
 ## Three outcomes
 
@@ -73,14 +99,10 @@ Use `ctx.authentication()` (never `null`), `ctx.identity<T>()` (throws when anon
 See [Access caller identity](../getting-started/access-caller-identity.md) for full HTTP and
 WebSocket examples.
 
-!!! tip "Sync vs async"
-    Built-in Basic Auth and JWT strategies are synchronous. For remote I/O (DB lookups, remote
-    IdP), implement `AuthenticationStrategy.Async` — see
-    [Custom authentication](../guides/custom-authentication.md).
-
 ## Next steps
 
 - [Authorization](authorization.md) — decide who is allowed.
 - [Access caller identity](../getting-started/access-caller-identity.md) — read the caller in
   handlers.
 - [Error handling](error-handling.md) — customize 401 / 403 responses.
+- [Custom authentication](../guides/custom-authentication.md) — implement your own strategy.

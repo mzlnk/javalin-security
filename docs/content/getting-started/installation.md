@@ -1,17 +1,6 @@
 # Installation
 
-Add the **core** artifact and Javalin. Everything else — Basic Auth, API Key, Opaque Token, Session, JWT, custom strategies — is
-optional and installed from its own page.
-
-!!! warning "Bring your own Javalin and SLF4J"
-    Core does not ship with Javalin or SLF4J. If they are missing, you will get
-    `NoClassDefFoundError` at runtime.
-
-## Core
-
-The core module is the only dependency you always need — it provides the plugin, the rule table,
-and the authentication SPI. Add it alongside Javalin and an SLF4J binding to get a working
-baseline.
+To begin, simply add the `javalin-security` library to your project dependencies. This is all you need for the minimum setup to enable authentication and authorization features in your Javalin app.
 
 === "Gradle (Kotlin DSL)"
 
@@ -45,8 +34,7 @@ baseline.
 
 ## Verify the setup
 
-Start Javalin with a minimal security block. If it boots without `NoClassDefFoundError`, core is
-wired correctly.
+Start Javalin with a minimal security block. If it boots without errors, the library is wired correctly.
 
 === "Kotlin"
 
@@ -83,17 +71,16 @@ wired correctly.
 
 ## Choose an extension
 
-Core ships **no** concrete authentication mechanism. Pick one — each page starts with its own
-install snippet:
+The `javalin-security` library itself does not include any built-in authentication mechanism. You need to either implement your own authentication strategy, or use one of the provided extensions designed for common authentication scenarios — so you don't have to build everything from scratch. Each extension's page includes its installation snippet:
 
-| Extension  | For                            | Guide                                                                     |
-|------------|--------------------------------|---------------------------------------------------------------------------|
-| Basic Auth    | HTTP Basic (RFC 7617)             | [Basic Auth](../extensions/basic-auth.md#installation)                    |
-| API Key       | Opaque API keys (`X-Api-Key`)     | [API Key](../extensions/api-key.md#installation)                          |
-| Opaque Token  | Server-issued opaque bearer tokens | [Opaque Token](../extensions/opaque-token.md#installation)               |
-| Session       | HTTP-session cookie auth          | [Session](../extensions/session.md#installation)                          |
-| JWT           | Verified JWTs (HTTP / WebSocket)  | [JWT](../extensions/jwt/index.md#installation)                          |
-| Custom        | mTLS, HMAC, other schemes         | [Custom authentication](../guides/custom-authentication.md)               |
+| Extension                                                                                         | For                                 |
+|---------------------------------------------------------------------------------------------------|-------------------------------------|
+| [Basic Auth](../extensions/basic-auth.md#installation)                                            | HTTP Basic (RFC 7617)               |
+| [API Key](../extensions/api-key.md#installation)                                                  | Opaque API keys (`X-Api-Key`)       |
+| [Opaque Token](../extensions/opaque-token.md#installation)                                        | Server-issued opaque bearer tokens  |
+| [Session](../extensions/session.md#installation)                                                  | HTTP-session cookie auth            |
+| [JWT](../extensions/jwt/index.md#installation)                                                    | Verified JWTs (HTTP / WebSocket)    |
+| [Custom authentication](../guides/custom-authentication.md)                                       | mTLS, HMAC, other schemes           |
 
 ## Next steps
 

@@ -9,11 +9,11 @@ Once authentication is configured, your handlers can read *who* is calling from 
 
 ## Accessors
 
-| Extension                                               | Returns                             | Anonymous caller                                      |
-|---------------------------------------------------------|-------------------------------------|-------------------------------------------------------|
-| `ctx.authentication()`                                  | `Authentication` (identity + roles) | Non-null, `isAuthenticated == false`                  |
-| `ctx.identity<T>()` / `ctx.identity(T.class)`           | Typed identity                      | Throws `IllegalStateException`                        |
-| `ctx.identityOrNull<T>()` / `ctx.identityOrNull(T.class)` | Typed identity or `null`          | `null`                                                |
+| Kotlin                    | Java                           | Returns                                                                 |
+| ------------------------- | ------------------------------ | ----------------------------------------------------------------------- |
+| `ctx.authentication()`    | `authentication(ctx)`          | `Authentication` (identity + roles). Always non-null — anonymous callers get `isAuthenticated == false`. |
+| `ctx.identity<T>()`       | `identity(ctx, T.class)`       | Typed identity. Throws `IllegalStateException` when anonymous.          |
+| `ctx.identityOrNull<T>()` | `identityOrNull(ctx, T.class)` | Typed identity, or `null` when anonymous.                               |
 
 Import them from `io.github.mzlnk.javalin.security`:
 
@@ -35,13 +35,11 @@ Import them from `io.github.mzlnk.javalin.security`:
 
 ## In HTTP handlers
 
-Every extension attaches whichever `Identity` your lookup / mapper returns (e.g. the `User`
-your `UserLookup` returns for `basicAuth { }`, the `Client` your `ApiKeyLookup` returns for
-`apiKey { }`) — that's the type you read back with `identity()`. JWT defaults to its own `Jwt`
-identity (wrapping the verified token), or your own type when you configure `identityMapper`.
-A custom authenticator can attach any `Identity` subtype you choose. `identity<T>()` is an
-unchecked cast (verified at runtime, like `ctx.attribute<T>()`): a mismatch between the type you
-attached and the type you request throws `ClassCastException`.
+On a successful authentication, the strategy attaches an `Identity` to the request. That is the
+value you read back with `identity()` / `identityOrNull()` — typically your own domain type that
+implements `Identity` (name, roles, and any extra fields you need). The cast is unchecked and
+verified at runtime (like `ctx.attribute<T>()`): requesting a type other than the one the
+strategy attached throws `ClassCastException`.
 
 Prefer `identity()` on routes guarded by `authenticated` or `hasRole(...)` — the caller is
 known to be authenticated, so the non-null return is safe. Use `identityOrNull()` when the
@@ -69,7 +67,8 @@ route may be hit anonymously.
 === "Java"
 
     ```java
-    // User is whatever Identity type you configured your strategy with.
+    // User is whatever Identity type you configured your strategy with, e.g.:
+    // record User(String name, Set<RouteRole> roles) implements Identity { ... }
 
     // Route behind Rules.authenticated() / hasRole(...) — identity is guaranteed
     config.routes.get("/api/v1/me", ctx -> {
@@ -86,25 +85,21 @@ route may be hit anonymously.
 
 ## In WebSocket handlers
 
-Authentication resolves **once at the upgrade**; the resulting `Authentication` is attached to
+Authentication resolves **once at the upgrade**. The resulting `Authentication` is attached to
 every `WsContext` for the session and never re-checked per message.
 
 === "Kotlin"
 
     ```kotlin
-    import io.github.mzlnk.javalin.security.authentication
-    import io.github.mzlnk.javalin.security.identity
-    import io.github.mzlnk.javalin.security.identityOrNull
-    import io.github.mzlnk.javalin.security.jwt.Jwt
-
     config.routes.ws("/ws/chat") { ws ->
         ws.onConnect { ctx ->
             // Behind Rules.authenticated() — use identity()
-            val user = ctx.identity<Jwt>()
+            val user = ctx.identity<User>()
             ctx.send("welcome ${user.name}")
         }
         ws.onMessage { ctx ->
-            val roles = ctx.authentication().roles      // same identity for every message
+            // Same identity for every message
+            val roles = ctx.authentication().roles
             ctx.send("you have roles: $roles")
         }
     }
@@ -112,7 +107,7 @@ every `WsContext` for the session and never re-checked per message.
     config.routes.ws("/ws/public") { ws ->
         ws.onConnect { ctx ->
             // May be anonymous — use identityOrNull()
-            val user = ctx.identityOrNull<Jwt>() ?: return@onConnect
+            val user = ctx.identityOrNull<User>() ?: return@onConnect
             ctx.send("welcome ${user.name}")
         }
     }
@@ -121,22 +116,23 @@ every `WsContext` for the session and never re-checked per message.
 === "Java"
 
     ```java
-    import io.github.mzlnk.javalin.security.jwt.Jwt;
-
     config.routes.ws("/ws/chat", ws -> {
         ws.onConnect(ctx -> {
             // Behind Rules.authenticated() — use identity()
-            Jwt user = identity(ctx, Jwt.class);
+            User user = identity(ctx, User.class);
             ctx.send("welcome " + user.getName());
         });
-        ws.onMessage(ctx ->
-            ctx.send("you have roles: " + authentication(ctx).getRoles()));
+        ws.onMessage(ctx -> {
+            // Same identity for every message
+            var roles = authentication(ctx).getRoles();
+            ctx.send("you have roles: " + roles);
+        });
     });
 
     config.routes.ws("/ws/public", ws -> {
         ws.onConnect(ctx -> {
             // May be anonymous — use identityOrNull()
-            Jwt user = identityOrNull(ctx, Jwt.class);
+            User user = identityOrNull(ctx, User.class);
             if (user == null) return;
             ctx.send("welcome " + user.getName());
         });
@@ -148,11 +144,11 @@ every `WsContext` for the session and never re-checked per message.
 `authentication()` never returns `null` — it returns an anonymous token when no credential is
 presented. Use it when you need the full picture.
 
-| Member            | Meaning                                    |
-|-------------------|--------------------------------------------|
-| `identity`        | Who is calling (`null` when anonymous).    |
-| `roles`           | Granted roles (empty when anonymous).      |
-| `isAuthenticated` | `true` when `identity != null`.            |
+| Kotlin            | Java               | Meaning                                 |
+| ----------------- | ------------------ | --------------------------------------- |
+| `identity`        | `getIdentity()`    | Who is calling (`null` when anonymous). |
+| `roles`           | `getRoles()`       | Granted roles (empty when anonymous).   |
+| `isAuthenticated` | `isAuthenticated()` | `true` when `identity != null`.        |
 
 === "Kotlin"
 
@@ -170,10 +166,8 @@ presented. Use it when you need the full picture.
 === "Java"
 
     ```java
-    import io.github.mzlnk.javalin.security.authentication.Authentication;
-
     config.routes.get("/api/v1/whoami", ctx -> {
-        Authentication auth = authentication(ctx);
+        var auth = authentication(ctx);
         if (!auth.isAuthenticated()) {
             ctx.result("anonymous");
         } else {
@@ -184,13 +178,14 @@ presented. Use it when you need the full picture.
 
 ## Common pitfalls
 
-- **`identity<T>()` throws for anonymous callers.** Use `identityOrNull()` when the route may
-  be hit without credentials. Prefer `identity()` behind `authenticated` / `hasRole` rules.
-- **Wrong type.** Calling `identity()` / `identity(ctx, T.class)` with a type that doesn't match
-  your configured strategy throws `ClassCastException`. Always use the identity type that matches
-  your strategy.
-- **`Context` vs `WsContext`.** Both expose the same extensions, but importing the wrong one
-  will not compile. Both live in `io.github.mzlnk.javalin.security`.
+- **`identity<T>()` / `identity(ctx, T.class)` throws for anonymous callers.** Use
+  `identityOrNull()` when the route may be hit without credentials. Prefer `identity()` behind
+  `authenticated` / `hasRole` rules.
+- **Wrong type.** Calling `identity()` with a type that doesn't match your configured strategy
+  throws `ClassCastException`. Always use the identity type that matches your strategy.
+- **`Context` vs `WsContext`.** Both expose the same accessors, but importing the wrong overload
+  will not compile. Both live in `io.github.mzlnk.javalin.security` (`SecurityExtensions` from
+  Java).
 - **WebSocket identity is fixed for the session.** If you need to react to token expiry
   mid-session, enforce it in your protocol.
 

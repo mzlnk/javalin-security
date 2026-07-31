@@ -8,29 +8,26 @@ This walkthrough uses **Basic Auth** as a concrete example. Any extension (or a 
 plugs in the same way.
 
 !!! tip "Authentication is pluggable"
-    Core provides the plugin and the rule table, not a login mechanism. Use a built-in strategy
-    like [Basic Auth](../extensions/basic-auth.md), [API Key](../extensions/api-key.md),
-    [Opaque Token](../extensions/opaque-token.md), [Session](../extensions/session.md),
-    [JWT](../extensions/jwt/index.md), or create a
+    `javalin-security` provides the plugin and the rule table, not a login mechanism. Use a
+    built-in strategy like [Basic Auth](../extensions/basic-auth.md),
+    [API Key](../extensions/api-key.md), [Opaque Token](../extensions/opaque-token.md),
+    [Session](../extensions/session.md), [JWT](../extensions/jwt/index.md), or create a
     [custom authenticator](../guides/custom-authentication.md) that fit your needs.
 
-Install [core](installation.md) plus the
+Install [`javalin-security`](installation.md) plus the
 [Basic Auth extension](../extensions/basic-auth.md#installation) before you begin.
 
-## 1. Configure authentication
+## 1. Create a `UserLookup`
 
-Open `config.security { … }` (Kotlin) or `new JavalinSecurityPlugin(…)` (Java), set fields on
-`security.http`, and assign a strategy. Both HTTP and WebSocket guards are installed as soon as
-the plugin is registered; declare rules on `security.rules` or set `http.fallback` /
-`ws.fallback` to control access (default fallback is deny).
+Define roles, an `Identity`, a small in-memory user store, and a `UserLookup` that Basic Auth
+will call for each request:
 
 === "Kotlin"
 
     ```kotlin
     import io.github.mzlnk.javalin.security.authentication.Identity
     import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
-    import io.github.mzlnk.javalin.security.authorization.Rules
-    import io.github.mzlnk.javalin.security.basicauth.*
+    import io.github.mzlnk.javalin.security.basicauth.UserLookup
     import io.javalin.security.RouteRole
 
     enum class Role : RouteRole { USER, ADMIN }
@@ -42,14 +39,7 @@ the plugin is registered; declare rules on `security.rules` or set `http.fallbac
         "admin" to PasswordCredentials(User("admin", setOf(Role.ADMIN)), "secret"),
     )
 
-    // inside Javalin.create { config ->
-    config.security { security ->
-        security.http.authentication = basicAuth { basic ->
-            basic.userLookup = UserLookup { users[it] }
-            // Demo only — use a real PasswordEncoder in production.
-        }
-        security.http.fallback = Rules.deny()
-    }
+    val userLookup = UserLookup { users[it] }
     ```
 
 === "Java"
@@ -57,8 +47,7 @@ the plugin is registered; declare rules on `security.rules` or set `http.fallbac
     ```java
     import io.github.mzlnk.javalin.security.authentication.Identity;
     import io.github.mzlnk.javalin.security.authentication.PasswordCredentials;
-    import io.github.mzlnk.javalin.security.basicauth.*;
-    import io.github.mzlnk.javalin.security.authorization.Rules;
+    import io.github.mzlnk.javalin.security.basicauth.UserLookup;
     import io.javalin.security.RouteRole;
     import java.util.Map;
     import java.util.Set;
@@ -74,10 +63,36 @@ the plugin is registered; declare rules on `security.rules` or set `http.fallbac
         "alice", new PasswordCredentials(new User("alice", Set.of(Role.USER)), "secret"),
         "admin", new PasswordCredentials(new User("admin", Set.of(Role.ADMIN)), "secret"));
 
-    // inside Javalin.create(config -> {
+    UserLookup userLookup = users::get;
+    ```
+
+## 2. Configure authentication
+
+Open `config.security { … }` (Kotlin) or `new JavalinSecurityPlugin(…)` (Java), set fields on
+`security.http`, and assign a strategy. Both HTTP and WebSocket guards are installed as soon as
+the plugin is registered. Declare rules on `security.rules` or set `http.fallback` /
+`ws.fallback` to control access (default fallback is deny).
+
+=== "Kotlin"
+
+    ```kotlin
+    config.security { security ->
+        security.http.authentication = basicAuth { basic ->
+            basic.userLookup = userLookup
+            // Demo only — use a real PasswordEncoder in production.
+        }
+        security.http.fallback = Rules.deny()
+    }
+    ```
+
+=== "Java"
+
+    ```java
     config.registerPlugin(new JavalinSecurityPlugin(security -> {
-        security.http.authentication = BasicAuthSecurity.basicAuth(basic ->
-            basic.userLookup = users::get);
+        security.http.authentication = BasicAuthSecurity.basicAuth(basic -> {
+            basic.userLookup = userLookup;
+            // Demo only — use a real PasswordEncoder in production.
+        });
         security.http.fallback = Rules.deny();
     }));
     ```
@@ -85,10 +100,10 @@ the plugin is registered; declare rules on `security.rules` or set `http.fallbac
 For WebSocket upgrades, set fields on `security.ws` the same way (typically with
 [JWT](../extensions/jwt/index.md)) — see [WebSocket security](../websocket-security.md).
 
-## 2. Declare who is allowed
+## 3. Declare who is allowed
 
 Add rules on `security.rules`. HTTP entries match **path + method** (a GET rule also governs
-HEAD). WebSocket entries match on **path only**. Entries are evaluated in order; **first match
+HEAD). WebSocket entries match on **path only**. Entries are evaluated in order — **first match
 wins**. Anything that does not match a rule falls through to `http.fallback` or `ws.fallback`
 (deny-by-default when unset).
 
@@ -97,8 +112,6 @@ wins**. Anything that does not match a rule falls through to `http.fallback` or 
 === "Kotlin"
 
     ```kotlin
-    import io.github.mzlnk.javalin.security.authorization.Rules
-
     security.rules.get("/api/v1/*", Rules.allow())                  // public reads
     security.rules.post("/api/v1/*", Rules.authenticated())         // any logged-in user
     security.rules.delete("/api/v1/*", Rules.hasRole(Role.ADMIN))   // admins only
@@ -107,11 +120,9 @@ wins**. Anything that does not match a rule falls through to `http.fallback` or 
 === "Java"
 
     ```java
-    import io.github.mzlnk.javalin.security.authorization.Rules;
-
-    security.rules.get("/api/v1/*", Rules.allow());
-    security.rules.post("/api/v1/*", Rules.authenticated());
-    security.rules.delete("/api/v1/*", Rules.hasRole(Role.ADMIN));
+    security.rules.get("/api/v1/*", Rules.allow());                 // public reads
+    security.rules.post("/api/v1/*", Rules.authenticated());        // any logged-in user
+    security.rules.delete("/api/v1/*", Rules.hasRole(Role.ADMIN));  // admins only
     ```
 
 ### Grouped with `apiBuilder`
@@ -122,101 +133,138 @@ When paths share a prefix, nest rules under `apiBuilder` — analogous to Javali
 === "Kotlin"
 
     ```kotlin
-    import io.github.mzlnk.javalin.security.apibuilder.SecurityApiBuilder.*
-    import io.github.mzlnk.javalin.security.authorization.Rules
-
     security.rules.apiBuilder {
         path("/api/v1") {
-            get("/*", Rules.allow())
-            post("/*", Rules.authenticated())
-            delete("/*", Rules.hasRole(Role.ADMIN))
+            get("/*", Rules.allow())                                // public reads
+            post("/*", Rules.authenticated())                       // any logged-in user
+            delete("/*", Rules.hasRole(Role.ADMIN))                 // admins only
         }
-        ws("/ws/chat", Rules.authenticated())   // path-only WebSocket rule; enforced by the WS guard (installed with the plugin)
+        ws("/ws/chat", Rules.authenticated())   // path-only WebSocket rule, enforced by the WS guard
     }
     ```
 
 === "Java"
 
     ```java
-    import io.github.mzlnk.javalin.security.authorization.Rules;
-
-    import static io.github.mzlnk.javalin.security.apibuilder.SecurityApiBuilder.*;
-
     security.rules.apiBuilder(() -> {
         path("/api/v1", () -> {
-            get("/*", Rules.allow());
-            post("/*", Rules.authenticated());
-            delete("/*", Rules.hasRole(Role.ADMIN));
+            get("/*", Rules.allow());                               // public reads
+            post("/*", Rules.authenticated());                      // any logged-in user
+            delete("/*", Rules.hasRole(Role.ADMIN));                // admins only
         });
-        ws("/ws/chat", Rules.authenticated());  // path-only WebSocket rule; enforced by the WS guard (installed with the plugin)
+        ws("/ws/chat", Rules.authenticated());  // path-only WebSocket rule, enforced by the WS guard
     });
     ```
 
-## 3. Register routes and run
+## 4. Wrap it together and run
 
 === "Kotlin"
 
     ```kotlin
+    import io.github.mzlnk.javalin.security.authentication.Identity
+    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials
     import io.github.mzlnk.javalin.security.authorization.Rules
     import io.github.mzlnk.javalin.security.basicauth.*
+    import io.github.mzlnk.javalin.security.identity
     import io.github.mzlnk.javalin.security.security
     import io.javalin.Javalin
+    import io.javalin.security.RouteRole
 
-    val app = Javalin.create { config ->
-        config.security { security ->
-            security.rules.get("/api/v1/*", Rules.allow())
-            security.rules.post("/api/v1/*", Rules.authenticated())
-            security.rules.delete("/api/v1/*", Rules.hasRole(Role.ADMIN))
-            security.http.authentication = basicAuth { basic ->
-                basic.userLookup = UserLookup { users[it] }
+    enum class Role : RouteRole { USER, ADMIN }
+
+    data class User(override val name: String, override val roles: Set<RouteRole>) : Identity
+
+    fun main() {
+        val users = mapOf(
+            "alice" to PasswordCredentials(User("alice", setOf(Role.USER)), "secret"),
+            "admin" to PasswordCredentials(User("admin", setOf(Role.ADMIN)), "secret"),
+        )
+        val userLookup = UserLookup { users[it] }
+
+        Javalin.create { config ->
+            config.security { security ->
+                security.rules.get("/api/v1/*", Rules.allow())                  // public reads
+                security.rules.post("/api/v1/*", Rules.authenticated())         // any logged-in user
+                security.rules.delete("/api/v1/*", Rules.hasRole(Role.ADMIN))   // admins only
+
+                security.http.authentication = basicAuth { basic ->
+                    basic.userLookup = userLookup
+                    // Demo only — use a real PasswordEncoder in production.
+                }
+                security.http.fallback = Rules.deny()
             }
-            security.http.fallback = Rules.deny()
-        }
-        config.routes.get("/api/v1/resource") { it.result("ok") }
-        config.routes.post("/api/v1/resource") { it.result("created") }
-        config.routes.delete("/api/v1/resource") { it.result("deleted") }
-        config.routes.get("/api/v1/me") { it.result(it.identity<User>().name) }
-    }.start(7070)
+
+            config.routes.get("/api/v1/resource") { it.result("ok") }
+            config.routes.post("/api/v1/resource") { it.result("created") }
+            config.routes.delete("/api/v1/resource") { it.result("deleted") }
+            config.routes.get("/api/v1/me") { it.result(it.identity<User>().name) }
+        }.start(7070)
+    }
     ```
 
 === "Java"
 
     ```java
     import io.github.mzlnk.javalin.security.JavalinSecurityPlugin;
-    import io.github.mzlnk.javalin.security.basicauth.*;
+    import io.github.mzlnk.javalin.security.authentication.Identity;
+    import io.github.mzlnk.javalin.security.authentication.PasswordCredentials;
     import io.github.mzlnk.javalin.security.authorization.Rules;
+    import io.github.mzlnk.javalin.security.basicauth.*;
     import io.javalin.Javalin;
+    import io.javalin.security.RouteRole;
+    import java.util.Map;
+    import java.util.Set;
 
     import static io.github.mzlnk.javalin.security.SecurityExtensions.identity;
 
-    Javalin app = Javalin.create(config -> {
-        config.registerPlugin(new JavalinSecurityPlugin(security -> {
-            security.rules.get("/api/v1/*", Rules.allow());
-            security.rules.post("/api/v1/*", Rules.authenticated());
-            security.rules.delete("/api/v1/*", Rules.hasRole(Role.ADMIN));
-            security.http.authentication = BasicAuthSecurity.basicAuth(basic ->
-                basic.userLookup = users::get);
-            security.http.fallback = Rules.deny();
-        }));
-        config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));
-        config.routes.post("/api/v1/resource", ctx -> ctx.result("created"));
-        config.routes.delete("/api/v1/resource", ctx -> ctx.result("deleted"));
-        config.routes.get("/api/v1/me", ctx ->
-            ctx.result(identity(ctx, User.class).getName()));
-    }).start(7070);
+    enum Role implements RouteRole { USER, ADMIN }
+
+    record User(String name, Set<RouteRole> roles) implements Identity {
+        @Override public String getName() { return name; }
+        @Override public Set<RouteRole> getRoles() { return roles; }
+    }
+
+    void main() {
+        Map<String, PasswordCredentials> users = Map.of(
+            "alice", new PasswordCredentials(new User("alice", Set.of(Role.USER)), "secret"),
+            "admin", new PasswordCredentials(new User("admin", Set.of(Role.ADMIN)), "secret"));
+        UserLookup userLookup = users::get;
+
+        Javalin.create(config -> {
+            config.registerPlugin(new JavalinSecurityPlugin(security -> {
+                security.rules.get("/api/v1/*", Rules.allow());                 // public reads
+                security.rules.post("/api/v1/*", Rules.authenticated());        // any logged-in user
+                security.rules.delete("/api/v1/*", Rules.hasRole(Role.ADMIN));  // admins only
+
+                security.http.authentication = BasicAuthSecurity.basicAuth(basic -> {
+                    basic.userLookup = userLookup;
+                    // Demo only — use a real PasswordEncoder in production.
+                });
+                security.http.fallback = Rules.deny();
+            }));
+
+            config.routes.get("/api/v1/resource", ctx -> ctx.result("ok"));
+            config.routes.post("/api/v1/resource", ctx -> ctx.result("created"));
+            config.routes.delete("/api/v1/resource", ctx -> ctx.result("deleted"));
+            config.routes.get("/api/v1/me", ctx ->
+                ctx.result(identity(ctx, User.class).getName()));
+        }).start(7070);
+    }
     ```
 
-## 4. Try it
+## 5. Try it
 
-```bash
-curl -i localhost:7070/api/v1/resource                           # 200 — public GET
-curl -i -X POST localhost:7070/api/v1/resource                   # 401 — no credentials
-curl -i -X POST localhost:7070/api/v1/resource -u alice:secret   # 200
-curl -i -X DELETE localhost:7070/api/v1/resource -u alice:secret # 403 — not ADMIN
-curl -i -X DELETE localhost:7070/api/v1/resource -u admin:secret # 200
-```
+=== "cURL"
 
-Anonymous denials return **401**; authenticated-but-forbidden calls return **403**.
+    ```bash
+    curl -i localhost:7070/api/v1/resource                           # 200 — public GET
+    curl -i -X POST localhost:7070/api/v1/resource                   # 401 — no credentials
+    curl -i -X POST localhost:7070/api/v1/resource -u alice:secret   # 200
+    curl -i -X DELETE localhost:7070/api/v1/resource -u alice:secret # 403 — not ADMIN
+    curl -i -X DELETE localhost:7070/api/v1/resource -u admin:secret # 200
+    ```
+
+Anonymous denials return **401**. Authenticated-but-forbidden calls return **403**.
 
 ## Next steps
 
