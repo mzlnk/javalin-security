@@ -130,6 +130,12 @@ nav:
           - Custom authorization rules: guides/custom-rules.md
           - CORS: guides/cors.md
           - Testing: guides/testing.md
+          - AI instructions:
+              - AGENTS.md: ai-instructions/agents-md.md
+              - Claude Code: ai-instructions/claude-code.md
+              - Cursor: ai-instructions/cursor.md
+              - Codex: ai-instructions/codex.md
+              - Kimi Code: ai-instructions/kimi-code.md
   - Reference:
       - API reference: api-reference.md
       - Rules DSL: rules.md

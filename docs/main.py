@@ -19,6 +19,9 @@ Available in Markdown as::
     {{ versions.auth0_jwks_rsa }}
     {{ versions.junit_bom }}
     {{ versions.assertj }}
+
+Also exposes the ``ai_include(rel_path)`` macro used by the AI instructions
+pages to embed copy-pasteable files from ``includes/ai/``.
 """
 
 from __future__ import annotations
@@ -60,8 +63,13 @@ def _family(version: str, *, parts: int, suffix: str = "") -> str:
     return f"{head}{suffix}"
 
 
+# AI agent instruction files live next to this module under `includes/ai/`.
+# They are embedded 1:1 into the AI instructions pages as copy-pasteable blocks.
+_AI_INCLUDES = Path(__file__).resolve().parent / "includes" / "ai"
+
+
 def define_env(env):
-    """Publish `versions.*` variables to the docs."""
+    """Publish `versions.*` variables and AI-include helpers to the docs."""
     library = _project_version()
     deps = _dependency_versions()
 
@@ -80,3 +88,17 @@ def define_env(env):
         "junit_bom": deps["junit-bom"],
         "assertj": deps["assertj"],
     }
+
+    @env.macro
+    def ai_include(rel_path: str) -> str:
+        """Return the raw text of an AI instruction file under ``includes/ai/``.
+
+        Used by the AI instructions pages so the copy-pasteable block stays
+        identical to the committed source file.
+        """
+        path = (_AI_INCLUDES / rel_path).resolve()
+        if not str(path).startswith(str(_AI_INCLUDES)) or not path.is_file():
+            raise FileNotFoundError(
+                f"AI include not found: includes/ai/{rel_path}"
+            )
+        return path.read_text(encoding="utf-8")

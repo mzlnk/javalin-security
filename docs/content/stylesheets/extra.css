@@ -18,3 +18,15 @@
 
   --md-typeset-a-color:              #e0e0e0;
 }
+
+/* Tall AI instruction paste blocks — keep the page compact. */
+.md-typeset .highlight.ai-paste {
+  max-height: min(70vh, 40rem);
+  overflow: auto;
+}
+
+.md-typeset .highlight.ai-paste > .filename {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
